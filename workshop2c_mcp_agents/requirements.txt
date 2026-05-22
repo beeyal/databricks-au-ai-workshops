@@ -1,0 +1,5 @@
+gradio>=4.0,<5.0
+databricks-langchain>=0.1.0
+databricks-mcp>=0.1.0
+langgraph>=1.0.9
+mlflow>=2.17.0

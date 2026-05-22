@@ -1,0 +1,20 @@
+command: ["python", "app.py"]
+
+env:
+  - name: PT_ENDPOINT
+    value: au_east_llm_inregion
+  - name: CATALOG
+    value: workshop_au
+  - name: SCHEMA_AEMO
+    value: aemo
+  # GENIE_SPACE_ID: set this via the UI Environment tab after deployment,
+  # or uncomment the lines below and fill in your Space ID.
+  # - name: GENIE_SPACE_ID
+  #   value: FILL_IN
+
+resources:
+  - name: aemo-pt-endpoint
+    description: Provisioned Throughput endpoint for AEMO agent LLM calls
+    serving_endpoint:
+      name: au_east_llm_inregion
+      permission: CAN_QUERY

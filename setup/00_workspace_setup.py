@@ -756,6 +756,219 @@ if smoke_warnings:
 
 # COMMAND ----------
 
+# MAGIC %md
+# MAGIC ---
+# MAGIC ## AEMO/NEM Data Tables (Session 3 — Optional)
+# MAGIC
+# MAGIC Run this section if you are running **Session 3 (AEMO Business User)** or **Workshop 2c (MCP Agents)**.
+# MAGIC
+# MAGIC This section loads six NEM/AEMO-specific tables into a dedicated `aemo` schema:
+# MAGIC
+# MAGIC | Table | Rows | Description |
+# MAGIC |---|---|---|
+# MAGIC | `dispatch_intervals` | 50,000 | 5-minute generator dispatch (coal/gas/wind/solar/hydro/battery) |
+# MAGIC | `spot_prices` | 20,000 | 30-minute Regional Reference Prices + FCAS + demand |
+# MAGIC | `market_notices` | 500 | LOR/market notices and system normal events |
+# MAGIC | `generator_registration` | 200 | Registered NEM generators with capacity and ramp rates |
+# MAGIC | `constraint_sets` | 2,000 | Constraint activations (thermal/voltage/stability) |
+# MAGIC | `settlement_amounts` | 3,000 | Weekly settlement amounts by participant |
+# MAGIC
+# MAGIC **Pre-requisite:** upload the AEMO CSVs to DBFS before running:
+# MAGIC ```bash
+# MAGIC databricks fs cp -r ./data/sample_data/aemo/ dbfs:/tmp/au_workshop/sample_data/aemo/
+# MAGIC ```
+
+# COMMAND ----------
+
+dbutils.widgets.text("schema_aemo", "aemo", "6. AEMO/NEM schema")
+
+# COMMAND ----------
+
+SCHEMA_AEMO    = dbutils.widgets.get("schema_aemo")
+AEMO_DATA_PATH = f"{SAMPLE_DATA_PATH}/aemo"
+
+print(f"AEMO schema:      {SCHEMA_AEMO}")
+print(f"AEMO data path:   {AEMO_DATA_PATH}")
+
+# COMMAND ----------
+
+print("=" * 60)
+print("STEP A — CREATE AEMO SCHEMA")
+print("=" * 60)
+
+spark.sql(f"CREATE SCHEMA IF NOT EXISTS {CATALOG}.{SCHEMA_AEMO} COMMENT 'AU AI Workshops — AEMO/NEM wholesale market data'")
+print(f"  ✅ Schema '{CATALOG}.{SCHEMA_AEMO}' ready.")
+
+# COMMAND ----------
+
+print("=" * 60)
+print("STEP B — LOAD AEMO TABLES")
+print("=" * 60)
+
+# Table definitions: (csv_filename, partition_cols, description)
+AEMO_TABLES = [
+    (
+        "dispatch_intervals",
+        ["region_id", "fuel_type"],
+        "NEM 5-minute dispatch intervals — coal/gas/wind/solar/hydro/battery generators",
+    ),
+    (
+        "spot_prices",
+        ["region_id"],
+        "NEM 30-minute spot prices (RRP) and FCAS prices per region",
+    ),
+    (
+        "market_notices",
+        [],
+        "AEMO market notices including LOR1/LOR2/LOR3 reserve events and system normal",
+    ),
+    (
+        "generator_registration",
+        ["region_id", "fuel_type"],
+        "NEM registered generator data — capacity, ramp rates, participant details",
+    ),
+    (
+        "constraint_sets",
+        ["constraint_type"],
+        "NEM constraint activations — thermal, voltage and stability constraints",
+    ),
+    (
+        "settlement_amounts",
+        ["run_type"],
+        "Weekly NEM settlement amounts by participant — energy, FCAS, interconnector residue",
+    ),
+]
+
+aemo_loaded = {}
+
+for table_name, partition_cols, description in AEMO_TABLES:
+    full_table = f"{CATALOG}.{SCHEMA_AEMO}.{table_name}"
+    csv_path   = f"{AEMO_DATA_PATH}/{table_name}.csv"
+    print(f"\nLoading {full_table}...")
+    print(f"  Source: {csv_path}")
+
+    df = (
+        spark.read
+        .option("header", "true")
+        .option("inferSchema", "true")
+        .option("multiLine", "true")
+        .option("escape", '"')
+        .csv(csv_path)
+    )
+
+    row_count = df.count()
+    print(f"  Rows read: {row_count:,}")
+
+    writer = (
+        df.write
+        .format("delta")
+        .mode("overwrite")
+        .option("overwriteSchema", "true")
+        .option("delta.enableChangeDataFeed", "true")
+    )
+
+    if row_count >= 2000 and partition_cols:
+        writer = writer.partitionBy(*partition_cols)
+
+    writer.saveAsTable(full_table)
+    spark.sql(f"COMMENT ON TABLE {full_table} IS '{description}'")
+    spark.sql(f"OPTIMIZE {full_table}")
+
+    row_final = spark.table(full_table).count()
+    print(f"  ✅ Loaded {row_final:,} rows → {full_table}")
+    aemo_loaded[full_table] = row_final
+
+print("\n" + "-" * 50)
+print("AEMO data load summary:")
+for tbl, cnt in aemo_loaded.items():
+    print(f"  {tbl:<60} {cnt:>8,} rows")
+total_aemo = sum(aemo_loaded.values())
+print(f"\n  {'TOTAL':<60} {total_aemo:>8,} rows")
+print("✅ All AEMO tables loaded.")
+
+# COMMAND ----------
+
+print("=" * 60)
+print("STEP C — AEMO SMOKE TESTS")
+print("=" * 60)
+
+aemo_errors = []
+
+
+def aemo_smoke(name: str, fn) -> bool:
+    try:
+        result = fn()
+        print(f"  ✅ {name}: {result}")
+        return True
+    except Exception as exc:
+        aemo_errors.append(f"{name}: {exc}")
+        print(f"  ❌ {name}: {exc}")
+        return False
+
+
+aemo_smoke(
+    "dispatch_intervals row count",
+    lambda: f"{spark.table(f'{CATALOG}.{SCHEMA_AEMO}.dispatch_intervals').count():,} rows",
+)
+aemo_smoke(
+    "spot_prices row count",
+    lambda: f"{spark.table(f'{CATALOG}.{SCHEMA_AEMO}.spot_prices').count():,} rows",
+)
+aemo_smoke(
+    "market_notices row count",
+    lambda: f"{spark.table(f'{CATALOG}.{SCHEMA_AEMO}.market_notices').count():,} rows",
+)
+aemo_smoke(
+    "generator_registration row count",
+    lambda: f"{spark.table(f'{CATALOG}.{SCHEMA_AEMO}.generator_registration').count():,} rows",
+)
+aemo_smoke(
+    "constraint_sets row count",
+    lambda: f"{spark.table(f'{CATALOG}.{SCHEMA_AEMO}.constraint_sets').count():,} rows",
+)
+aemo_smoke(
+    "settlement_amounts row count",
+    lambda: f"{spark.table(f'{CATALOG}.{SCHEMA_AEMO}.settlement_amounts').count():,} rows",
+)
+aemo_smoke(
+    "Spot price range (neg prices exist)",
+    lambda: f"min={spark.sql(f'SELECT MIN(rrp) FROM {CATALOG}.{SCHEMA_AEMO}.spot_prices').collect()[0][0]:.2f}, "
+            f"max={spark.sql(f'SELECT MAX(rrp) FROM {CATALOG}.{SCHEMA_AEMO}.spot_prices').collect()[0][0]:.2f}",
+)
+aemo_smoke(
+    "Solar dispatch zero at night",
+    lambda: (
+        lambda n: f"{n} nighttime solar intervals correctly at 0 MW"
+    )(
+        spark.sql(
+            f"SELECT COUNT(*) FROM {CATALOG}.{SCHEMA_AEMO}.dispatch_intervals "
+            f"WHERE fuel_type='solar' AND HOUR(settlement_date) < 5 AND dispatch_mw = 0"
+        ).collect()[0][0]
+    ),
+)
+aemo_smoke(
+    "LOR events in market_notices",
+    lambda: f"{spark.sql(f\"SELECT COUNT(*) FROM {CATALOG}.{SCHEMA_AEMO}.market_notices WHERE notice_type LIKE 'LOR%'\").collect()[0][0]} LOR notices",
+)
+aemo_smoke(
+    "Top region by avg spot price",
+    lambda: spark.sql(
+        f"SELECT region_id, ROUND(AVG(rrp),2) AS avg_rrp "
+        f"FROM {CATALOG}.{SCHEMA_AEMO}.spot_prices "
+        f"GROUP BY region_id ORDER BY avg_rrp DESC LIMIT 1"
+    ).collect()[0]["region_id"],
+)
+
+print()
+if aemo_errors:
+    print(f"❌ {len(aemo_errors)} AEMO smoke test(s) failed:")
+    for e in aemo_errors:
+        print(f"   • {e}")
+else:
+    print("✅ All AEMO smoke tests passed.")
+
+# COMMAND ----------
+
 # MAGIC %md ## 8 — Setup Complete
 
 # COMMAND ----------
