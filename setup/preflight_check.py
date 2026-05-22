@@ -403,17 +403,19 @@ def check_model_serving():
         )
         return
 
-    # Check for the Qwen3 embedding model (needed for Vector Search)
-    qwen3_name   = "databricks-qwen3-embedding-0-6b"
-    llama_name   = "databricks-meta-llama-3-3-70b-instruct"
-    dbrx_name    = "databricks-dbrx-instruct"
+    # Check for in-region models only.
+    # ⚠️  databricks-meta-llama-* and databricks-dbrx-* are cross-geo for AU East — do NOT use.
+    # Safe in-region models: Claude via Provisioned Throughput, qwen3 embedding.
+    qwen3_name   = "databricks-qwen3-embedding-0-6b"     # ✅ in-region embedding
+    haiku_name   = "databricks-claude-haiku-4-5"          # ✅ in-region via PT
+    sonnet_name  = "databricks-claude-sonnet-4-6"         # ✅ in-region via PT
 
-    expected_models = [qwen3_name, llama_name, dbrx_name]
+    expected_models = [qwen3_name, haiku_name, sonnet_name]
     found_models    = [m for m in expected_models if m in endpoints]
     missing_models  = [m for m in expected_models if m not in endpoints]
 
-    # Query one FMAPI model to validate end-to-end connectivity
-    test_model = llama_name if llama_name in endpoints else (found_models[0] if found_models else None)
+    # Query one in-region Claude model to validate FMAPI connectivity
+    test_model = haiku_name if haiku_name in endpoints else (sonnet_name if sonnet_name in endpoints else (found_models[0] if found_models else None))
     query_ok   = False
     query_detail = "No FMAPI model available to test"
 

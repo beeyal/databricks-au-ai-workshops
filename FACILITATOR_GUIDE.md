@@ -63,7 +63,7 @@ Enable the following features in the workspace. Most are enabled by default but 
 This is required for Workshop 1 Lab 2, Workshop 2a Lab 2, and Workshop 2b Lab 4. It takes 15–30 minutes to become available.
 
 - [ ] Go to **Serving → Create serving endpoint**
-- [ ] Select a Foundation Model, recommended: `databricks-claude-haiku-4-5` or `databricks-meta-llama-3-3-70b-instruct`
+- [ ] Select a Foundation Model — **AU East in-region options only**: `databricks-claude-haiku-4-5` (recommended) or `databricks-claude-sonnet-4-6`. Do NOT use `databricks-meta-llama-*` — Llama models route cross-geo for AU.
 - [ ] Endpoint name: `workshop-pt-endpoint`
 - [ ] Set throughput: minimum 1 token unit (sufficient for workshop volume)
 - [ ] Create the endpoint and confirm status reaches **Ready** before the workshop day

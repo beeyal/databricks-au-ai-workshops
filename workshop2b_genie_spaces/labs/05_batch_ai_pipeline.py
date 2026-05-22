@@ -139,7 +139,7 @@ except Exception as e:
 def estimate_batch_cost(
     pending_count: int,
     avg_doc_chars: int = 3000,
-    model_name: str = "meta-llama/Meta-Llama-3.1-8B-Instruct",
+    model_name: str = "databricks-claude-haiku-4-5",  # ✅ in-region PT model for AU East
 ) -> dict:
     """
     Estimates AI inference cost for a pending batch.

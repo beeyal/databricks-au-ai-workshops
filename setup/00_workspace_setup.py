@@ -70,8 +70,9 @@ EMBEDDING_MODEL = "databricks-qwen3-embedding-0-6b"
 # Genie Space name
 GENIE_SPACE_NAME = "AU Energy Workshop — Regulated Data Assistant"
 
-# LLM for Genie (use the best available in-region model)
-GENIE_LLM_MODEL = "databricks-meta-llama-3-3-70b-instruct"
+# LLM for FMAPI smoke test — must be a PT endpoint name, NOT a pay-per-token model.
+# databricks-meta-llama-* models are cross-geo for AU East. Use Claude via PT only.
+GENIE_LLM_MODEL = "databricks-claude-haiku-4-5"  # PT endpoint in AU East ✅
 
 # ── End configuration ────────────────────────────────────────────────────────
 

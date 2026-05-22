@@ -222,10 +222,10 @@ PT_ENDPOINT_NAME = PT_ENDPOINT  # from widget, default "au_east_llm_inregion"
 # - databricks-claude-sonnet-4               (routes outside AU)
 # - databricks-meta-llama-3-1-405b           (routes outside AU)
 #
-# NOTE: databricks-claude-haiku-4-5 appears in the UI -- verify PP status before regulated use.
-# For this workshop, use Meta-Llama-3.1-8B: confirmed in-region, most cost-effective.
+# ✅ Claude Haiku 4.5 is the recommended PT model for AU East — in-region and IRAP-eligible.
+# ⚠️  Do NOT use meta-llama/* — Llama has no committed AU East date; data may leave AU.
 
-PT_MODEL_NAME = "meta-llama/Meta-Llama-3.1-8B-Instruct"
+PT_MODEL_NAME = "databricks-claude-haiku-4-5"  # ✅ in-region PT model for AU East
 
 
 def create_pt_endpoint(endpoint_name: str, model_name: str) -> str:
@@ -1019,7 +1019,7 @@ AU EAST AI FUNCTIONS -- IN-REGION PATTERN REFERENCE
 SETUP (once per workspace):
   1. Deploy PT endpoint:
        endpoint_name = "au_east_llm_inregion"
-       model_name    = "meta-llama/Meta-Llama-3.1-8B-Instruct"
+       model_name    = "databricks-claude-haiku-4-5"   # ✅ in-region PT model
 
   2. Create UC wrapper functions in catalog.ai_functions:
        classify_text(text, categories, domain_context)

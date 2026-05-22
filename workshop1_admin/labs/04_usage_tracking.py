@@ -523,19 +523,20 @@ display(gateway_changes)
 # COMMAND ----------
 
 # Token pricing — update these when your contracts are finalised
-# TODO: Replace with your actual contracted rates
+# ⚠️  Only include in-region models for regulated AU workloads.
+# databricks-meta-llama-* models are cross-geo for AU East and should NOT be used.
 TOKEN_PRICES = {
-    "databricks-meta-llama-3-3-70b-instruct": {
-        "input_per_1m":  0.90,
-        "output_per_1m": 2.70,
+    "databricks-claude-haiku-4-5": {      # ✅ IN-REGION via Provisioned Throughput
+        "input_per_1m":  1.00,
+        "output_per_1m": 5.00,
     },
-    "gpt-4o": {
-        "input_per_1m":  2.50,
-        "output_per_1m": 10.00,
+    "databricks-claude-sonnet-4-6": {     # ✅ IN-REGION via Provisioned Throughput
+        "input_per_1m":  3.00,
+        "output_per_1m": 15.00,
     },
-    "databricks-meta-llama-3-1-8b-instruct": {
-        "input_per_1m":  0.20,
-        "output_per_1m": 0.60,
+    "databricks-qwen3-embedding-0-6b": {  # ✅ IN-REGION embedding model
+        "input_per_1m":  0.025,
+        "output_per_1m": 0.00,
     },
 }
 

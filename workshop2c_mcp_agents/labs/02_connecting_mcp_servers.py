@@ -785,7 +785,7 @@ else:
 # MAGIC Click on aemo_market_notices_index to see:
 # MAGIC   - Source table: workshop_au.aemo.market_notices
 # MAGIC   - Embedding column: notice_text
-# MAGIC   - Embedding model: databricks-gte-large-en
+# MAGIC   - Embedding model: databricks-qwen3-embedding-0-6b  ← in-region ✅ (NOT gte-large-en which is cross-geo)
 # MAGIC   - Sync status: Synced (green tick)
 # MAGIC   - Row count: should match market_notices table row count
 # MAGIC
@@ -935,7 +935,8 @@ else:
 # MAGIC
 # MAGIC The `score` field is the cosine similarity between the query embedding and each document
 # MAGIC embedding. Higher is more semantically similar. The Vector Search MCP server uses
-# MAGIC `databricks-gte-large-en` to embed the query at search time — no separate embedding step.
+# MAGIC `databricks-qwen3-embedding-0-6b` to embed the query at search time — no separate embedding step.
+# MAGIC This model is in-region for AU East ✅. Never use `databricks-gte-large-en` — it is cross-geo.
 
 # COMMAND ----------
 

@@ -694,7 +694,8 @@ try:
             embedding_source_columns=[
                 EmbeddingSourceColumn(
                     name="content",
-                    embedding_model_endpoint_name="databricks-gte-large-en",
+                    # ✅ qwen3 is in-region for AU East. gte-large-en is cross-geo — never use it.
+                    embedding_model_endpoint_name="databricks-qwen3-embedding-0-6b",
                 )
             ],
         ),

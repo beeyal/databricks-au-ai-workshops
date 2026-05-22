@@ -133,7 +133,7 @@
 # MAGIC   → Filter by "Entity type: Foundation Model"
 # MAGIC ```
 # MAGIC
-# MAGIC **What to note:** Are there any `databricks-meta-llama-3-3-70b-instruct` endpoints
+# MAGIC **What to note:** Are there any `databricks-claude-haiku-4-5` endpoints
 # MAGIC already deployed? If yes, note the name.
 # MAGIC
 # MAGIC ---
@@ -247,7 +247,7 @@ print(f"Auth : {w.config.auth_type}")
 # MAGIC and is the recommended path for any model inference involving regulated data.
 # MAGIC All tokens stay within the australiaeast Azure region.
 # MAGIC
-# MAGIC **Model used in this lab:** `databricks-meta-llama-3-3-70b-instruct` — available
+# MAGIC **Model used in this lab:** `databricks-claude-haiku-4-5` — available
 # MAGIC on provisioned throughput in AU East. For lighter workshop use, swap in
 # MAGIC `databricks-llama-4-scout` or `databricks-claude-haiku-4-5` if your account has access.
 
@@ -316,7 +316,7 @@ print(f"Auth : {w.config.auth_type}")
 # MAGIC
 # MAGIC **Step 4 — Select model**
 # MAGIC ```
-# MAGIC  Model:  [ databricks-meta-llama-3-3-70b-instruct  ▾ ]
+# MAGIC  Model:  [ databricks-claude-haiku-4-5  ▾ ]
 # MAGIC           (or databricks-claude-haiku-4-5 for lighter workshop use)
 # MAGIC ```
 # MAGIC
@@ -350,7 +350,8 @@ print(f"Auth : {w.config.auth_type}")
 # TODO: Fill in these values before running
 # Configurable — change via widget above if running in customer environment
 PT_ENDPOINT_NAME    = GW_ENDPOINT                                 # from widget, default "au-workshop-gateway"
-PT_MODEL_NAME       = "databricks-meta-llama-3-3-70b-instruct"   # TODO: your PT model
+PT_MODEL_NAME       = "databricks-claude-haiku-4-5"              # ✅ IN-REGION via PT endpoint
+# ⚠️  DO NOT use databricks-meta-llama-* — Llama has no committed AU East date and is cross-geo
 CATALOG_NAME        = CATALOG_W                                   # from widget, default "energy_ai"
 SCHEMA_NAME         = SCHEMA_W                                    # from widget, default "audit_logs"
 PAYLOAD_TABLE_NAME  = "ai_gw_payloads"                           # TODO: Delta table name prefix
@@ -525,7 +526,7 @@ print("Expected creation time: ~3 minutes for a PT-backed endpoint.")
 # MAGIC #### ✅ Expected output after endpoint creation:
 # MAGIC ```
 # MAGIC Creating endpoint 'au-workshop-gateway'...
-# MAGIC   Model   : databricks-meta-llama-3-3-70b-instruct
+# MAGIC   Model   : databricks-claude-haiku-4-5
 # MAGIC   Max PT  : 400 tokens/s
 # MAGIC   Waiting for Ready state (~3 minutes)...
 # MAGIC
@@ -554,7 +555,7 @@ print("Expected creation time: ~3 minutes for a PT-backed endpoint.")
 # MAGIC │  Overview  │  Governance  │  Rate limits  │  Permissions         │
 # MAGIC │                                                                   │
 # MAGIC │  Overview tab:                                                    │
-# MAGIC │    Provider model  : databricks-meta-llama-3-3-70b-instruct       │
+# MAGIC │    Provider model  : databricks-claude-haiku-4-5       │
 # MAGIC │    Invocation URL  : .../serving-endpoints/au-workshop-gateway/   │
 # MAGIC │                       invocations                                 │
 # MAGIC │                                                                   │
@@ -1588,4 +1589,4 @@ print("─" * 60)
 # MAGIC **Key SDK note — `ServedEntityInput.name` vs model name:**
 # MAGIC `ServedEntityInput.name` is a **routing label**, not the model name.
 # MAGIC `Route.served_model_name` must match this label exactly — it does NOT take
-# MAGIC the raw model name like `databricks-meta-llama-3-3-70b-instruct`.
+# MAGIC the raw model name like `databricks-claude-haiku-4-5`.
