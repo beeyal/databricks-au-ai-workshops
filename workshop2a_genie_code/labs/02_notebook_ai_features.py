@@ -193,6 +193,10 @@
 # MAGIC
 # MAGIC > 💡 **Rule of thumb:** Start with Chat mode for speed. Switch to Agent mode when
 # MAGIC > Chat mode gives you generic or incorrect answers.
+# MAGIC
+# MAGIC > 💡 **AU East note:** Agent mode in AU East uses Claude Sonnet (Anthropic on Databricks,
+# MAGIC > in-region). If your workspace has "Enforce data processing within Geography" enabled,
+# MAGIC > only in-region Claude models will be available for Agent mode.
 
 # COMMAND ----------
 
@@ -827,6 +831,26 @@ df_profile.printSchema()
 # MAGIC
 # MAGIC This section compares the two modes on real tasks.
 # MAGIC You'll run similar requests in both modes and compare quality.
+# MAGIC
+# MAGIC ---
+# MAGIC ## 🤖 What Agent Mode Can Access
+# MAGIC
+# MAGIC When you switch to Agent mode, Genie Code has access to additional capabilities:
+# MAGIC
+# MAGIC | Capability | How to enable | Notes |
+# MAGIC |---|---|---|
+# MAGIC | UC Functions as tools | Register functions in Unity Catalog | Requires EXECUTE grant |
+# MAGIC | MCP servers | Configure in Genie Code settings | Genie, Vector Search, UC Functions |
+# MAGIC | Skills | Create SKILL.md files | @mention to invoke |
+# MAGIC | Custom instructions | Create .assistant_instructions.md | Always loaded |
+# MAGIC | Workspace files | Automatic | Can read/write notebooks, files |
+# MAGIC
+# MAGIC **MCP Tool Caps in Agent Mode:**
+# MAGIC - Maximum 20 tools total across all connected MCP servers
+# MAGIC - Maximum 15 tools per individual MCP server
+# MAGIC - If you have too many UC functions, use a schema-level endpoint to limit scope
+# MAGIC
+# MAGIC **→ We configure all of this in Labs 03 and 04.**
 # MAGIC
 # MAGIC ---
 # MAGIC

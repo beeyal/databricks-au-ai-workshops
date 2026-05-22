@@ -1163,6 +1163,68 @@ for f in flagged[:3]:
 
 # MAGIC %md
 # MAGIC ---
+# MAGIC <div style="border-left: 4px solid #FF3621; padding-left: 16px; margin: 24px 0">
+# MAGIC <h2 style="color: #1B3139; margin: 0">⚙️ Section 4: Personalising Genie Code</h2>
+# MAGIC <p style="color: #666; margin: 4px 0 0 0">⏱️ ~5 minutes</p>
+# MAGIC </div>
+# MAGIC
+# MAGIC ## Custom Instructions — Teaching Genie Your Domain
+# MAGIC
+# MAGIC Genie Code can be given **persistent domain knowledge** that applies to every conversation:
+# MAGIC
+# MAGIC | File | Scope | Who sets it |
+# MAGIC |------|-------|-------------|
+# MAGIC | `/Users/{you}/.assistant_instructions.md` | Personal only | You |
+# MAGIC | `Workspace/.assistant_workspace_instructions.md` | All workspace users | Admin |
+# MAGIC | `AGENTS.md` in notebook folder | That project only | You (auto-discovered) |
+# MAGIC
+# MAGIC > 💡 **Note:** These work the same way as `CLAUDE.md` in Claude Code —
+# MAGIC > Genie Code's Agent mode walks up your directory tree looking for `AGENTS.md` files.
+# MAGIC
+# MAGIC ## Skills — On-Demand Knowledge Documents
+# MAGIC
+# MAGIC Skills are Markdown files stored in `Workspace/.assistant/skills/<name>/SKILL.md`.
+# MAGIC Unlike custom instructions (always loaded), skills are loaded on-demand.
+# MAGIC Invoke a skill with `@skill-name` in the Genie Code chat panel.
+# MAGIC
+# MAGIC **→ We cover this in depth in Lab 03.**
+# MAGIC
+# MAGIC ## Where to Find These Settings in the UI
+# MAGIC
+# MAGIC ```
+# MAGIC Genie Code panel (right sidebar) → ⚙️ gear icon → Personal instructions
+# MAGIC
+# MAGIC ┌─── Genie Code Settings ─────────────────────────────────┐
+# MAGIC │  ⚙️ Settings                                             │
+# MAGIC │  ─────────────────────────────────────────────────────  │
+# MAGIC │  Personal instructions                                   │
+# MAGIC │  ┌─────────────────────────────────────────────────┐   │
+# MAGIC │  │ Add context about your role, preferences, and   │   │
+# MAGIC │  │ the projects you work on...                      │   │
+# MAGIC │  └─────────────────────────────────────────────────┘   │
+# MAGIC │                                    [Save]               │
+# MAGIC └──────────────────────────────────────────────────────────┘
+# MAGIC ```
+# MAGIC
+# MAGIC > ⚠️ **Note:** Instructions added via the UI settings panel are stored differently
+# MAGIC > from the `.assistant_instructions.md` file. The file-based approach (Lab 03)
+# MAGIC > is recommended for teams as it can be version-controlled.
+
+# COMMAND ----------
+
+# Quick exercise: check if you have any instructions set
+username = spark.sql("SELECT current_user()").collect()[0][0]
+try:
+    content = dbutils.fs.head(f"/Users/{username}/.assistant_instructions.md", 200)
+    print(f"You have instructions set:\n{content[:200]}...")
+except:
+    print("No personal instructions file yet — we'll create one in Lab 03.")
+    print(f"Path would be: /Users/{username}/.assistant_instructions.md")
+
+# COMMAND ----------
+
+# MAGIC %md
+# MAGIC ---
 # MAGIC ## ✅ Lab 01 Complete
 # MAGIC
 # MAGIC <div style="background: #1B3139; padding: 16px; border-radius: 6px; border-left: 4px solid #FF6B35">
