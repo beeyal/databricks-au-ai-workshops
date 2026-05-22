@@ -1,28 +1,19 @@
 # Databricks notebook source
 # MAGIC %md
-# MAGIC # Lab 05: Data Residency Verification & Compliance Evidence
+# MAGIC <div style="background: linear-gradient(135deg, #1B3139 0%, #243447 100%); padding: 24px; border-radius: 8px; margin-bottom: 8px">
+# MAGIC   <h1 style="color: #FF6B35; margin: 0 0 8px 0; font-size: 28px">🔒 Lab 05: Data Residency & Compliance Evidence</h1>
+# MAGIC   <p style="color: #AECBCC; margin: 0; font-size: 14px">Workshop 1: Admin Track · Australian Regulated Industries</p>
+# MAGIC </div>
 # MAGIC
-# MAGIC **Workshop:** Governing Databricks AI Features in Australian Regulated Industries
-# MAGIC **Estimated time:** 35–40 minutes
-# MAGIC **Difficulty:** Intermediate
-# MAGIC
-# MAGIC ---
-# MAGIC
-# MAGIC ## Objectives
-# MAGIC
-# MAGIC By the end of this lab you will be able to:
-# MAGIC
-# MAGIC 1. Verify that the workspace is in `australiaeast` via API
-# MAGIC 2. Confirm the "Enforce data processing within Geography" account setting is active
-# MAGIC 3. Audit which AI features are currently enabled at workspace level
-# MAGIC 4. Generate a **compliance evidence package** listing each AI feature and its residency status
-# MAGIC 5. Query `system.access.audit` to produce an AI model access log for APRA audit evidence
-# MAGIC 6. Create a UC tag schema for AI asset data classification
-# MAGIC 7. Run a complete pre-flight checklist before enabling AI access to new user groups
+# MAGIC | | |
+# MAGIC |---|---|
+# MAGIC | ⏱️ **Duration** | 35 minutes |
+# MAGIC | **Prerequisites** | Labs 01–04 complete |
+# MAGIC | **By the end** | Compliance evidence package generated, pre-flight checklist run, APRA audit log exported |
 # MAGIC
 # MAGIC ---
 # MAGIC
-# MAGIC ## Regulatory Context
+# MAGIC ### Regulatory context
 # MAGIC
 # MAGIC | Regulation | Requirement | How this lab addresses it |
 # MAGIC |---|---|---|
@@ -34,31 +25,102 @@
 # MAGIC
 # MAGIC ---
 # MAGIC
-# MAGIC ## AU East Residency Status Reference
+# MAGIC ### AU East residency status — quick reference
 # MAGIC
-# MAGIC | Feature | Residency | Evidence source |
+# MAGIC | Feature | Residency | Safe for regulated data? |
 # MAGIC |---|---|---|
-# MAGIC | Genie Spaces | In-region | Databricks regional availability matrix |
-# MAGIC | AI Gateway | In-region | Databricks regional availability matrix |
-# MAGIC | FMAPI Provisioned Throughput | In-region | Databricks regional availability matrix |
-# MAGIC | External Models (Azure OpenAI Regional) | In-region | Azure OpenAI regional deployment |
-# MAGIC | Vector Search | In-region | Uses australiaeast zone storage |
-# MAGIC | MLflow | In-region | Stored in workspace-local control plane |
-# MAGIC | FMAPI Pay-Per-Token | CROSS-GEO | Routes to US East — do not use for regulated data |
-# MAGIC | Knowledge Assistant | CROSS-GEO | Not GA in AU East — workaround required |
-# MAGIC | Foundation Model Fine-tuning | NOT AVAILABLE | No AU East availability date confirmed |
+# MAGIC | Genie Spaces | In-region | Yes |
+# MAGIC | AI Gateway | In-region | Yes |
+# MAGIC | FMAPI Provisioned Throughput | In-region | Yes |
+# MAGIC | External Models (Azure OpenAI Regional) | In-region | Yes — verify deployment region |
+# MAGIC | Vector Search | In-region | Yes |
+# MAGIC | MLflow Tracking | In-region | Yes |
+# MAGIC | FMAPI Pay-Per-Token | CROSS-GEO | **No** — routes to US East |
+# MAGIC | Knowledge Assistant | CROSS-GEO | **No** — not GA in AU East |
+# MAGIC | Foundation Model Fine-tuning | Not available | Not applicable |
 
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC ## 0. Setup
+# MAGIC ## Before We Code: 6-Minute UI Tour (do this first!)
+# MAGIC
+# MAGIC This lab generates a compliance evidence package.
+# MAGIC First, manually verify the key settings in the UI —
+# MAGIC the code confirms the same things programmatically.
+# MAGIC
+# MAGIC ---
+# MAGIC
+# MAGIC ### Task 1 — Confirm the workspace region in the Account Console
+# MAGIC
+# MAGIC **Where to go:**
+# MAGIC ```
+# MAGIC accounts.azuredatabricks.net
+# MAGIC   → Workspaces (left sidebar) → click your workspace name
+# MAGIC     → Look at the "Region" field
+# MAGIC ```
+# MAGIC
+# MAGIC **What you should see:**
+# MAGIC ```
+# MAGIC ┌──────────────────────────────────────────────────┐
+# MAGIC │  Workspace: au-energy-prod                       │
+# MAGIC │  Cloud:     Azure                                │
+# MAGIC │  Region:    australiaeast    ← confirm this      │
+# MAGIC └──────────────────────────────────────────────────┘
+# MAGIC ```
+# MAGIC
+# MAGIC ---
+# MAGIC
+# MAGIC ### Task 2 — Verify the Geography Enforcement toggle
+# MAGIC
+# MAGIC **Where to go:**
+# MAGIC ```
+# MAGIC accounts.azuredatabricks.net
+# MAGIC   → Settings → Security & compliance
+# MAGIC     → "Enforce data processing within workspace Geography" — is it ON?
+# MAGIC ```
+# MAGIC
+# MAGIC ---
+# MAGIC
+# MAGIC ### Task 3 — Browse AI features in Workspace Settings
+# MAGIC
+# MAGIC **Where to go:**
+# MAGIC ```
+# MAGIC Your workspace → Settings (gear icon)
+# MAGIC   → Workspace settings → scroll through: note which AI features are ON or OFF
+# MAGIC     Genie Spaces / AI Playground / Databricks Assistant
+# MAGIC ```
+# MAGIC
+# MAGIC ---
+# MAGIC
+# MAGIC ### Task 4 — Browse the audit log in system tables
+# MAGIC
+# MAGIC **Where to go:**
+# MAGIC ```
+# MAGIC Left sidebar → Catalog → system → access → audit
+# MAGIC   → "Sample Data" tab
+# MAGIC     → Look for action_name values like:
+# MAGIC         "genieConversation", "serveEndpointInvoke", "aiPlayground"
+# MAGIC ```
+# MAGIC
+# MAGIC Section 5 of this lab writes SQL to extract these events for APRA audit evidence.
+# MAGIC
+# MAGIC ---
+# MAGIC
+# MAGIC **Time check:** 6 minutes. Return to this notebook before continuing.
+
+# COMMAND ----------
+
+# MAGIC %md
+# MAGIC <div style="border-left: 4px solid #FF3621; padding-left: 16px; margin: 24px 0">
+# MAGIC <h2 style="color: #1B3139; margin: 0">Section 0: Setup</h2>
+# MAGIC </div>
 
 # COMMAND ----------
 
 import os
 import json
 import requests
-from datetime import datetime, timezone, date
+from datetime import datetime, timezone, date, timedelta
 from databricks.sdk import WorkspaceClient
 
 # TODO: Fill in your workspace and account details
@@ -79,43 +141,36 @@ w = WorkspaceClient()
 
 REPORT_TIMESTAMP = datetime.now(timezone.utc).isoformat()
 print(f"Compliance evidence run timestamp: {REPORT_TIMESTAMP}")
-print(f"Workspace URL: {WORKSPACE_URL}")
+print(f"Workspace URL                    : {WORKSPACE_URL}")
 
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC ## 1. Verify Workspace Region
+# MAGIC <div style="border-left: 4px solid #FF3621; padding-left: 16px; margin: 24px 0">
+# MAGIC <h2 style="color: #1B3139; margin: 0">Section 1: Verify Workspace Region</h2>
+# MAGIC <p style="color: #666; margin: 4px 0 0 0">⏱️ ~5 minutes — the foundation of your residency assertion</p>
+# MAGIC </div>
 # MAGIC
 # MAGIC Before enabling AI features for any user group, confirm the workspace is
 # MAGIC physically located in Azure `australiaeast`. This is the technical basis
 # MAGIC for your data residency assertion to regulators.
+# MAGIC
+# MAGIC **Three ways to verify the region:**
+# MAGIC 1. Azure IMDS (most authoritative — runs on the actual compute node)
+# MAGIC 2. Spark conf tags (set by Databricks runtime on Azure)
+# MAGIC 3. Account Console workspace list (requires account admin role)
 
 # COMMAND ----------
 
-def get_workspace_metadata(workspace_url: str, headers: dict) -> dict:
-    """
-    Retrieve workspace metadata including cloud region via the workspace info API.
-    """
-    url = f"{workspace_url}/api/2.0/clusters/get-default-values"
-    response = requests.get(url, headers=headers, timeout=30)
-    if response.status_code == 200:
-        return response.json()
-
-    # Fallback: use the workspace list API if available via account admin token
-    return {"error": f"HTTP {response.status_code}", "raw": response.text[:200]}
-
-
 def get_workspace_info_sdk(w: WorkspaceClient) -> dict:
-    """
-    Get workspace info via the SDK — includes the cloud region.
-    """
+    """Get workspace info via the SDK — includes host and auth type."""
     try:
         ws_config = w.config
         return {
-            "host":             ws_config.host,
+            "host":                        ws_config.host,
             "azure_workspace_resource_id": getattr(ws_config, "azure_workspace_resource_id", None),
-            "cloud":            getattr(ws_config, "cloud", None),
-            "auth_type":        getattr(ws_config, "auth_type", None),
+            "cloud":                       getattr(ws_config, "cloud", None),
+            "auth_type":                   getattr(ws_config, "auth_type", None),
         }
     except Exception as e:
         return {"error": str(e)}
@@ -123,14 +178,10 @@ def get_workspace_info_sdk(w: WorkspaceClient) -> dict:
 
 def check_workspace_region_from_host(workspace_url: str) -> dict:
     """
-    Parse the workspace URL to infer the Azure region.
-    Databricks Azure workspace URLs embed the region in the hostname.
-
-    Example: https://adb-1234567890.5.azuredatabricks.net
-    The 'adb-' prefix and '.azuredatabricks.net' suffix are constants.
-    Region is confirmed via the Azure resource metadata.
+    Attempt to determine the Azure region via IMDS (Instance Metadata Service).
+    Falls back to URL inference if not running on Azure compute.
     """
-    # Use IMDS (Instance Metadata Service) if running on Azure
+    # Attempt Azure IMDS — only works from a running cluster on Azure
     try:
         imds_url = "http://169.254.169.254/metadata/instance?api-version=2021-02-01"
         imds_response = requests.get(
@@ -141,21 +192,20 @@ def check_workspace_region_from_host(workspace_url: str) -> dict:
         if imds_response.status_code == 200:
             metadata = imds_response.json()
             return {
-                "location": metadata.get("compute", {}).get("location"),
+                "location":        metadata.get("compute", {}).get("location"),
                 "subscription_id": metadata.get("compute", {}).get("subscriptionId"),
-                "resource_group": metadata.get("compute", {}).get("resourceGroupName"),
-                "vm_size": metadata.get("compute", {}).get("vmSize"),
-                "source": "Azure IMDS",
+                "resource_group":  metadata.get("compute", {}).get("resourceGroupName"),
+                "vm_size":         metadata.get("compute", {}).get("vmSize"),
+                "source":          "Azure IMDS (authoritative)",
             }
     except Exception:
         pass
 
     # Fallback: derive from workspace URL pattern
-    # Azure Databricks workspaces in australiaeast have a predictable hostname structure
     return {
         "location": "australiaeast (inferred from workspace URL)",
-        "source": "URL inference",
-        "note": "For definitive proof, query Azure IMDS from a running cluster",
+        "source":   "URL inference — run from a cluster for IMDS confirmation",
+        "note":     "For definitive proof, query Azure IMDS from a running cluster.",
     }
 
 
@@ -176,54 +226,73 @@ for k, v in region_check.items():
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC ### 1b. Verify region via cluster metadata (most reliable method)
+# MAGIC ### 1b. Verify region via Spark conf tags (runs on the cluster)
 
 # COMMAND ----------
 
-# This cell queries the cluster's own Azure IMDS endpoint
-# It provides cryptographic proof of the physical compute location
-
-IMDS_CHECK_SQL = """
--- Run this as a SQL command on a cluster to confirm execution context
--- Combine with Azure IMDS call (Python cell above) for location proof
-SELECT
-  CURRENT_CATALOG()     AS current_catalog,
-  CURRENT_DATABASE()    AS current_schema,
-  CURRENT_USER()        AS running_as
-"""
-# Note: SPARK_MASTER() is not a valid Spark SQL function.
-# To check cluster mode, use: spark.conf.get("spark.master") in Python.
-
-# Try to get region from Spark config (set by Databricks runtime on Azure)
+# Spark conf tags are set by the Databricks runtime on Azure — a fast and reliable signal
 try:
-    cluster_region = spark.conf.get("spark.databricks.clusterUsageTags.clusterCloudProvider", "unknown")
-    cluster_id     = spark.conf.get("spark.databricks.clusterUsageTags.clusterId", "unknown")
-    workspace_id   = spark.conf.get("spark.databricks.workspaceId", "unknown")
-    cluster_mode   = spark.conf.get("spark.master", "unknown")  # e.g. "local[8]" or "yarn"
+    cluster_cloud   = spark.conf.get("spark.databricks.clusterUsageTags.clusterCloudProvider", "unknown")
+    cluster_id      = spark.conf.get("spark.databricks.clusterUsageTags.clusterId", "unknown")
+    workspace_id    = spark.conf.get("spark.databricks.workspaceId", "unknown")
+    cluster_mode    = spark.conf.get("spark.master", "unknown")
 
-    print("Cluster Azure tags:")
-    print(f"  Cloud provider  : {cluster_region}")
+    print("Cluster Spark conf tags:")
+    print(f"  Cloud provider  : {cluster_cloud}")
     print(f"  Cluster ID      : {cluster_id}")
     print(f"  Workspace ID    : {workspace_id}")
     print(f"  Cluster mode    : {cluster_mode}")
 except Exception as e:
     print(f"Could not read Spark conf tags: {e}")
 
-display(spark.sql(IMDS_CHECK_SQL))
+# Also show current user context for the evidence record
+display(spark.sql("""
+  SELECT
+    CURRENT_CATALOG()  AS current_catalog,
+    CURRENT_DATABASE() AS current_schema,
+    CURRENT_USER()     AS running_as
+"""))
 
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC ## 2. Verify "Enforce Data Processing Within Geography" Setting
+# MAGIC <div style="border-left: 4px solid #FF3621; padding-left: 16px; margin: 24px 0">
+# MAGIC <h2 style="color: #1B3139; margin: 0">Section 2: Verify "Enforce Data Processing Within Geography"</h2>
+# MAGIC <p style="color: #666; margin: 4px 0 0 0">⏱️ ~5 minutes — the most critical APRA control in this lab</p>
+# MAGIC </div>
 # MAGIC
-# MAGIC This is the **most critical control** for APRA compliance. It must be `ENABLED`.
+# MAGIC This is the **single most important control** for APRA compliance. It must be `ENABLED`.
+# MAGIC When disabled, some Databricks AI features may route data outside Australia.
+# MAGIC
+# MAGIC ### Checking the setting in Account Console
+# MAGIC
+# MAGIC ```
+# MAGIC URL: https://accounts.azuredatabricks.net
+# MAGIC
+# MAGIC Navigate: Workspaces → [your workspace name] → Security and compliance tab
+# MAGIC             (NOT "Settings" — use the Security and compliance tab on the workspace detail page)
+# MAGIC
+# MAGIC CRITICAL setting:
+# MAGIC ┌─── Security and compliance tab ────────────────────────────┐
+# MAGIC │  ┌─────────────────────────────────────────────────────┐    │
+# MAGIC │  │ ☑ Enforce data processing within workspace Geography │    │
+# MAGIC │  │   ← THIS MUST BE CHECKED for APRA CPS 234 compliance│    │
+# MAGIC │  └─────────────────────────────────────────────────────┘    │
+# MAGIC │                                                              │
+# MAGIC │  When enabled:  cross-geo features return an error           │
+# MAGIC │  When disabled: data may leave AU East ⚠️                     │
+# MAGIC └──────────────────────────────────────────────────────────────┘
+# MAGIC ```
+# MAGIC
+# MAGIC The API check below confirms this programmatically for your evidence package.
 
 # COMMAND ----------
 
 def check_geography_enforcement(account_id: str, headers: dict) -> dict:
     """
-    Fetch and evaluate the Geography enforcement setting.
+    Fetch and evaluate the Geography enforcement account setting.
     Returns a structured result with pass/fail status.
+    Requires account admin role — returns CANNOT_VERIFY if 403.
     """
     url = (
         f"https://accounts.azuredatabricks.net/api/2.0/accounts/{account_id}"
@@ -235,46 +304,49 @@ def check_geography_enforcement(account_id: str, headers: dict) -> dict:
 
         if response.status_code == 403:
             return {
-                "status": "CANNOT_VERIFY",
-                "reason": "403 Forbidden — account admin role required",
-                "recommendation": "Ask your Account Admin to verify this setting and provide evidence.",
-                "compliant": None,
+                "status":         "CANNOT_VERIFY",
+                "reason":         "403 Forbidden — account admin role required",
+                "recommendation": "Ask your Account Admin to verify this setting and provide a screenshot as evidence.",
+                "compliant":      None,
             }
 
         if response.status_code == 404:
             return {
-                "status": "FAIL",
-                "reason": "Setting not found — Geography enforcement is NOT enabled",
-                "recommendation": "Enable via Account Console > Settings > Advanced > Enforce data processing within workspace Geography",
-                "compliant": False,
+                "status":         "FAIL",
+                "reason":         "Setting not found — Geography enforcement is NOT enabled",
+                "recommendation": (
+                    "Enable via Account Console → Workspaces → [workspace] → Settings → "
+                    "Advanced Security → Enforce data processing within workspace Geography"
+                ),
+                "compliant":      False,
             }
 
         response.raise_for_status()
-        body = response.json()
+        body      = response.json()
         csp_block = body.get("shield_csp_enforcement_account_setting", {})
         csp_value = csp_block.get("csp", "")
 
         if csp_value == "COMPLIANCE_SECURITY_PROFILE":
             return {
-                "status": "PASS",
+                "status":    "PASS",
                 "csp_value": csp_value,
-                "etag": body.get("etag"),
-                "reason": "Geography enforcement is ENABLED",
+                "etag":      body.get("etag"),
+                "reason":    "Geography enforcement is ENABLED",
                 "compliant": True,
             }
         else:
             return {
-                "status": "FAIL",
-                "csp_value": csp_value,
-                "reason": f"Geography enforcement is NOT enabled (current value: '{csp_value}')",
-                "recommendation": "Enable via Account Console > Settings",
-                "compliant": False,
+                "status":         "FAIL",
+                "csp_value":      csp_value,
+                "reason":         f"Geography enforcement is NOT enabled (current value: '{csp_value}')",
+                "recommendation": "Enable via Account Console",
+                "compliant":      False,
             }
 
     except Exception as e:
         return {
-            "status": "ERROR",
-            "reason": str(e),
+            "status":    "ERROR",
+            "reason":    str(e),
             "compliant": None,
         }
 
@@ -283,22 +355,36 @@ geo_result = check_geography_enforcement(ACCOUNT_ID, HEADERS)
 print("=== Geography Enforcement Check ===")
 print(json.dumps(geo_result, indent=2))
 
-status = geo_result["status"]
-icon = {"PASS": "[PASS]", "FAIL": "[FAIL]", "CANNOT_VERIFY": "[WARN]", "ERROR": "[ERROR]"}.get(status, "[?]")
+icon = {"PASS": "[PASS]", "FAIL": "[FAIL]", "CANNOT_VERIFY": "[WARN]", "ERROR": "[ERROR]"}.get(
+    geo_result["status"], "[?]"
+)
 print(f"\n{icon} {geo_result['reason']}")
 
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC ## 3. Audit Which AI Features Are Enabled
-# MAGIC
-# MAGIC Query all workspace-level AI feature flags and record their current state.
-# MAGIC This forms the "Feature Inventory" section of the compliance evidence package.
+# MAGIC <div style="background: #FFF3CD; padding: 12px 16px; border-radius: 4px; border-left: 4px solid #FFC107">
+# MAGIC <strong>📋 Facilitator note:</strong> Pause here and ask the group —
+# MAGIC "Which of these AI features are your compliance team most concerned about?
+# MAGIC Has anyone already had a conversation with their CISO about the FMAPI Pay-Per-Token
+# MAGIC cross-geo issue?" This is a good point to reference the APRA CPS 234 evidence package
+# MAGIC this section generates — show the group what the final output looks like before they run it.
+# MAGIC </div>
 
 # COMMAND ----------
 
-# Feature inventory with residency metadata
-# This is the canonical list for AU East workspaces in FY26
+# MAGIC %md
+# MAGIC <div style="border-left: 4px solid #FF3621; padding-left: 16px; margin: 24px 0">
+# MAGIC <h2 style="color: #1B3139; margin: 0">Section 3: Audit Which AI Features Are Enabled</h2>
+# MAGIC <p style="color: #666; margin: 4px 0 0 0">⏱️ ~5 minutes — builds the feature inventory section of the evidence package</p>
+# MAGIC </div>
+# MAGIC
+# MAGIC Query all workspace-level AI feature flags and record their current state.
+# MAGIC This forms the **Feature Inventory** section of the compliance evidence package.
+
+# COMMAND ----------
+
+# Feature inventory with residency metadata — canonical list for AU East workspaces FY26
 AI_FEATURE_INVENTORY = [
     {
         "feature_name": "Genie Spaces",
@@ -311,7 +397,7 @@ AI_FEATURE_INVENTORY = [
     },
     {
         "feature_name": "AI Gateway",
-        "feature_flag_type": None,  # Enabled by default; controlled by endpoint creation
+        "feature_flag_type": None,
         "residency": "IN_REGION",
         "region": "australiaeast",
         "risk_rating": "LOW",
@@ -320,7 +406,7 @@ AI_FEATURE_INVENTORY = [
     },
     {
         "feature_name": "FMAPI Provisioned Throughput",
-        "feature_flag_type": None,  # Controlled via endpoint configuration
+        "feature_flag_type": None,
         "residency": "IN_REGION",
         "region": "australiaeast",
         "risk_rating": "LOW",
@@ -397,17 +483,13 @@ AI_FEATURE_INVENTORY = [
         "region": "australiaeast",
         "risk_rating": "LOW",
         "approved_for_regulated_data": True,
-        "notes": "Point ai_query() at a PT endpoint. Default FMAPI endpoint is cross-geo.",
+        "notes": "Point ai_query() at a PT endpoint. Default FMAPI endpoint is cross-geo — do not use.",
     },
 ]
 
 
-def check_feature_flag_status(
-    workspace_url: str,
-    headers: dict,
-    flag_type: str,
-) -> str:
-    """Query a workspace feature flag and return ENABLED, DISABLED, or UNKNOWN."""
+def check_feature_flag_status(workspace_url: str, headers: dict, flag_type: str) -> str:
+    """Query a workspace feature flag and return ENABLED, DISABLED, or NOT_FLAG_CONTROLLED."""
     if flag_type is None:
         return "NOT_FLAG_CONTROLLED"
 
@@ -417,8 +499,7 @@ def check_feature_flag_status(
         if response.status_code == 404:
             return "NOT_SET (default)"
         response.raise_for_status()
-        body = response.json()
-        # Parse the nested value — structure varies by flag type
+        body   = response.json()
         nested = body.get(flag_type, {})
         if isinstance(nested, dict):
             enabled = nested.get("enabled")
@@ -440,13 +521,13 @@ for feature in AI_FEATURE_INVENTORY:
     feature["flag_status"] = flag_status
 
 # Print the inventory table
-print(f"{'Feature':<45} {'Residency':<12} {'Approved':<10} {'Flag Status'}")
+print(f"{'Feature':<45} {'Residency':<14} {'Approved':<10} {'Flag Status'}")
 print("-" * 100)
 for f in AI_FEATURE_INVENTORY:
     approved = "YES" if f["approved_for_regulated_data"] else "NO"
     print(
         f"  {f['feature_name']:<43} "
-        f"{f['residency']:<12} "
+        f"{f['residency']:<14} "
         f"{approved:<10} "
         f"{f['flag_status']}"
     )
@@ -454,7 +535,10 @@ for f in AI_FEATURE_INVENTORY:
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC ## 4. Generate Compliance Evidence Package
+# MAGIC <div style="border-left: 4px solid #FF3621; padding-left: 16px; margin: 24px 0">
+# MAGIC <h2 style="color: #1B3139; margin: 0">Section 4: Generate Compliance Evidence Package</h2>
+# MAGIC <p style="color: #666; margin: 4px 0 0 0">⏱️ ~5 minutes — outputs the auditor-ready JSON document</p>
+# MAGIC </div>
 
 # COMMAND ----------
 
@@ -471,18 +555,17 @@ def generate_compliance_evidence_package(
     Generate a structured compliance evidence package.
     This document can be provided to internal audit or an APRA reviewer.
     """
-    # Count features by status
-    in_region_approved = [f for f in feature_inventory if f["residency"] == "IN_REGION" and f["approved_for_regulated_data"]]
+    in_region_approved = [f for f in feature_inventory if f["residency"] == "IN_REGION"     and f["approved_for_regulated_data"]]
     cross_geo_features = [f for f in feature_inventory if f["residency"] in ("CROSS_GEO", "NOT_AVAILABLE")]
     not_approved       = [f for f in feature_inventory if not f["approved_for_regulated_data"]]
 
-    package = {
-        "document_type": "AI Governance Compliance Evidence Package",
-        "organisation": "TODO: Your Organisation Name",                 # TODO
-        "workspace_url": workspace_url,
-        "account_id": account_id,
-        "assessment_date": report_timestamp,
-        "assessed_by": "TODO: Name/Role",                               # TODO
+    return {
+        "document_type":       "AI Governance Compliance Evidence Package",
+        "organisation":        "TODO: Your Organisation Name",   # TODO
+        "workspace_url":       workspace_url,
+        "account_id":          account_id,
+        "assessment_date":     report_timestamp,
+        "assessed_by":         "TODO: Name/Role",                # TODO
         "regulatory_frameworks": [
             "APRA CPS 234 (Information Security)",
             "APRA CPS 230 (Operational Risk Management)",
@@ -491,23 +574,23 @@ def generate_compliance_evidence_package(
         ],
 
         "section_1_infrastructure": {
-            "title": "1. Infrastructure & Data Residency",
-            "workspace_region": region_check_result.get("location", "unknown"),
-            "cloud_provider": "Microsoft Azure",
-            "region_assertion": "australiaeast (Azure Australia East data centre)",
-            "region_evidence_method": region_check_result.get("source", "unknown"),
-            "geography_enforcement_enabled": geo_enforcement_result.get("compliant"),
-            "geography_enforcement_status": geo_enforcement_result.get("status"),
-            "geography_enforcement_detail": geo_enforcement_result.get("reason"),
+            "title":                             "1. Infrastructure & Data Residency",
+            "workspace_region":                  region_check_result.get("location", "unknown"),
+            "cloud_provider":                    "Microsoft Azure",
+            "region_assertion":                  "australiaeast (Azure Australia East data centre)",
+            "region_evidence_method":            region_check_result.get("source", "unknown"),
+            "geography_enforcement_enabled":     geo_enforcement_result.get("compliant"),
+            "geography_enforcement_status":      geo_enforcement_result.get("status"),
+            "geography_enforcement_detail":      geo_enforcement_result.get("reason"),
         },
 
         "section_2_feature_inventory": {
-            "title": "2. AI Feature Inventory & Residency Status",
-            "total_features_reviewed": len(feature_inventory),
-            "in_region_approved_count": len(in_region_approved),
-            "cross_geo_or_unavailable_count": len(cross_geo_features),
+            "title":                                 "2. AI Feature Inventory & Residency Status",
+            "total_features_reviewed":               len(feature_inventory),
+            "in_region_approved_count":              len(in_region_approved),
+            "cross_geo_or_unavailable_count":        len(cross_geo_features),
             "not_approved_for_regulated_data_count": len(not_approved),
-            "features": feature_inventory,
+            "features":                              feature_inventory,
         },
 
         "section_3_access_controls": {
@@ -538,18 +621,19 @@ def generate_compliance_evidence_package(
             "title": "5. Non-Compliant Features & Exceptions",
             "features_requiring_exception": [
                 {
-                    "feature": f["feature_name"],
-                    "risk": f["risk_rating"],
-                    "status": f["residency"],
+                    "feature":     f["feature_name"],
+                    "risk":        f["risk_rating"],
+                    "status":      f["residency"],
                     "mitigations": f["notes"],
                 }
                 for f in not_approved
             ],
-            "exception_process": "Exceptions require sign-off from CISO and Data Governance Council before any use with regulated data.",
+            "exception_process": (
+                "Exceptions require sign-off from CISO and Data Governance Council "
+                "before any use with regulated data."
+            ),
         },
     }
-
-    return package
 
 
 compliance_package = generate_compliance_evidence_package(
@@ -572,27 +656,26 @@ print(json.dumps(compliance_package, indent=2, default=str))
 
 # COMMAND ----------
 
-# SOLUTION: Persist the compliance package as a Delta record
-CATALOG_NAME = "energy_ai"    # TODO
-SCHEMA_NAME  = "compliance"   # TODO
+CATALOG_NAME = "energy_ai"    # TODO: your catalog
+SCHEMA_NAME  = "compliance"   # TODO: your schema
 
-# Flatten the package for Delta storage
+
 def save_compliance_evidence(spark, catalog: str, schema: str, package: dict) -> None:
     """Save the compliance package to a Delta table for audit retention."""
     table = f"{catalog}.{schema}.ai_compliance_evidence"
     spark.sql(f"CREATE SCHEMA IF NOT EXISTS {catalog}.{schema}")
 
     row = {
-        "assessment_timestamp": package["assessment_date"],
-        "workspace_url":        package["workspace_url"],
-        "account_id":           package["account_id"],
-        "assessed_by":          package["assessed_by"],
-        "geography_enforcement_compliant": package["section_1_infrastructure"]["geography_enforcement_enabled"],
-        "workspace_region":     package["section_1_infrastructure"]["workspace_region"],
-        "total_features_reviewed": package["section_2_feature_inventory"]["total_features_reviewed"],
-        "in_region_approved_count": package["section_2_feature_inventory"]["in_region_approved_count"],
-        "non_compliant_count":  package["section_2_feature_inventory"]["not_approved_for_regulated_data_count"],
-        "full_package_json":    json.dumps(package, default=str),
+        "assessment_timestamp":             package["assessment_date"],
+        "workspace_url":                    package["workspace_url"],
+        "account_id":                       package["account_id"],
+        "assessed_by":                      package["assessed_by"],
+        "geography_enforcement_compliant":  package["section_1_infrastructure"]["geography_enforcement_enabled"],
+        "workspace_region":                 package["section_1_infrastructure"]["workspace_region"],
+        "total_features_reviewed":          package["section_2_feature_inventory"]["total_features_reviewed"],
+        "in_region_approved_count":         package["section_2_feature_inventory"]["in_region_approved_count"],
+        "non_compliant_count":              package["section_2_feature_inventory"]["not_approved_for_regulated_data_count"],
+        "full_package_json":                json.dumps(package, default=str),
     }
 
     df = spark.createDataFrame([row])
@@ -603,32 +686,28 @@ def save_compliance_evidence(spark, catalog: str, schema: str, package: dict) ->
 # TODO: Uncomment to persist the evidence
 # save_compliance_evidence(spark, CATALOG_NAME, SCHEMA_NAME, compliance_package)
 
-print("Compliance evidence save is commented out — uncomment after setting catalog/schema.")
+print("Compliance evidence save is commented out — uncomment after configuring catalog/schema.")
 
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC ## 5. APRA Audit Evidence — AI Model Access Logs
+# MAGIC <div style="border-left: 4px solid #FF3621; padding-left: 16px; margin: 24px 0">
+# MAGIC <h2 style="color: #1B3139; margin: 0">Section 5: APRA Audit Evidence — AI Model Access Logs</h2>
+# MAGIC <p style="color: #666; margin: 4px 0 0 0">⏱️ ~5 minutes</p>
+# MAGIC </div>
 # MAGIC
-# MAGIC APRA CPS 234 requires you to demonstrate that access to AI models is
-# MAGIC logged and that logs are retained for an appropriate period (typically 7 years
-# MAGIC for financial records, but confirm with your legal team).
+# MAGIC APRA CPS 234 requires you to demonstrate that access to AI models is logged and
+# MAGIC that logs are retained for an appropriate period (confirm the retention period
+# MAGIC with your legal and risk team — typically 7 years for financial records).
 # MAGIC
-# MAGIC The queries below produce audit logs in a format suitable for:
+# MAGIC The queries below produce audit logs suitable for:
 # MAGIC - Internal audit reviews
 # MAGIC - APRA CPS 234 assessments
-# MAGIC - Incident investigation (who queried the model before/after an event)
+# MAGIC - Incident investigation (who queried the model before or after an event)
 
 # COMMAND ----------
 
-# SOLUTION: Full AI model access log for a specified date range
-# This is the primary evidence artefact for APRA reviews
-
-def generate_ai_access_log(
-    start_date: str,
-    end_date: str,
-    include_endpoints: list = None,
-):
+def generate_ai_access_log(start_date: str, end_date: str, include_endpoints: list = None):
     """
     Generate an AI model access log for APRA audit purposes.
 
@@ -665,33 +744,27 @@ def generate_ai_access_log(
     """
 
     print(f"AI Access Log: {start_date} to {end_date}")
-    print(f"Filter: {endpoint_filter or 'All AI endpoints'}\n")
+    print(f"Filter: {endpoint_filter or 'All AI service endpoints'}\n")
 
-    df = spark.sql(access_log_sql)
+    df        = spark.sql(access_log_sql)
     row_count = df.count()
     print(f"Total access events: {row_count:,}")
     display(df)
-
     return df
 
 
-# TODO: Set your review period dates — update to a recent range that covers your test activity
-# Example: last 30 days from today
-from datetime import timedelta
+# Generate the access log for the last 30 days
 AUDIT_END   = date.today().isoformat()
 AUDIT_START = (date.today() - timedelta(days=30)).isoformat()
 
-# Generate the access log
 access_log_df = generate_ai_access_log(AUDIT_START, AUDIT_END)
 
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC ### 5b. Export access log to CSV (for email evidence package)
+# MAGIC ### 5b. Export access log to a Unity Catalog volume (for email evidence package)
 
 # COMMAND ----------
-
-# SOLUTION: Export the access log to a volume for download
 
 def export_access_log_to_volume(
     access_log_df,
@@ -703,14 +776,15 @@ def export_access_log_to_volume(
     """
     Write the access log DataFrame to a Unity Catalog volume as CSV.
     Returns the volume path.
+
+    After writing, download from:
+    Data → Volumes → [catalog] → [schema] → audit_exports
     """
     volume_path = f"/Volumes/{catalog}/{schema}/audit_exports"
     file_path   = f"{volume_path}/ai_access_log_{start_date}_to_{end_date}.csv"
 
-    # Create the volume if needed
     spark.sql(f"CREATE VOLUME IF NOT EXISTS {catalog}.{schema}.audit_exports")
 
-    # Write as single CSV file
     (
         access_log_df
         .coalesce(1)
@@ -720,8 +794,8 @@ def export_access_log_to_volume(
         .csv(file_path)
     )
 
-    print(f"Access log exported to: {file_path}")
-    print(f"Download from: Files > Volumes > {catalog} > {schema} > audit_exports")
+    print(f"Access log exported to : {file_path}")
+    print(f"Download from UI       : Data → Volumes → {catalog} → {schema} → audit_exports")
     return file_path
 
 
@@ -735,16 +809,37 @@ print("Access log export is commented out — uncomment after confirming catalog
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC ## 6. Unity Catalog Tag Schema for AI Asset Classification
+# MAGIC <div style="border-left: 4px solid #FF3621; padding-left: 16px; margin: 24px 0">
+# MAGIC <h2 style="color: #1B3139; margin: 0">Section 6: Unity Catalog Tag Schema for AI Asset Classification</h2>
+# MAGIC <p style="color: #666; margin: 4px 0 0 0">⏱️ ~5 minutes</p>
+# MAGIC </div>
 # MAGIC
-# MAGIC UC governed tags provide a standardised way to classify AI assets by
-# MAGIC data sensitivity. This enables governance policies to be enforced based
-# MAGIC on classification rather than by naming conventions.
+# MAGIC UC governed tags provide a standardised way to classify AI assets by data sensitivity.
+# MAGIC This enables governance policies to be enforced based on classification
+# MAGIC rather than by naming conventions.
+# MAGIC
+# MAGIC ### Verifying UC tags in Catalog Explorer
+# MAGIC
+# MAGIC ```
+# MAGIC Navigate: Data (left sidebar) → Catalog Explorer →
+# MAGIC   [catalog] → [table] → Overview tab
+# MAGIC
+# MAGIC The "Tags" section shows:
+# MAGIC ┌─── Table: energy_assets ────────────────────────────────────┐
+# MAGIC │  Owner: ...  |  Created: 2026-04-01                         │
+# MAGIC │                                                              │
+# MAGIC │  Tags:  [data_classification: restricted]  [+ Add tag]      │
+# MAGIC │         [data_residency: AU_EAST]                           │
+# MAGIC │         [regulatory_framework: APRA_CPS234]                 │
+# MAGIC └──────────────────────────────────────────────────────────────┘
+# MAGIC ```
+# MAGIC
+# MAGIC You can add and edit tags directly in the UI, or manage them programmatically
+# MAGIC using the SQL examples in the next cell.
 
 # COMMAND ----------
 
-# SOLUTION: Define and apply the AI asset classification tag schema
-
+# Define the tag schema for all AI assets in the workspace
 AI_TAG_SCHEMA = {
     "data_classification": {
         "description": "Sensitivity classification of data processed by this AI asset",
@@ -767,13 +862,13 @@ AI_TAG_SCHEMA = {
         "default": "none",
     },
     "ai_approved": {
-        "description": "Whether this asset has been approved for AI workload use by governance council",
+        "description": "Whether this asset has been approved for AI workload use by the governance council",
         "values": ["approved", "pending-review", "not-approved", "conditional"],
         "default": "pending-review",
     },
     "owner_team": {
         "description": "Databricks group responsible for this AI asset",
-        "values": None,  # Free text
+        "values": None,   # Free text
         "default": None,
     },
 }
@@ -796,15 +891,15 @@ for tag_name, tag_def in AI_TAG_SCHEMA.items():
 
 # COMMAND ----------
 
-# SOLUTION: SQL statements to create tag keys and apply them to AI assets
-# TODO: Replace with your catalog, schema, and asset names
+# SQL statements to create tag keys and apply them to AI assets
+# TODO: Replace catalog, schema, and asset names with your own
 
 TAG_SQL_EXAMPLES = """
--- Step 1: Create tag keys at the catalog level (one-time, schema admin)
+-- Step 1: Apply a residency policy tag at the catalog level
 ALTER CATALOG energy_ai
   SET TAGS ('data_residency_policy' = 'au-east-only');
 
--- Step 2: Tag a registered model (UC SQL — works for models in Unity Catalog)
+-- Step 2: Tag a registered model in Unity Catalog
 ALTER MODEL energy_ai.models.meter_anomaly_v1
   SET TAGS (
     'data_classification' = 'confidential',
@@ -815,25 +910,17 @@ ALTER MODEL energy_ai.models.meter_anomaly_v1
     'owner_team'          = 'grp_data_science'
   );
 
--- Step 3: Tag a serving endpoint
--- NOTE: Serving endpoints are NOT Unity Catalog objects and do not support
--- ALTER ENDPOINT … SET TAGS in SQL. Use the REST API instead:
+-- Step 3: Tag a serving endpoint via REST API
+-- (Serving endpoints are NOT Unity Catalog objects and do not support ALTER … SET TAGS in SQL.)
+-- Use the REST API:
 --   PUT /api/2.0/serving-endpoints/{name}/tags
 --   Body: {"tags": [{"key": "ai_approved", "value": "approved"}, ...]}
--- Example Python:
---   requests.put(
---     f"{WORKSPACE_URL}/api/2.0/serving-endpoints/meter-anomaly-endpoint/tags",
---     headers=HEADERS,
---     json={"tags": [{"key": "data_classification", "value": "confidential"},
---                    {"key": "ai_approved", "value": "approved"},
---                    {"key": "owner_team", "value": "grp_ai_admins"}]},
---   )
 
 -- Step 4: Query all UC object tags by classification
 SELECT
   catalog_name,
   schema_name,
-  table_name      AS asset_name,
+  table_name   AS asset_name,
   tag_name,
   tag_value
 FROM system.information_schema.table_tags
@@ -842,7 +929,7 @@ UNION ALL
 SELECT
   catalog_name,
   schema_name,
-  model_name      AS asset_name,
+  model_name   AS asset_name,
   tag_name,
   tag_value
 FROM system.information_schema.model_tags
@@ -856,10 +943,14 @@ print(TAG_SQL_EXAMPLES)
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC ## 7. Pre-flight Checklist — Before Enabling AI for New User Groups
+# MAGIC <div style="border-left: 4px solid #FF3621; padding-left: 16px; margin: 24px 0">
+# MAGIC <h2 style="color: #1B3139; margin: 0">Section 7: Pre-flight Checklist — Before Enabling AI for New User Groups</h2>
+# MAGIC <p style="color: #666; margin: 4px 0 0 0">⏱️ ~5 minutes — run this every time you onboard a new team</p>
+# MAGIC </div>
 # MAGIC
 # MAGIC Run this checklist every time you plan to enable AI access for a new
 # MAGIC business unit or user group. Each check must PASS before proceeding.
+# MAGIC The report is saved to Delta as change management evidence.
 
 # COMMAND ----------
 
@@ -872,24 +963,23 @@ def run_preflight_checklist(
 ) -> dict:
     """
     Run a comprehensive pre-flight check before enabling AI access for a new group.
-
     Returns a dict with all check results and an overall pass/fail.
     """
     results = []
 
     def add_check(name: str, passed: bool, detail: str = "", remediation: str = "") -> None:
         results.append({
-            "check": name,
-            "status": "PASS" if passed else "FAIL",
-            "detail": detail,
+            "check":       name,
+            "status":      "PASS" if passed else "FAIL",
+            "detail":      detail,
             "remediation": remediation if not passed else "",
         })
 
-    # ── 1. Workspace region ──────────────────────────────────────────
+    # 1. Workspace region
     try:
-        region = check_workspace_region_from_host(workspace_url)
-        location = region.get("location", "")
-        in_region = "australiaeast" in location.lower()
+        region     = check_workspace_region_from_host(workspace_url)
+        location   = region.get("location", "")
+        in_region  = "australiaeast" in location.lower()
         add_check(
             "Workspace in australiaeast",
             in_region,
@@ -899,7 +989,7 @@ def run_preflight_checklist(
     except Exception as e:
         add_check("Workspace region check", False, detail=str(e), remediation="Investigate API access.")
 
-    # ── 2. Geography enforcement ─────────────────────────────────────
+    # 2. Geography enforcement
     geo = check_geography_enforcement(account_id, headers)
     if geo["compliant"] is True:
         add_check("Geography enforcement enabled", True, detail="COMPLIANCE_SECURITY_PROFILE")
@@ -913,44 +1003,45 @@ def run_preflight_checklist(
             remediation="Confirm with Account Admin before proceeding.",
         )
 
-    # ── 3. Target endpoint exists ────────────────────────────────────
+    # 3. Target endpoint exists and is READY
     try:
-        ep_url = f"{workspace_url}/api/2.0/serving-endpoints/{endpoint_name}"
+        ep_url  = f"{workspace_url}/api/2.0/serving-endpoints/{endpoint_name}"
         ep_resp = requests.get(ep_url, headers=headers, timeout=15)
+        ep_json = ep_resp.json() if ep_resp.status_code == 200 else {}
         ep_ready = (
             ep_resp.status_code == 200
-            and ep_resp.json().get("state", {}).get("ready") == "READY"
+            and ep_json.get("state", {}).get("ready") == "READY"
         )
-        detail = f"State: {ep_resp.json().get('state', {}).get('ready', 'unknown')}" if ep_resp.status_code == 200 else f"HTTP {ep_resp.status_code}"
+        detail = f"State: {ep_json.get('state', {}).get('ready', 'unknown')}" if ep_resp.status_code == 200 else f"HTTP {ep_resp.status_code}"
         add_check(
             f"Endpoint '{endpoint_name}' is READY",
             ep_ready,
             detail=detail,
-            remediation=f"Wait for endpoint to reach READY state, or create the endpoint first.",
+            remediation="Wait for endpoint to reach READY state, or create the endpoint first.",
         )
 
-        # ── 4. AI Gateway config ─────────────────────────────────────
+        # 4. AI Gateway config checks (only if endpoint is accessible)
         if ep_resp.status_code == 200:
-            gateway = ep_resp.json().get("ai_gateway", {})
+            gateway    = ep_json.get("ai_gateway", {})
             guardrails = gateway.get("guardrails", {})
             pii_block  = guardrails.get("input", {}).get("pii", {}).get("behavior") == "BLOCK"
             safety_on  = guardrails.get("input", {}).get("safety", False)
-            usage_on   = gateway.get("usage_tracking_config", {}).get("enabled", False)
+            usage_on   = gateway.get("usage_tracking_config",  {}).get("enabled", False)
             payload_on = gateway.get("inference_table_config", {}).get("enabled", False)
             rate_set   = len(gateway.get("rate_limits", [])) > 0
 
-            add_check("AI Gateway: PII BLOCK on input", pii_block,  remediation="Set pii.behavior = BLOCK via gateway config update.")
-            add_check("AI Gateway: Safety filter on",  safety_on,  remediation="Set guardrails.input.safety = true.")
-            add_check("AI Gateway: Usage tracking on", usage_on,   remediation="Enable usage_tracking_config.enabled = true.")
-            add_check("AI Gateway: Payload logging on", payload_on, remediation="Enable inference_table_config with a valid catalog/schema/table.")
-            add_check("AI Gateway: Rate limits set",    rate_set,   remediation="Add at least one rate limit (endpoint QPM).")
+            add_check("AI Gateway: PII BLOCK on input",  pii_block,  remediation="Set pii.behavior = BLOCK via gateway config update.")
+            add_check("AI Gateway: Safety filter on",    safety_on,  remediation="Set guardrails.input.safety = true.")
+            add_check("AI Gateway: Usage tracking on",   usage_on,   remediation="Enable usage_tracking_config.enabled = true.")
+            add_check("AI Gateway: Payload logging on",  payload_on, remediation="Enable inference_table_config with a valid catalog/schema/table.")
+            add_check("AI Gateway: Rate limits set",     rate_set,   remediation="Add at least one rate limit (endpoint QPM).")
 
     except Exception as e:
-        add_check(f"Endpoint check", False, detail=str(e), remediation="Check endpoint name and API access.")
+        add_check("Endpoint check", False, detail=str(e), remediation="Check endpoint name and API access.")
 
-    # ── 5. Target group exists ───────────────────────────────────────
+    # 5. Target group exists in the workspace
     try:
-        groups = list(w.groups.list(filter=f"displayName eq \"{target_group}\""))
+        groups      = list(w.groups.list(filter=f"displayName eq \"{target_group}\""))
         group_exists = len(groups) > 0
         add_check(
             f"Group '{target_group}' exists",
@@ -961,13 +1052,11 @@ def run_preflight_checklist(
     except Exception as e:
         add_check(f"Group '{target_group}' exists", False, detail=str(e))
 
-    # ── 6. UC permissions logged ─────────────────────────────────────
-    # Note: we can't programmatically verify all GRANT statements are correct,
-    # but we can check if there are any grants on the endpoint at all.
+    # 6. Endpoint has permission entries
     try:
-        perms_url = f"{workspace_url}/api/2.0/permissions/serving-endpoints/{endpoint_name}"
+        perms_url  = f"{workspace_url}/api/2.0/permissions/serving-endpoints/{endpoint_name}"
         perms_resp = requests.get(perms_url, headers=headers, timeout=15)
-        has_perms = perms_resp.status_code == 200 and bool(perms_resp.json().get("access_control_list"))
+        has_perms  = perms_resp.status_code == 200 and bool(perms_resp.json().get("access_control_list"))
         add_check(
             "Serving endpoint has permission entries",
             has_perms,
@@ -977,15 +1066,15 @@ def run_preflight_checklist(
     except Exception as e:
         add_check("Endpoint permissions check", False, detail=str(e))
 
-    # ── Compile results ──────────────────────────────────────────────
+    # Compile results
     all_passed = all(r["status"] == "PASS" for r in results)
     return {
         "preflight_timestamp": datetime.now(timezone.utc).isoformat(),
-        "endpoint_name": endpoint_name,
-        "target_group": target_group,
-        "overall_status": "PASS — safe to enable AI access" if all_passed else "FAIL — resolve issues before enabling AI access",
-        "all_checks_passed": all_passed,
-        "checks": results,
+        "endpoint_name":       endpoint_name,
+        "target_group":        target_group,
+        "overall_status":      "PASS — safe to enable AI access" if all_passed else "FAIL — resolve issues before enabling AI access",
+        "all_checks_passed":   all_passed,
+        "checks":              results,
     }
 
 
@@ -1019,7 +1108,6 @@ def print_preflight_report(report: dict) -> None:
 PREFLIGHT_ENDPOINT = "pt-llama3-energy"   # TODO
 PREFLIGHT_GROUP    = "grp_analysts"        # TODO
 
-# Run the pre-flight checklist
 preflight_report = run_preflight_checklist(
     workspace_url=WORKSPACE_URL,
     account_id=ACCOUNT_ID,
@@ -1037,23 +1125,21 @@ print_preflight_report(preflight_report)
 
 # COMMAND ----------
 
-# SOLUTION: Persist pre-flight results to Delta for change management audit trail
-
 def save_preflight_report(spark, catalog: str, schema: str, report: dict) -> None:
-    """Persist a pre-flight checklist result to Delta."""
+    """Persist a pre-flight checklist result to Delta for change management audit trail."""
     table = f"{catalog}.{schema}.ai_preflight_checks"
     spark.sql(f"CREATE SCHEMA IF NOT EXISTS {catalog}.{schema}")
 
     row = {
-        "check_timestamp": report["preflight_timestamp"],
-        "endpoint_name":   report["endpoint_name"],
-        "target_group":    report["target_group"],
-        "all_passed":      report["all_checks_passed"],
-        "overall_status":  report["overall_status"],
-        "check_count":     len(report["checks"]),
-        "pass_count":      sum(1 for c in report["checks"] if c["status"] == "PASS"),
-        "fail_count":      sum(1 for c in report["checks"] if c["status"] == "FAIL"),
-        "full_report_json": json.dumps(report, default=str),
+        "check_timestamp":   report["preflight_timestamp"],
+        "endpoint_name":     report["endpoint_name"],
+        "target_group":      report["target_group"],
+        "all_passed":        report["all_checks_passed"],
+        "overall_status":    report["overall_status"],
+        "check_count":       len(report["checks"]),
+        "pass_count":        sum(1 for c in report["checks"] if c["status"] == "PASS"),
+        "fail_count":        sum(1 for c in report["checks"] if c["status"] == "FAIL"),
+        "full_report_json":  json.dumps(report, default=str),
     }
 
     df = spark.createDataFrame([row])
@@ -1069,10 +1155,10 @@ print("Pre-flight report save is commented out — uncomment after configuring c
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC ## 8. Final Compliance Summary
-# MAGIC
-# MAGIC Run this cell at the end of the workshop to generate the final compliance
-# MAGIC summary. This is the "executive summary" page of your evidence package.
+# MAGIC <div style="border-left: 4px solid #FF3621; padding-left: 16px; margin: 24px 0">
+# MAGIC <h2 style="color: #1B3139; margin: 0">Section 8: Final Compliance Summary</h2>
+# MAGIC <p style="color: #666; margin: 4px 0 0 0">Executive summary page of the evidence package — run this last.</p>
+# MAGIC </div>
 
 # COMMAND ----------
 
@@ -1084,9 +1170,9 @@ def print_final_compliance_summary(
 ) -> None:
     """Print a one-page compliance summary for executive review."""
 
-    in_region  = [f for f in feature_inventory if f["residency"] == "IN_REGION"]
-    cross_geo  = [f for f in feature_inventory if f["residency"] == "CROSS_GEO"]
-    unavail    = [f for f in feature_inventory if f["residency"] == "NOT_AVAILABLE"]
+    in_region = [f for f in feature_inventory if f["residency"] == "IN_REGION"]
+    cross_geo = [f for f in feature_inventory if f["residency"] == "CROSS_GEO"]
+    unavail   = [f for f in feature_inventory if f["residency"] == "NOT_AVAILABLE"]
 
     geo_status = geo_result.get("status", "UNKNOWN")
 
@@ -1100,7 +1186,11 @@ def print_final_compliance_summary(
     print("║                                                                ║")
     print("║  INFRASTRUCTURE                                                ║")
     print(f"║  Workspace region          : australiaeast (Azure)             ║")
-    geo_display = {"PASS": "ENABLED [PASS]", "FAIL": "NOT ENABLED [FAIL]", "CANNOT_VERIFY": "UNVERIFIED [WARN]"}.get(geo_status, geo_status)
+    geo_display = {
+        "PASS":           "ENABLED [PASS]",
+        "FAIL":           "NOT ENABLED [FAIL]",
+        "CANNOT_VERIFY":  "UNVERIFIED [WARN]",
+    }.get(geo_status, geo_status)
     print(f"║  Geography enforcement     : {geo_display:<38}║")
     print("║                                                                ║")
     print("║  AI FEATURE INVENTORY                                          ║")
@@ -1109,7 +1199,11 @@ def print_final_compliance_summary(
     print(f"║  Not available in AU East  : {len(unavail):<4} features                      ║")
     print("║                                                                ║")
     print("║  CONTROLS                                                      ║")
-    pf_status = "ALL PASSED" if preflight_report["all_checks_passed"] else f"ISSUES FOUND ({sum(1 for c in preflight_report['checks'] if c['status'] == 'FAIL')} failing)"
+    pf_status = (
+        "ALL PASSED"
+        if preflight_report["all_checks_passed"]
+        else f"ISSUES ({sum(1 for c in preflight_report['checks'] if c['status'] == 'FAIL')} failing)"
+    )
     print(f"║  Pre-flight check          : {pf_status:<38}║")
     print("║  Rate limits               : Configured (endpoint + user)      ║")
     print("║  PII guardrail             : BLOCK mode on all prod endpoints   ║")
@@ -1135,7 +1229,9 @@ print_final_compliance_summary(
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC ## 9. Lab Summary & Workshop Recap
+# MAGIC <div style="border-left: 4px solid #FF3621; padding-left: 16px; margin: 24px 0">
+# MAGIC <h2 style="color: #1B3139; margin: 0">Section 9: Lab Checkpoint & Workshop Recap</h2>
+# MAGIC </div>
 
 # COMMAND ----------
 
@@ -1149,7 +1245,7 @@ checks = [
     "AI feature inventory: 11 features reviewed with residency status",
     "Feature flag status queried for each feature",
     "Compliance evidence package generated (structured JSON)",
-    "Evidence package saved to Delta pattern",
+    "Evidence package save-to-Delta pattern documented",
     "APRA audit log query: all AI access events with user/IP",
     "Access log export to Unity Catalog volume",
     "UC tag schema defined for AI asset classification",
@@ -1174,22 +1270,23 @@ print("  03  Rate Limits & Guardrails Deep Dive")
 print("  04  Usage Tracking & Cost Attribution")
 print("  05  Data Residency Verification & Compliance Evidence")
 print()
-print("Next steps for your organisation:")
+print("Recommended next steps for your organisation:")
 print("  1. Enable Geography enforcement in Account Console")
 print("  2. Create AI Gateway endpoints for each access tier")
 print("  3. Apply PII BLOCK + safety guardrails on all production endpoints")
 print("  4. Schedule the daily budget alert notebook")
 print("  5. Run the pre-flight checklist before each new team onboarding")
 print("  6. Tag all AI assets in Unity Catalog")
-print("  7. Set up the compliance evidence package as a quarterly scheduled job")
+print("  7. Schedule the compliance evidence package as a quarterly job")
 
 # COMMAND ----------
 
 # MAGIC %md
 # MAGIC ---
-# MAGIC ## Reference: Compliance Evidence Artefact Checklist
+# MAGIC <div style="background: #F0F4F8; padding: 16px; border-radius: 6px; margin-top: 16px">
+# MAGIC <h3 style="color: #1B3139; margin: 0 0 12px 0">Compliance Evidence Artefact Checklist</h3>
 # MAGIC
-# MAGIC Use this as your evidence collection checklist for an APRA CPS 234 review:
+# MAGIC Use this as your collection checklist for an APRA CPS 234 review:
 # MAGIC
 # MAGIC | Artefact | Source | How to produce |
 # MAGIC |---|---|---|
@@ -1203,3 +1300,4 @@ print("  7. Set up the compliance evidence package as a quarterly scheduled job"
 # MAGIC | Payload log table metadata | UC `DESCRIBE TABLE` | Run against inference table |
 # MAGIC | Pre-flight checklist run log | Delta table | Section 7b in this notebook |
 # MAGIC | Budget alert job definition | Databricks Jobs API | Job JSON from Lab 04 Section 5c |
+# MAGIC </div>

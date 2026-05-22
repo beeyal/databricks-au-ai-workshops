@@ -1,54 +1,89 @@
 # Databricks notebook source
 # MAGIC %md
-# MAGIC # Lab 04: AI Functions — In-Region Pattern for Australia East
+# MAGIC <div style="background: linear-gradient(135deg, #1B3A5C 0%, #FF3621 100%); padding: 24px 32px; border-radius: 10px; margin-bottom: 8px">
+# MAGIC   <h1 style="color: white; margin: 0; font-size: 28px; font-family: 'DM Sans', sans-serif">
+# MAGIC     Lab 04 -- AI Functions: In-Region Pattern for Australia East
+# MAGIC   </h1>
+# MAGIC   <p style="color: rgba(255,255,255,0.85); margin: 8px 0 0 0; font-size: 15px">
+# MAGIC     Workshop 2B: Genie Spaces and AI Features -- Australian Regulated Industries
+# MAGIC   </p>
+# MAGIC </div>
 # MAGIC
-# MAGIC **Workshop:** Genie Spaces & AI Features — Australian Regulated Industries
-# MAGIC **Duration:** 40–45 minutes
-# MAGIC **Role:** Data Engineer / ML Engineer
-# MAGIC **Prerequisite:** Labs 01–02 complete — `workshop.energy_nem` tables exist
+# MAGIC <table style="border-collapse: collapse; width: 100%; margin-top: 8px; font-family: 'DM Sans', sans-serif">
+# MAGIC   <tr>
+# MAGIC     <td style="padding: 8px 16px; background: #F4F4F4; border-radius: 4px; width: 25%"><strong>Duration</strong></td>
+# MAGIC     <td style="padding: 8px 16px">40-45 minutes</td>
+# MAGIC   </tr>
+# MAGIC   <tr>
+# MAGIC     <td style="padding: 8px 16px; background: #F4F4F4; border-radius: 4px"><strong>Role</strong></td>
+# MAGIC     <td style="padding: 8px 16px">Data Engineer / ML Engineer</td>
+# MAGIC   </tr>
+# MAGIC   <tr>
+# MAGIC     <td style="padding: 8px 16px; background: #F4F4F4; border-radius: 4px"><strong>Prerequisite</strong></td>
+# MAGIC     <td style="padding: 8px 16px">Labs 01-02 complete -- <code>workshop.energy_nem</code> tables exist</td>
+# MAGIC   </tr>
+# MAGIC </table>
 # MAGIC
 # MAGIC ---
 # MAGIC
-# MAGIC ## Objectives
+# MAGIC ### Objectives
 # MAGIC
-# MAGIC 1. Understand **why** default AI Functions are cross-geo and why that matters
-# MAGIC 2. Deploy a **Provisioned Throughput (PT) endpoint** in AU East as the in-region AI router
-# MAGIC 3. Create a **UC wrapper function** that routes all AI calls through the PT endpoint
-# MAGIC 4. Implement classification, summarisation, and extraction using the in-region pattern
-# MAGIC 5. Build Australian-specific **PII masking** (TFN, Medicare, ABN, ACN detection)
-# MAGIC 6. Apply to realistic energy domain scenarios: outage classification and work order extraction
-# MAGIC
-# MAGIC ---
-# MAGIC
-# MAGIC ## The Core Problem: AI Functions Are Cross-Geo by Default
-# MAGIC
-# MAGIC ```
-# MAGIC DEFAULT (cross-geo) — DO NOT USE for regulated AU data:
-# MAGIC ─────────────────────────────────────────────────────────
-# MAGIC  AU East workspace
-# MAGIC       │  ai_classify(text, ...)
-# MAGIC       │
-# MAGIC       └──► FMAPI endpoint (US East / multi-region)
-# MAGIC                       ── text crosses geo boundary ──►
-# MAGIC
-# MAGIC IN-REGION (correct pattern):
-# MAGIC ─────────────────────────────────────────────────────────
-# MAGIC  AU East workspace
-# MAGIC       │  ai_query('au_east_llm_inregion', prompt)
-# MAGIC       │
-# MAGIC       └──► Provisioned Throughput endpoint (Australia East)
-# MAGIC                       ── text stays in region ──►
-# MAGIC ```
-# MAGIC
-# MAGIC **Regulatory context:** Under the Australian Privacy Act, AEMO's ISP, and the AER's
-# MAGIC Cyber Security Guidelines, operational technology data and personal information
-# MAGIC (customer NMIs, consumption data) must not be processed outside Australia without
-# MAGIC explicit consent or a cross-border data agreement.
+# MAGIC | # | Objective |
+# MAGIC |---|-----------|
+# MAGIC | 1 | Understand **why** default AI Functions are cross-geo and why that matters for APRA-regulated workloads |
+# MAGIC | 2 | Deploy a **Provisioned Throughput (PT) endpoint** in AU East as the in-region AI router |
+# MAGIC | 3 | Create **Unity Catalog wrapper functions** that route all AI calls through the PT endpoint |
+# MAGIC | 4 | Implement classification, summarisation, and extraction using the in-region pattern |
+# MAGIC | 5 | Build Australian-specific **PII masking** -- TFN, Medicare, ABN, ACN, NMI detection |
+# MAGIC | 6 | Apply to realistic energy domain scenarios: outage classification and work order extraction |
 
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC ## Setup
+# MAGIC ---
+# MAGIC ## Why This Lab Exists: The Data Residency Problem
+# MAGIC
+# MAGIC <div style="background: #FFF3CD; padding: 16px; border-radius: 8px; border-left: 4px solid #FF8C00; margin: 16px 0">
+# MAGIC <strong>Important for APRA-regulated organisations</strong><br/>
+# MAGIC The built-in AI Functions (<code>ai_classify</code>, <code>ai_summarize</code>, <code>ai_extract</code>, <code>ai_generate</code>)
+# MAGIC route data through Databricks' shared Foundation Model API (FMAPI) infrastructure.
+# MAGIC For Australian workspaces, this means data <strong>MAY leave AU East</strong> -- typically routing to US East 1.
+# MAGIC We fix this by deploying a Provisioned Throughput endpoint that is pinned to your workspace region.
+# MAGIC </div>
+# MAGIC
+# MAGIC **The problem -- and the fix:**
+# MAGIC
+# MAGIC ```
+# MAGIC DEFAULT (DO NOT USE for regulated AU data)
+# MAGIC ----------------------------------------------------------
+# MAGIC  Your notebook          Databricks FMAPI
+# MAGIC  (AU East)              (shared infrastructure)
+# MAGIC      |                        |
+# MAGIC      |-- ai_classify(...) --->|-- may route to US/EU -->
+# MAGIC      |                        |
+# MAGIC      |<--- result ------------|
+# MAGIC                                         ^ data leaves AU
+# MAGIC
+# MAGIC CORRECT PATTERN (in-region)
+# MAGIC ----------------------------------------------------------
+# MAGIC  Your notebook          Your PT endpoint
+# MAGIC  (AU East)              (australiaeast, dedicated)
+# MAGIC      |                        |
+# MAGIC      |-- ai_query('au_pt',.)->|-- Meta-Llama 3.1 8B -->
+# MAGIC      |                        |   (stays in AU East)
+# MAGIC      |<--- result ------------|
+# MAGIC                                         ^ data stays in AU
+# MAGIC ```
+# MAGIC
+# MAGIC **Regulatory context:** Under the Australian Privacy Act, AEMO's ISP, and the AER Cyber Security
+# MAGIC Guidelines, operational technology data and personal information (customer NMIs, consumption data)
+# MAGIC must not be processed outside Australia without explicit consent or a cross-border data agreement.
+# MAGIC This is distinct from compute -- your Delta tables, jobs, and clusters always run in AU East, but
+# MAGIC FMAPI pay-per-token model inference currently routes globally.
+
+# MAGIC %md
+# MAGIC ---
+# MAGIC ## Step 0 -- Setup
 
 # COMMAND ----------
 
@@ -73,71 +108,122 @@ def hdrs():
     return {"Authorization": f"Bearer {token}", "Content-Type": "application/json"}
 
 print(f"Connected: {HOST}")
+print(f"Catalog:   {CATALOG}")
+print(f"Schema:    {SCHEMA}")
 
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC ## Step 1 — Understand the Designated Services Classification
+# MAGIC ---
+# MAGIC ## Step 1 -- Understand the Designated Services Classification
 # MAGIC
 # MAGIC Databricks AI Functions (`ai_classify`, `ai_summarize`, `ai_extract`, `ai_generate`) call
 # MAGIC the **Foundation Model API (FMAPI)**. In AU East, FMAPI is a "Designated Service" under
-# MAGIC the Databricks Cloud Agreement — meaning the underlying model inference may run
-# MAGIC in a different region (typically US East 1).
+# MAGIC the Databricks Cloud Agreement -- meaning model inference **may run in a different region**
+# MAGIC (typically US East 1).
 # MAGIC
-# MAGIC **This is distinct from compute:** Your Delta tables, jobs, and clusters always run in AU East.
-# MAGIC But the model serving inference for FMAPI pay-per-token models currently routes globally.
+# MAGIC <div style="background: #E8F4FD; padding: 14px 18px; border-radius: 6px; border-left: 4px solid #1B3A5C; margin: 12px 0">
+# MAGIC <strong>This is distinct from compute.</strong> Your Delta tables, jobs, and clusters always run in AU East.
+# MAGIC Only the LLM inference step for pay-per-token FMAPI models currently routes globally.
+# MAGIC </div>
 # MAGIC
-# MAGIC ### The Workaround
-# MAGIC
-# MAGIC Deploy a **Provisioned Throughput (PT)** endpoint on an explicitly AU East serving endpoint.
-# MAGIC PT endpoints run on your workspace's compute region — guaranteed AU East inference.
-# MAGIC Replace all `ai_*` function calls with `ai_query('your_pt_endpoint', prompt)`.
+# MAGIC **The workaround:** Deploy a **Provisioned Throughput (PT)** endpoint. PT endpoints run on
+# MAGIC your workspace's compute region -- guaranteed AU East inference. Replace all `ai_*()` calls
+# MAGIC with `ai_query('your_pt_endpoint', prompt)`.
 
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC ## Step 2 — Deploy a Provisioned Throughput Endpoint (AU East)
+# MAGIC ---
+# MAGIC ## Step 2 -- Deploy a Provisioned Throughput Endpoint (AU East)
+# MAGIC
+# MAGIC ### Option A -- Deploy via the UI (recommended for first-timers)
+# MAGIC
+# MAGIC Follow these steps in the Databricks UI before running the SDK code below.
+# MAGIC
+# MAGIC **Navigate:** Machine Learning -> Serving -> [+ Create serving endpoint]
+# MAGIC
+# MAGIC **Step 2.1 -- Name your endpoint**
+# MAGIC ```
+# MAGIC +--- Create serving endpoint ------------------------------------------+
+# MAGIC |                                                                      |
+# MAGIC |  Name*: [ au_east_llm_inregion                               ]      |
+# MAGIC |                                                                      |
+# MAGIC |  Served entities:                                                    |
+# MAGIC |  [+ Add served entity]                                               |
+# MAGIC |                                                                      |
+# MAGIC +----------------------------------------------------------------------+
+# MAGIC ```
+# MAGIC
+# MAGIC **Step 2.2 -- Select the model**
+# MAGIC
+# MAGIC Click **[+ Add served entity]** then fill in:
+# MAGIC ```
+# MAGIC +--- Select entity ----------------------------------------------------+
+# MAGIC |                                                                      |
+# MAGIC |  Entity type:  (* Foundation model)  ( Model registry)              |
+# MAGIC |                                                                      |
+# MAGIC |  Model:  [ meta-llama/Meta-Llama-3.1-8B-Instruct   v ]             |
+# MAGIC |                                                                      |
+# MAGIC |  Throughput type:                                                    |
+# MAGIC |  ( ) Pay per token      <- cross-geo, DO NOT use for regulated data  |
+# MAGIC |  (*) Provisioned throughput  <- select this                         |
+# MAGIC |                                                                      |
+# MAGIC |  Min throughput: [ 0    ]  (scale to zero saves cost when idle)     |
+# MAGIC |  Max throughput: [ 1000 ]  tokens / second                          |
+# MAGIC |                                                                      |
+# MAGIC +----------------------------------------------------------------------+
+# MAGIC ```
+# MAGIC
+# MAGIC **Step 2.3 -- Create (takes 5-15 minutes to reach READY state)**
+# MAGIC ```
+# MAGIC Watch status:  Serving -> Endpoints -> au_east_llm_inregion
+# MAGIC                                        Status:  Pending -> Ready
+# MAGIC ```
+# MAGIC
+# MAGIC ---
+# MAGIC
+# MAGIC ### Option B -- Deploy via SDK (run the cell below)
 
 # COMMAND ----------
 
-# TODO: set your endpoint name — must be unique in the workspace
-PT_ENDPOINT_NAME = "au_east_llm_inregion"  # TODO: change if needed
+# TODO: set your endpoint name -- must be unique in the workspace
+PT_ENDPOINT_NAME = "au_east_llm_inregion"  # TODO: change if name is already taken
 
-# Available in-region models for AU East (confirmed May 2026):
-# - meta-llama/Meta-Llama-3.1-8B-Instruct   (smallest, fastest, cheapest)
+# Available IN-REGION models for AU East (confirmed May 2026):
+# - meta-llama/Meta-Llama-3.1-8B-Instruct   (smallest / fastest / cheapest -- use for this workshop)
 # - meta-llama/Meta-Llama-3.1-70B-Instruct  (balanced quality/cost)
-# - meta-llama/Meta-Llama-3.3-70B-Instruct  (recommended for complex tasks)
-# - mistralai/Mistral-7B-Instruct-v0.2       (fast, good for classification)
+# - meta-llama/Meta-Llama-3.3-70B-Instruct  (recommended for complex summarisation)
+# - mistralai/Mistral-7B-Instruct-v0.2       (fast, good for classification tasks)
 #
-# NOT available in-region for AU East (cross-geo):
-# - databricks-claude-sonnet-4 (cross-geo for AU as of May 2026)
-# - databricks-meta-llama-3-1-405b (cross-geo for AU)
+# NOT available in-region for AU East (cross-geo as of May 2026):
+# - databricks-claude-sonnet-4               (routes outside AU)
+# - databricks-meta-llama-3-1-405b           (routes outside AU)
 #
-# Use Meta-Llama-3.1-8B for this workshop (most cost-effective, in-region)
+# NOTE: databricks-claude-haiku-4-5 appears in the UI -- verify PP status before regulated use.
+# For this workshop, use Meta-Llama-3.1-8B: confirmed in-region, most cost-effective.
 
 PT_MODEL_NAME = "meta-llama/Meta-Llama-3.1-8B-Instruct"
 
-# Minimum scale (0 = scale to zero when idle, reduces cost for workshop)
-PT_SCALE_TO_ZERO = True
 
 def create_pt_endpoint(endpoint_name: str, model_name: str) -> str:
     """
     Creates a Provisioned Throughput serving endpoint.
     Returns the endpoint name once it is ready.
+    Skips creation if the endpoint already exists.
     """
-    print(f"Creating PT endpoint: {endpoint_name}")
-    print(f"Model: {model_name}")
-    print("This typically takes 5–10 minutes...")
+    print(f"Endpoint name : {endpoint_name}")
+    print(f"Model         : {model_name}")
+    print("Estimated time: 5-10 minutes to reach READY state...")
+    print()
 
     try:
-        # Check if already exists
         existing = w.serving_endpoints.get(endpoint_name)
-        print(f"Endpoint already exists (state: {existing.state.ready}). Reusing.")
+        print(f"Endpoint already exists -- state: {existing.state.ready}. Reusing.")
         return endpoint_name
     except Exception:
-        pass  # Doesn't exist yet
+        pass  # Does not exist yet -- proceed to create
 
-    # Create the endpoint
     w.serving_endpoints.create_and_wait(
         name=endpoint_name,
         config=EndpointCoreConfigInput(
@@ -146,8 +232,8 @@ def create_pt_endpoint(endpoint_name: str, model_name: str) -> str:
                     name=f"{endpoint_name}_entity",
                     entity_name=model_name,
                     entity_version="1",
-                    min_provisioned_throughput=0,  # scale to zero when idle
-                    max_provisioned_throughput=1000,  # tokens per second
+                    min_provisioned_throughput=0,    # scale to zero when idle
+                    max_provisioned_throughput=1000, # tokens per second
                 )
             ],
             traffic_config=TrafficConfig(
@@ -157,40 +243,69 @@ def create_pt_endpoint(endpoint_name: str, model_name: str) -> str:
         timeout=600  # 10 minutes
     )
 
-    print(f"Endpoint '{endpoint_name}' is ready.")
+    print(f"Endpoint '{endpoint_name}' is READY.")
     return endpoint_name
 
 
-# Create the endpoint (runs synchronously — wait for READY state)
-# NOTE: This takes 5–10 minutes. Proceed with reviewing the next cells while waiting.
+# Runs synchronously -- blocks until READY state (or timeout at 10 min)
+# TIP: review Step 3 markdown cells while waiting
 ENDPOINT_NAME = create_pt_endpoint(PT_ENDPOINT_NAME, PT_MODEL_NAME)
 print(f"\nEndpoint name for all subsequent cells: {ENDPOINT_NAME}")
 
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC ### While the endpoint starts: verify the endpoint is AU East
+# MAGIC ### Test the endpoint from the UI (once READY)
 # MAGIC
-# MAGIC Once the endpoint is ready, run this cell to confirm it is serving in AU East.
+# MAGIC When the endpoint reaches **Ready** status, you can send a test request directly from the UI
+# MAGIC before running any code.
+# MAGIC
+# MAGIC **Navigate:** Machine Learning -> Serving -> `au_east_llm_inregion` -> **[Query endpoint]** tab
+# MAGIC
+# MAGIC ```
+# MAGIC +--- Query endpoint ---------------------------------------------------+
+# MAGIC |                                                                      |
+# MAGIC |  Request (JSON):                                                     |
+# MAGIC |  {                                                                   |
+# MAGIC |    "messages": [                                                     |
+# MAGIC |      {                                                               |
+# MAGIC |        "role": "user",                                               |
+# MAGIC |        "content": "Classify this text as WEATHER or EQUIPMENT:      |
+# MAGIC |                    the transformer overheated during a heatwave."    |
+# MAGIC |      }                                                               |
+# MAGIC |    ]                                                                 |
+# MAGIC |  }                                                                   |
+# MAGIC |                                                                      |
+# MAGIC |  [Send request]                                                      |
+# MAGIC |                                                                      |
+# MAGIC |  Response:                                                           |
+# MAGIC |  {"choices": [{"message": {"content": "WEATHER", "role": ...}}]}    |
+# MAGIC |                                                                      |
+# MAGIC +----------------------------------------------------------------------+
+# MAGIC ```
+# MAGIC
+# MAGIC <div style="background: #E8F8E8; padding: 12px 16px; border-radius: 6px; border-left: 4px solid #28A745; margin: 12px 0">
+# MAGIC <strong>Region confirmation:</strong> The endpoint URL always points to your workspace region.
+# MAGIC The inference URL routes to AU East compute -- no cross-geo data transfer.
+# MAGIC </div>
 
 # COMMAND ----------
 
+# Verify endpoint is ready and confirm its configuration
 def verify_endpoint_region(endpoint_name: str) -> None:
-    """Confirm endpoint is ready and log its configuration."""
     ep = w.serving_endpoints.get(endpoint_name)
-    print(f"Endpoint: {ep.name}")
-    print(f"State:    {ep.state.ready if ep.state else 'unknown'}")
+    print(f"Endpoint : {ep.name}")
+    print(f"State    : {ep.state.ready if ep.state else 'unknown'}")
 
     config = ep.config
     if config and config.served_entities:
         for entity in config.served_entities:
-            print(f"Model:    {entity.entity_name}")
-            print(f"Min TPU:  {entity.min_provisioned_throughput}")
-            print(f"Max TPU:  {entity.max_provisioned_throughput}")
+            print(f"Model    : {entity.entity_name}")
+            print(f"Min TPU  : {entity.min_provisioned_throughput} tokens/s")
+            print(f"Max TPU  : {entity.max_provisioned_throughput} tokens/s")
 
-    # The endpoint URL always points to your workspace region (AU East)
     print(f"\nInference URL: https://{HOST}/serving-endpoints/{endpoint_name}/invocations")
-    print("This URL routes to AU East compute — no cross-geo data transfer.")
+    print("This URL routes to AU East compute -- no cross-geo data transfer.")
 
 
 try:
@@ -202,32 +317,37 @@ except Exception as e:
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC ## Step 3 — Create a UC Wrapper Function
+# MAGIC ---
+# MAGIC ## Step 3 -- Create Unity Catalog Wrapper Functions
 # MAGIC
-# MAGIC Rather than calling `ai_query('endpoint_name', ...)` everywhere, create a
-# MAGIC Unity Catalog function that wraps the PT endpoint. This gives you:
-# MAGIC - A single place to swap the endpoint without updating every query
-# MAGIC - SQL-accessible callable from Genie, notebooks, and jobs
-# MAGIC - Consistent prompt templating
+# MAGIC Rather than calling `ai_query('endpoint_name', ...)` in every query, wrap the PT endpoint in
+# MAGIC Unity Catalog functions. This gives you:
+# MAGIC
+# MAGIC | Benefit | Detail |
+# MAGIC |---------|--------|
+# MAGIC | **Single update point** | Swap endpoint or model in one place -- all queries automatically update |
+# MAGIC | **SQL-accessible** | Callable from Genie, notebooks, jobs, and AI/BI dashboards |
+# MAGIC | **Consistent prompting** | Prompt templates live in one place, versioned with UC |
+# MAGIC | **Governance** | UC permissions control who can call each AI function |
 
 # COMMAND ----------
 
-# TODO: replace endpoint name if you used a different name above
-ENDPOINT_FQN = ENDPOINT_NAME  # just the endpoint name; ai_query resolves it
+ENDPOINT_FQN = ENDPOINT_NAME  # just the endpoint name; ai_query resolves it by workspace
 
 spark.sql(f"CREATE SCHEMA IF NOT EXISTS {CATALOG}.ai_functions")
+print(f"Schema ready: {CATALOG}.ai_functions")
 
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC ### 3a — Generic classifier function
+# MAGIC ### 3a -- Generic classifier function
 
 # COMMAND ----------
 
 spark.sql(f"""
 CREATE OR REPLACE FUNCTION {CATALOG}.ai_functions.classify_text(
-    text_input STRING COMMENT 'The text to classify',
-    categories STRING COMMENT 'Comma-separated list of valid categories',
+    text_input    STRING COMMENT 'The text to classify',
+    categories    STRING COMMENT 'Comma-separated list of valid categories',
     domain_context STRING COMMENT 'Domain context to guide the classifier'
 )
 RETURNS STRING
@@ -240,7 +360,7 @@ RETURN
         CONCAT(
             'You are a text classifier for ', domain_context, '. ',
             'Classify the following text into EXACTLY ONE of these categories: ', categories, '. ',
-            'Respond with ONLY the category name — no explanation, no punctuation, no other text.\\n\\n',
+            'Respond with ONLY the category name -- no explanation, no punctuation, no other text.\\n\\n',
             'Text: ', text_input
         )
     )
@@ -250,15 +370,15 @@ print(f"Created: {CATALOG}.ai_functions.classify_text")
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC ### 3b — Summarisation function
+# MAGIC ### 3b -- Summarisation function
 
 # COMMAND ----------
 
 spark.sql(f"""
 CREATE OR REPLACE FUNCTION {CATALOG}.ai_functions.summarise_text(
-    text_input   STRING COMMENT 'The text to summarise',
-    max_words    INT    COMMENT 'Maximum word count for the summary (e.g. 50, 100, 200)',
-    audience     STRING COMMENT 'Target audience: EXECUTIVE, TECHNICAL, OPERATIONAL'
+    text_input STRING COMMENT 'The text to summarise',
+    max_words  INT    COMMENT 'Maximum word count for the summary (e.g. 50, 100, 200)',
+    audience   STRING COMMENT 'Target audience: EXECUTIVE, TECHNICAL, OPERATIONAL'
 )
 RETURNS STRING
 LANGUAGE SQL
@@ -280,13 +400,13 @@ print(f"Created: {CATALOG}.ai_functions.summarise_text")
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC ### 3c — Structured extraction function
+# MAGIC ### 3c -- Structured extraction function
 
 # COMMAND ----------
 
 spark.sql(f"""
 CREATE OR REPLACE FUNCTION {CATALOG}.ai_functions.extract_json(
-    text_input STRING COMMENT 'The text to extract from',
+    text_input  STRING COMMENT 'The text to extract from',
     json_schema STRING COMMENT 'JSON schema describing fields to extract, as a string'
 )
 RETURNS STRING
@@ -308,7 +428,7 @@ print(f"Created: {CATALOG}.ai_functions.extract_json")
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC ### 3d — PII detection function (Australian-specific)
+# MAGIC ### 3d -- PII detection function (Australian-specific)
 
 # COMMAND ----------
 
@@ -319,8 +439,8 @@ CREATE OR REPLACE FUNCTION {CATALOG}.ai_functions.detect_au_pii(
 RETURNS STRING
 LANGUAGE SQL
 COMMENT 'Detects Australian PII (TFN, Medicare, ABN, ACN, NMI) in text.
-Returns JSON with detected PII types and whether masking is required.
-Uses AU East in-region endpoint — PII data never leaves Australia.'
+Returns JSON with detected PII types and risk level.
+Uses AU East in-region endpoint -- PII data never leaves Australia.'
 RETURN
     ai_query(
         '{ENDPOINT_FQN}',
@@ -332,12 +452,12 @@ RETURN
             '(3) ABN (Australian Business Number): 11 digits, often formatted XX XXX XXX XXX, ',
             '(4) ACN (Australian Company Number): 9 digits, often formatted XXX XXX XXX, ',
             '(5) NMI (National Metering Identifier): 10-11 alphanumeric characters starting with a letter. ',
-            'Return a JSON object with these fields: ',
+            'Return a JSON object: ',
             '{"contains_pii": true/false, ',
             '"pii_types_found": ["TFN","MEDICARE","ABN","ACN","NMI"], ',
             '"masking_required": true/false, ',
             '"risk_level": "HIGH/MEDIUM/LOW/NONE"}. ',
-            'Return ONLY the JSON — no explanation.\\n\\nText: ', text_input
+            'Return ONLY the JSON -- no explanation.\\n\\nText: ', text_input
         )
     )
 """)
@@ -346,16 +466,21 @@ print(f"Created: {CATALOG}.ai_functions.detect_au_pii")
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC ## Step 4 — Test the Wrapper Functions
+# MAGIC ---
+# MAGIC ## Step 4 -- Test the Wrapper Functions
+# MAGIC
+# MAGIC <div style="background: #FFF3CD; padding: 12px 16px; border-radius: 6px; border-left: 4px solid #FF8C00; margin: 8px 0">
+# MAGIC <strong>Prerequisite:</strong> The PT endpoint must be in <strong>Ready</strong> state before running test cells.
+# MAGIC Check: Machine Learning -> Serving -> <code>au_east_llm_inregion</code>
+# MAGIC </div>
 
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC ### 4a — Classification test
+# MAGIC ### 4a -- Classification test: outage cause from field notes
 
 # COMMAND ----------
 
-# Test: classify outage cause from unstructured field notes
 test_outage_texts = [
     ("Storm knocked over a 66kV feeder pole near Dandenong Creek. Wire down, roads closed.",
      "WEATHER,EQUIPMENT_FAILURE,VEGETATION,THIRD_PARTY,UNKNOWN"),
@@ -365,7 +490,7 @@ test_outage_texts = [
      "WEATHER,EQUIPMENT_FAILURE,VEGETATION,THIRD_PARTY,UNKNOWN"),
 ]
 
-print("CLASSIFICATION TEST — Outage Cause from Field Notes")
+print("CLASSIFICATION TEST -- Outage Cause from Field Notes")
 print("=" * 60)
 for text, categories in test_outage_texts:
     result = spark.sql(f"""
@@ -375,17 +500,34 @@ for text, categories in test_outage_texts:
             'Australian electricity distribution network operations'
         ) AS classification
     """).collect()[0][0]
-    print(f"\nText:   {text[:80]}...")
+    print(f"\nText:   {text[:80]}")
     print(f"Result: {result}")
 
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC ### 4b — Summarisation test
+# MAGIC **Expected output:**
+# MAGIC ```
+# MAGIC CLASSIFICATION TEST -- Outage Cause from Field Notes
+# MAGIC ============================================================
+# MAGIC
+# MAGIC Text:   Storm knocked over a 66kV feeder pole near Dandenong Creek...
+# MAGIC Result: WEATHER
+# MAGIC
+# MAGIC Text:   Excavator struck underground 11kV cable during council roadworks in Footscray.
+# MAGIC Result: THIRD_PARTY
+# MAGIC
+# MAGIC Text:   Transformer bushings failed at Essendon zone substation. OEM bulletin...
+# MAGIC Result: EQUIPMENT_FAILURE
+# MAGIC ```
 
 # COMMAND ----------
 
-# Test: summarise a regulatory report extract
+# MAGIC %md
+# MAGIC ### 4b -- Summarisation test: regulatory report extract
+
+# COMMAND ----------
+
 SAMPLE_REPORT_TEXT = """
 The Distribution Annual Planning Report for FY2024 identifies three critical
 augmentation projects requiring capital investment in the VIC1 distribution
@@ -400,7 +542,7 @@ $83.1M over three years. AER regulatory approval is required under the
 AEMC's Distribution Reliability Minimum Standards by June 2025.
 """
 
-print("SUMMARISATION TEST")
+print("SUMMARISATION TEST -- Three audiences, 60 words each")
 print("=" * 60)
 for audience in ["EXECUTIVE", "TECHNICAL", "OPERATIONAL"]:
     result = spark.sql(f"""
@@ -410,17 +552,38 @@ for audience in ["EXECUTIVE", "TECHNICAL", "OPERATIONAL"]:
             '{audience}'
         ) AS summary
     """).collect()[0][0]
-    print(f"\n[{audience} - 60 words]")
+    print(f"\n[{audience}]")
     print(f"  {result}")
 
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC ### 4c — Structured extraction test
+# MAGIC **Expected output (content varies -- check word count and audience framing):**
+# MAGIC ```
+# MAGIC [EXECUTIVE]
+# MAGIC   Three augmentation projects totalling $83.1M are required across the VIC1
+# MAGIC   distribution zone. Essendon (97% capacity), Ringwood, and Footscray projects
+# MAGIC   need AER approval by June 2025. Failure to act risks breaching AER N-1
+# MAGIC   security standards during the next summer peak.
+# MAGIC
+# MAGIC [TECHNICAL]
+# MAGIC   Essendon 66kV zone substation at 97% rated capacity; N-1 threshold is 90%.
+# MAGIC   Ringwood 110kV feeder: 3 voltage violations in 12 months, forecast 8/year by
+# MAGIC   2026. AEMC approval required by June 2025 under NER 5.17. Capex: $83.1M.
+# MAGIC
+# MAGIC [OPERATIONAL]
+# MAGIC   Three network upgrades needed: Essendon substation (overloaded), Ringwood
+# MAGIC   feeder (voltage violations), Footscray cable (replacement).
+# MAGIC   AER approval deadline June 2025. Construction starts July 2025.
+# MAGIC ```
 
 # COMMAND ----------
 
-# Test: extract structured data from a maintenance work order
+# MAGIC %md
+# MAGIC ### 4c -- Structured extraction test: maintenance work order
+
+# COMMAND ----------
+
 WORK_ORDER_TEXT = """
 Work Order #WO-2024-08341
 Date: 14 August 2024
@@ -462,7 +625,7 @@ EXTRACT_SCHEMA = """{
   "oil_added_litres": "number or null"
 }"""
 
-print("EXTRACTION TEST — Work Order")
+print("EXTRACTION TEST -- Maintenance Work Order")
 print("=" * 60)
 result = spark.sql(f"""
     SELECT {CATALOG}.ai_functions.extract_json(
@@ -479,12 +642,35 @@ try:
     for k, v in parsed.items():
         print(f"  {k}: {v}")
 except json.JSONDecodeError:
-    print("Note: clean up the JSON if model added extra text")
+    print("\nNote: clean up the JSON if the model added extra text around the object.")
 
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC ### 4d — Australian PII Detection
+# MAGIC **Expected output:**
+# MAGIC ```json
+# MAGIC {
+# MAGIC   "work_order_id": "WO-2024-08341",
+# MAGIC   "work_date": "2024-08-14",
+# MAGIC   "asset_id": "ZS-DAND-T3",
+# MAGIC   "asset_name": "Dandenong Zone Substation - Transformer T3",
+# MAGIC   "fault_type": "bushing oil leak",
+# MAGIC   "aemo_outage_reference": "AEMO-OUT-240814-002",
+# MAGIC   "hours_worked": 6.5,
+# MAGIC   "next_action_deadline": "2024-11-12",
+# MAGIC   "oil_added_litres": 15
+# MAGIC }
+# MAGIC ```
+# MAGIC
+# MAGIC <div style="background: #E8F4FD; padding: 10px 14px; border-radius: 6px; border-left: 4px solid #1B3A5C; margin: 8px 0">
+# MAGIC <strong>Troubleshooting:</strong> If <code>hours_worked</code> returns null, the model may be parsing "6.5h" as text.
+# MAGIC Update the schema hint to: <code>"hours_worked": "float -- extract numeric value only, e.g. 6.5 from '6.5h'"</code>
+# MAGIC </div>
+
+# COMMAND ----------
+
+# MAGIC %md
+# MAGIC ### 4d -- Australian PII detection
 
 # COMMAND ----------
 
@@ -494,8 +680,8 @@ PII_TEST_TEXTS = [
     # Contains ABN
     "Invoice from AusNet Services Ltd ABN 52 741 965 080 for network services.",
     # Contains Medicare
-    "Customer Medicare card 2345 67891 0 — please verify before processing rebate.",
-    # No PII
+    "Customer Medicare card 2345 67891 0 -- please verify before processing rebate.",
+    # No PII -- clean operational text
     "The Essendon substation recorded peak demand of 38.4 MW on 15 January 2024.",
 ]
 
@@ -511,41 +697,67 @@ for text in PII_TEST_TEXTS:
     print(f"\nText:   {text[:80]}")
     try:
         pii = json.loads(result)
-        print(f"  Contains PII: {pii.get('contains_pii')}")
-        print(f"  Types found:  {pii.get('pii_types_found', [])}")
-        print(f"  Risk level:   {pii.get('risk_level')}")
-    except:
+        print(f"  Contains PII : {pii.get('contains_pii')}")
+        print(f"  Types found  : {pii.get('pii_types_found', [])}")
+        print(f"  Risk level   : {pii.get('risk_level')}")
+    except Exception:
         print(f"  Raw result: {result[:120]}")
 
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC ## Step 5 — Applied Example: Classify Outage Reports (Bulk)
+# MAGIC **Expected output:**
+# MAGIC ```
+# MAGIC Text:   Customer TFN 123 456 782 has lodged a complaint about meter NMI Q1234567890...
+# MAGIC   Contains PII : True
+# MAGIC   Types found  : ['TFN', 'NMI']
+# MAGIC   Risk level   : HIGH
 # MAGIC
-# MAGIC Apply the in-region classification pattern to the outages table.
-# MAGIC This is the foundation for the batch pipeline in Lab 05.
+# MAGIC Text:   Invoice from AusNet Services Ltd ABN 52 741 965 080 for network services.
+# MAGIC   Contains PII : True
+# MAGIC   Types found  : ['ABN']
+# MAGIC   Risk level   : MEDIUM
+# MAGIC
+# MAGIC Text:   Customer Medicare card 2345 67891 0 -- please verify before processing rebate.
+# MAGIC   Contains PII : True
+# MAGIC   Types found  : ['MEDICARE']
+# MAGIC   Risk level   : HIGH
+# MAGIC
+# MAGIC Text:   The Essendon substation recorded peak demand of 38.4 MW on 15 January 2024.
+# MAGIC   Contains PII : False
+# MAGIC   Types found  : []
+# MAGIC   Risk level   : NONE
+# MAGIC ```
 
 # COMMAND ----------
 
-# Add a sample unstructured description column to outages
+# MAGIC %md
+# MAGIC ---
+# MAGIC ## Step 5 -- Applied Example: Bulk Classification of Outage Field Notes
+# MAGIC
+# MAGIC Apply the in-region classification pattern to the existing outages table.
+# MAGIC This pattern is the foundation for the batch pipeline in Lab 05.
+
+# COMMAND ----------
+
+# Add unstructured field notes column if it does not exist
 spark.sql(f"""
 ALTER TABLE {CATALOG}.{SCHEMA}.outages
 ADD COLUMN IF NOT EXISTS field_notes STRING
 COMMENT 'Unstructured field technician notes describing the outage cause and restoration actions'
 """)
 
-# Seed sample field notes for the 30 outage rows
+# Seed sample field notes for each cause category
 from pyspark.sql.functions import col, when, lit
 
 field_notes_map = {
-    "WEATHER":            "Storm damage to overhead lines. Strong winds caused conductor to sag into trees along the creek corridor. Supply restored after vegetation cleared and conductor re-tensioned.",
-    "EQUIPMENT_FAILURE":  "Transformer failure at zone substation. OC relay operated. Fault investigation found insulation breakdown on 22kV winding. Emergency transformer swap-out performed.",
-    "VEGETATION":         "Tree branch contact with 11kV bare conductor. Branch fell during calm conditions, possibly due to disease. Tree removed and conductor inspected prior to re-energisation.",
-    "THIRD_PARTY":        "Third-party cable strike during civil works. Excavator operator failed to dial before dig. Immediate isolation and cable repair. Regulatory notification sent to Energy Safe Victoria.",
-    "UNKNOWN":            "Supply loss detected by SCADA at 03:22. No obvious fault found on patrol. Supply restored by switching operation. Root cause investigation ongoing.",
+    "WEATHER":           "Storm damage to overhead lines. Strong winds caused conductor to sag into trees along the creek corridor. Supply restored after vegetation cleared and conductor re-tensioned.",
+    "EQUIPMENT_FAILURE": "Transformer failure at zone substation. OC relay operated. Fault investigation found insulation breakdown on 22kV winding. Emergency transformer swap-out performed.",
+    "VEGETATION":        "Tree branch contact with 11kV bare conductor. Branch fell during calm conditions, possibly due to disease. Tree removed and conductor inspected prior to re-energisation.",
+    "THIRD_PARTY":       "Third-party cable strike during civil works. Excavator operator failed to dial before dig. Immediate isolation and cable repair. Regulatory notification sent to Energy Safe Victoria.",
+    "UNKNOWN":           "Supply loss detected by SCADA at 03:22. No obvious fault found on patrol. Supply restored by switching operation. Root cause investigation ongoing.",
 }
 
-# Update each cause_category with corresponding field notes
 for cause, note in field_notes_map.items():
     spark.sql(f"""
         UPDATE {CATALOG}.{SCHEMA}.outages
@@ -555,7 +767,9 @@ for cause, note in field_notes_map.items():
     """)
 
 print("Field notes seeded.")
-spark.table(f"{CATALOG}.{SCHEMA}.outages").select("outage_id", "cause_category", "field_notes").show(5, truncate=60)
+spark.table(f"{CATALOG}.{SCHEMA}.outages").select(
+    "outage_id", "cause_category", "field_notes"
+).show(5, truncate=60)
 
 # COMMAND ----------
 
@@ -564,17 +778,16 @@ spark.table(f"{CATALOG}.{SCHEMA}.outages").select("outage_id", "cause_category",
 
 # COMMAND ----------
 
-# Read outages with field notes and classify using in-region function
 outages_with_notes = spark.sql(f"""
     SELECT
         outage_id,
-        cause_category                           AS recorded_cause,
+        cause_category                                    AS recorded_cause,
         field_notes,
         {CATALOG}.ai_functions.classify_text(
             field_notes,
             'WEATHER,EQUIPMENT_FAILURE,VEGETATION,THIRD_PARTY,UNKNOWN',
             'Australian electricity distribution network field operations'
-        )                                        AS ai_classified_cause
+        )                                                 AS ai_classified_cause
     FROM {CATALOG}.{SCHEMA}.outages
     WHERE field_notes IS NOT NULL
     LIMIT 10
@@ -591,12 +804,12 @@ outages_with_notes.show(truncate=50)
 
 spark.sql(f"""
 SELECT
-    COUNT(*)                                                   AS total,
+    COUNT(*)                                                                AS total,
     SUM(CASE WHEN recorded_cause = ai_classified_cause THEN 1 ELSE 0 END) AS agreements,
     ROUND(
         SUM(CASE WHEN recorded_cause = ai_classified_cause THEN 1 ELSE 0 END) * 100.0 / COUNT(*),
         1
-    )                                                         AS agreement_pct
+    )                                                                       AS agreement_pct
 FROM (
     SELECT
         cause_category AS recorded_cause,
@@ -613,17 +826,36 @@ FROM (
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC ## Step 6 — Extract Equipment Details from Work Orders
+# MAGIC **Expected output:**
+# MAGIC ```
+# MAGIC +-------+------------+---------------+
+# MAGIC | total | agreements | agreement_pct |
+# MAGIC +-------+------------+---------------+
+# MAGIC |    30 |         28 |          93.3 |
+# MAGIC +-------+------------+---------------+
+# MAGIC ```
 # MAGIC
-# MAGIC Demonstrate end-to-end extraction pipeline: unstructured text → structured Delta table.
+# MAGIC <div style="background: #E8F4FD; padding: 10px 14px; border-radius: 6px; border-left: 4px solid #1B3A5C; margin: 8px 0">
+# MAGIC <strong>Note:</strong> Agreement rate of 70-100% is normal for seeded data with clear category definitions.
+# MAGIC For real-world field notes (abbreviated, jargon-heavy), expect 65-85% without few-shot examples.
+# MAGIC Adding 2-3 labelled examples to the prompt typically improves agreement to 85-95%.
+# MAGIC </div>
 
 # COMMAND ----------
 
-# Create work orders table for this example
+# MAGIC %md
+# MAGIC ---
+# MAGIC ## Step 6 -- Extract Equipment Details from Work Orders
+# MAGIC
+# MAGIC End-to-end extraction pipeline: unstructured work order text to structured Delta table.
+
+# COMMAND ----------
+
+# Create work orders table
 spark.sql(f"""
 CREATE TABLE IF NOT EXISTS {CATALOG}.{SCHEMA}.work_orders (
     work_order_id  STRING    COMMENT 'Work order identifier, e.g. WO-2024-08341',
-    asset_id       STRING    COMMENT 'FK → assets.asset_id',
+    asset_id       STRING    COMMENT 'FK to assets.asset_id',
     created_date   DATE      COMMENT 'Date work order was raised',
     work_notes     STRING    COMMENT 'Unstructured technician notes from field',
     status         STRING    COMMENT 'OPEN, IN_PROGRESS, CLOSED',
@@ -635,7 +867,7 @@ COMMENT 'Maintenance work orders. work_notes contains unstructured field technic
 
 # Seed with realistic work orders
 import uuid
-from datetime import datetime, date, timedelta
+from datetime import datetime, date
 from pyspark.sql import Row
 
 work_order_templates = [
@@ -671,11 +903,11 @@ for i, template in enumerate(work_order_templates):
     ))
 
 spark.createDataFrame(wo_rows).write.mode("append").saveAsTable(f"{CATALOG}.{SCHEMA}.work_orders")
-print(f"Work orders created: {spark.table(f'{CATALOG}.{SCHEMA}.work_orders').count()}")
+print(f"Work orders in table: {spark.table(f'{CATALOG}.{SCHEMA}.work_orders').count()}")
 
 # COMMAND ----------
 
-# Extract structured data from work order notes using in-region AI
+# Extract structured fields from work order notes using in-region AI
 WO_EXTRACT_SCHEMA = """{
   "asset_voltage_kv": "number or null",
   "fault_type": "string - short description",
@@ -734,20 +966,33 @@ parsed_df.show(truncate=60)
 
 # Save structured results to Delta
 parsed_df.write.mode("overwrite").saveAsTable(f"{CATALOG}.{SCHEMA}.work_orders_extracted")
-print(f"Structured work order data saved to {CATALOG}.{SCHEMA}.work_orders_extracted")
+print(f"Saved to: {CATALOG}.{SCHEMA}.work_orders_extracted")
 
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC ## Step 7 — Pattern Reference Card
-# MAGIC
-# MAGIC All patterns from this lab in one summary for quick reference.
+# MAGIC **Expected output (values vary by model run):**
+# MAGIC ```
+# MAGIC +--------------+------------+------------------+----------------+-------------------+-----------------+
+# MAGIC |work_order_id | status     | fault_type       | urgency        | follow_up_required| estimated_hours |
+# MAGIC +--------------+------------+------------------+----------------+-------------------+-----------------+
+# MAGIC |WO-2024-08341 | CLOSED     | bushing oil leak | WITHIN_90_DAYS | true              | 16.0            |
+# MAGIC |WO-2024-08342 | IN_PROGRESS| SF6 gas low      | WITHIN_30_DAYS | true              | null            |
+# MAGIC |WO-2024-08343 | IN_PROGRESS| insulation crack | WITHIN_30_DAYS | true              | null            |
+# MAGIC +--------------+------------+------------------+----------------+-------------------+-----------------+
+# MAGIC ```
+
+# COMMAND ----------
+
+# MAGIC %md
+# MAGIC ---
+# MAGIC ## Step 7 -- Pattern Reference Card
 
 # COMMAND ----------
 
 print("""
-AU EAST AI FUNCTIONS — IN-REGION PATTERN REFERENCE
-====================================================
+AU EAST AI FUNCTIONS -- IN-REGION PATTERN REFERENCE
+=====================================================
 
 SETUP (once per workspace):
   1. Deploy PT endpoint:
@@ -763,9 +1008,7 @@ SETUP (once per workspace):
 USAGE IN SQL (all in-region):
   -- Classification
   SELECT catalog.ai_functions.classify_text(
-      my_text_col,
-      'TYPE_A,TYPE_B,TYPE_C',
-      'domain description'
+      my_text_col, 'TYPE_A,TYPE_B', 'domain description'
   ) FROM my_table
 
   -- Summarisation
@@ -787,30 +1030,35 @@ DO NOT USE (cross-geo for AU):
   ai_generate(prompt)                -- routes to US East
 
 EMBEDDING MODEL FOR VECTOR SEARCH / GENIE RAG:
-  In-region:   databricks-qwen3-embedding-0-6b  ← USE THIS
-  Cross-geo:   databricks-gte-large-en           ← AVOID for regulated AU data
+  In-region:  databricks-qwen3-embedding-0-6b  <- USE THIS
+  Cross-geo:  databricks-gte-large-en           <- AVOID for regulated AU data
 """)
 
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC ## Lab 04 — Review Questions
+# MAGIC ---
+# MAGIC ## Lab 04 -- Review Questions
 # MAGIC
-# MAGIC 1. A colleague says "I'll just use `ai_classify()` — it's faster and easier than
-# MAGIC    deploying a PT endpoint." What are the two reasons this is a problem for your
-# MAGIC    energy company customer?
+# MAGIC <div style="background: #F4F4F4; padding: 16px 20px; border-radius: 8px; margin: 8px 0">
 # MAGIC
-# MAGIC 2. The PT endpoint is deployed and working. A week later, the model vendor releases
-# MAGIC    a newer model version. How do you update all AI function calls to use the new model
-# MAGIC    without changing every notebook?
+# MAGIC **Q1.** A colleague says "I'll just use `ai_classify()` -- it's faster and easier than
+# MAGIC deploying a PT endpoint." What are the two reasons this is a problem for your
+# MAGIC APRA-regulated energy company customer?
 # MAGIC
-# MAGIC 3. A work order extraction returns `null` for `estimated_hours` even though the text
-# MAGIC    says "16 hours". What might be causing this, and how would you fix the prompt?
+# MAGIC **Q2.** The PT endpoint is deployed and working. A week later, the model vendor releases
+# MAGIC a newer model version. How do you update all AI function calls to use the new model
+# MAGIC without changing every notebook or query?
 # MAGIC
-# MAGIC 4. Which PII types are detected by the `detect_au_pii` function? Which type is specific
-# MAGIC    to the energy industry (not just general Australian PII)?
+# MAGIC **Q3.** A work order extraction returns `null` for `estimated_hours` even though the text
+# MAGIC says "16 hours work". What might be causing this, and how would you fix the schema hint?
 # MAGIC
-# MAGIC 5. The classification agreement rate between `recorded_cause` and `ai_classified_cause`
-# MAGIC    is 70%. What are three ways you could improve it?
+# MAGIC **Q4.** Which five PII types are detected by the `detect_au_pii` function?
+# MAGIC Which one is specific to the energy industry (not general Australian PII)?
+# MAGIC
+# MAGIC **Q5.** The classification agreement rate between `recorded_cause` and `ai_classified_cause`
+# MAGIC is 70%. List three ways you could improve it without switching to a larger model.
+# MAGIC
+# MAGIC </div>
 # MAGIC
 # MAGIC **Proceed to Lab 05 when ready.**
