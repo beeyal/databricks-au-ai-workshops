@@ -1,0 +1,915 @@
+doc_id,doc_type,title,department,effective_date,review_date,content,version,classification
+DOC-0001,data_governance,Data Governance — Engineering Services v1.8,Engineering Services,2021-02-05,2022-02-05,"Data Governance Policy v1.8 — Engineering Services
+
+1. PURPOSE
+Establish accountabilities, standards, and controls for the management of data assets across the organisation, ensuring data quality, security, lineage, and regulatory compliance.
+
+2. DATA CLASSIFICATION
+All data assets must be classified as: Public, Internal, Restricted, or Confidential. Customer metering data, personal information, and grid operational data are classified Restricted by default.
+
+3. DATA STEWARDSHIP
+Each business unit must appoint a Data Steward responsible for cataloguing, quality monitoring, and access management of their data products. Data Stewards report quarterly to the Data Governance Committee.
+
+4. RETENTION AND DISPOSAL
+Meter data: retain for 7 years per NEM Rules. Customer personal data: retain for 7 years post-contract end. Operational logs: retain for 3 years. Disposal must be documented and approved.
+
+5. PRIVACY
+All data handling involving personal information must comply with the Privacy Act 1988 (Cth), Australian Privacy Principles, and state privacy legislation. Privacy Impact Assessments are mandatory for new data sharing arrangements and analytics use cases involving personal data.",1.8,internal
+DOC-0002,safety_procedure,Safety Procedure — Asset Management v4.9,Asset Management,2020-08-26,2022-08-26,"Safety Procedure SP-4.9 — Isolation and Earthing of High-Voltage Equipment — Asset Management
+
+1. OBJECTIVE
+To prevent injury or death from unintended energisation of high-voltage equipment during maintenance or construction activities.
+
+2. APPLICABILITY
+All authorised HV switching operators and maintenance personnel working on assets rated 1kV to 275kV.
+
+3. PROCEDURE
+Step 1: Obtain isolation authority from the Network Operations Controller.
+Step 2: Identify and confirm correct isolation points using approved single-line diagrams.
+Step 3: Operate isolation devices in the correct sequence — open circuit breaker, open isolator, apply locks and danger tags.
+Step 4: Apply high-voltage earths to all potentially energised conductors on both source and load sides of work zone.
+Step 5: Test for absence of voltage using approved HV test equipment before commencing work.
+
+4. RESTORATION
+Restoration must follow reverse sequence. All earths must be removed and accounted for. Confirmation must be given to NOC before any switching.
+
+5. REFERENCES
+AS/NZS 3000, Electricity Safety Act 1998, Network Safety Rules v4.2.",4.9,restricted
+DOC-0003,safety_procedure,Safety Procedure — Safety and Environment v2.5,Safety and Environment,2022-07-31,2023-07-31,"Safety Procedure SP-2.5 — Isolation and Earthing of High-Voltage Equipment — Safety and Environment
+
+1. OBJECTIVE
+To prevent injury or death from unintended energisation of high-voltage equipment during maintenance or construction activities.
+
+2. APPLICABILITY
+All authorised HV switching operators and maintenance personnel working on assets rated 1kV to 275kV.
+
+3. PROCEDURE
+Step 1: Obtain isolation authority from the Network Operations Controller.
+Step 2: Identify and confirm correct isolation points using approved single-line diagrams.
+Step 3: Operate isolation devices in the correct sequence — open circuit breaker, open isolator, apply locks and danger tags.
+Step 4: Apply high-voltage earths to all potentially energised conductors on both source and load sides of work zone.
+Step 5: Test for absence of voltage using approved HV test equipment before commencing work.
+
+4. RESTORATION
+Restoration must follow reverse sequence. All earths must be removed and accounted for. Confirmation must be given to NOC before any switching.
+
+5. REFERENCES
+AS/NZS 3000, Electricity Safety Act 1998, Network Safety Rules v4.2.",2.5,internal
+DOC-0004,safety_procedure,Safety Procedure — Network Operations v3.8,Network Operations,2018-10-07,2019-10-07,"Safety Procedure SP-3.8 — Isolation and Earthing of High-Voltage Equipment — Network Operations
+
+1. OBJECTIVE
+To prevent injury or death from unintended energisation of high-voltage equipment during maintenance or construction activities.
+
+2. APPLICABILITY
+All authorised HV switching operators and maintenance personnel working on assets rated 1kV to 275kV.
+
+3. PROCEDURE
+Step 1: Obtain isolation authority from the Network Operations Controller.
+Step 2: Identify and confirm correct isolation points using approved single-line diagrams.
+Step 3: Operate isolation devices in the correct sequence — open circuit breaker, open isolator, apply locks and danger tags.
+Step 4: Apply high-voltage earths to all potentially energised conductors on both source and load sides of work zone.
+Step 5: Test for absence of voltage using approved HV test equipment before commencing work.
+
+4. RESTORATION
+Restoration must follow reverse sequence. All earths must be removed and accounted for. Confirmation must be given to NOC before any switching.
+
+5. REFERENCES
+AS/NZS 3000, Electricity Safety Act 1998, Network Safety Rules v4.2.",3.8,internal
+DOC-0005,data_governance,Data Governance — Information Technology v2.8,Information Technology,2020-05-18,2022-05-18,"Data Governance Policy v2.8 — Information Technology
+
+1. PURPOSE
+Establish accountabilities, standards, and controls for the management of data assets across the organisation, ensuring data quality, security, lineage, and regulatory compliance.
+
+2. DATA CLASSIFICATION
+All data assets must be classified as: Public, Internal, Restricted, or Confidential. Customer metering data, personal information, and grid operational data are classified Restricted by default.
+
+3. DATA STEWARDSHIP
+Each business unit must appoint a Data Steward responsible for cataloguing, quality monitoring, and access management of their data products. Data Stewards report quarterly to the Data Governance Committee.
+
+4. RETENTION AND DISPOSAL
+Meter data: retain for 7 years per NEM Rules. Customer personal data: retain for 7 years post-contract end. Operational logs: retain for 3 years. Disposal must be documented and approved.
+
+5. PRIVACY
+All data handling involving personal information must comply with the Privacy Act 1988 (Cth), Australian Privacy Principles, and state privacy legislation. Privacy Impact Assessments are mandatory for new data sharing arrangements and analytics use cases involving personal data.",2.8,internal
+DOC-0006,data_governance,Data Governance — Regulatory Affairs v4.1,Regulatory Affairs,2018-08-04,2019-08-04,"Data Governance Policy v4.1 — Regulatory Affairs
+
+1. PURPOSE
+Establish accountabilities, standards, and controls for the management of data assets across the organisation, ensuring data quality, security, lineage, and regulatory compliance.
+
+2. DATA CLASSIFICATION
+All data assets must be classified as: Public, Internal, Restricted, or Confidential. Customer metering data, personal information, and grid operational data are classified Restricted by default.
+
+3. DATA STEWARDSHIP
+Each business unit must appoint a Data Steward responsible for cataloguing, quality monitoring, and access management of their data products. Data Stewards report quarterly to the Data Governance Committee.
+
+4. RETENTION AND DISPOSAL
+Meter data: retain for 7 years per NEM Rules. Customer personal data: retain for 7 years post-contract end. Operational logs: retain for 3 years. Disposal must be documented and approved.
+
+5. PRIVACY
+All data handling involving personal information must comply with the Privacy Act 1988 (Cth), Australian Privacy Principles, and state privacy legislation. Privacy Impact Assessments are mandatory for new data sharing arrangements and analytics use cases involving personal data.",4.1,public
+DOC-0007,ai_usage_policy,Ai Usage Policy — Asset Management v2.1,Asset Management,2022-06-27,2023-06-27,"Artificial Intelligence Usage Policy v2.1 — Asset Management
+
+1. PURPOSE
+Govern the responsible use of artificial intelligence (AI) and machine learning (ML) systems across the organisation to ensure safety, fairness, transparency, and compliance with regulatory obligations.
+
+2. PROHIBITED USES
+AI must not be used to: make fully automated decisions that affect customer financial outcomes without human review; process sensitive personal information without a completed Privacy Impact Assessment; operate or directly control protection systems without certification under IEC 61511 functional safety standards.
+
+3. AI RISK TIERS
+Tier 1 (High Risk): AI systems that inform regulatory submissions, affect safety-critical operations, or process >10,000 customer records. Require Board approval, independent validation, and ongoing monitoring.
+Tier 2 (Medium Risk): AI systems used for internal operational decisions. Require GM approval and documented testing.
+Tier 3 (Low Risk): AI productivity tools, summarisation, and document assistance. Require IT risk assessment only.
+
+4. DATA RESIDENCY
+All AI model training, inference, and data processing involving customer or grid data must occur within Australian jurisdiction. Use of offshore AI services requires CISO approval and a Data Processing Agreement meeting Australian Privacy Principle 8 requirements.
+
+5. HUMAN OVERSIGHT
+All AI-generated outputs that inform consequential decisions must be reviewed by a qualified human before action. AI systems must log all inputs and outputs for audit purposes for a minimum of 3 years.
+
+6. REVIEW
+This policy is reviewed annually or following any material AI incident or regulatory change.",2.1,restricted
+DOC-0008,emergency_response,Emergency Response — Safety and Environment v1.5,Safety and Environment,2020-01-24,2021-01-23,"Emergency Response Plan — Major Network Incident — Safety and Environment v1.5
+
+1. ACTIVATION CRITERIA
+This plan is activated for any event affecting more than 10,000 customers, any 132kV or above circuit fault, or any event declared a Public Safety Power Shutoff (PSPS).
+
+2. INCIDENT COMMAND
+The Network Operations Manager assumes the role of Incident Commander on activation. An Emergency Response Team (ERT) is stood up within 30 minutes, comprising representatives from Operations, Engineering, Media, and Customer Service.
+
+3. NOTIFICATION
+Within 15 minutes of activation: notify General Manager Networks, AER (if affecting reliability targets), AEMO (if affecting wholesale market), state energy regulator, and emergency services if life safety risk exists.
+
+4. CUSTOMER COMMUNICATIONS
+Estimated restoration times must be published via SMS, web, and IVR within 30 minutes. Updates every 60 minutes until restoration.
+
+5. POST-INCIDENT
+A post-incident review must be completed within 5 business days. Findings and corrective actions registered in the asset management system.",1.5,restricted
+DOC-0009,safety_procedure,Safety Procedure — Asset Management v4.3,Asset Management,2024-06-21,2025-06-21,"Safety Procedure SP-4.3 — Isolation and Earthing of High-Voltage Equipment — Asset Management
+
+1. OBJECTIVE
+To prevent injury or death from unintended energisation of high-voltage equipment during maintenance or construction activities.
+
+2. APPLICABILITY
+All authorised HV switching operators and maintenance personnel working on assets rated 1kV to 275kV.
+
+3. PROCEDURE
+Step 1: Obtain isolation authority from the Network Operations Controller.
+Step 2: Identify and confirm correct isolation points using approved single-line diagrams.
+Step 3: Operate isolation devices in the correct sequence — open circuit breaker, open isolator, apply locks and danger tags.
+Step 4: Apply high-voltage earths to all potentially energised conductors on both source and load sides of work zone.
+Step 5: Test for absence of voltage using approved HV test equipment before commencing work.
+
+4. RESTORATION
+Restoration must follow reverse sequence. All earths must be removed and accounted for. Confirmation must be given to NOC before any switching.
+
+5. REFERENCES
+AS/NZS 3000, Electricity Safety Act 1998, Network Safety Rules v4.2.",4.3,internal
+DOC-0010,ai_usage_policy,Ai Usage Policy — Regulatory Affairs v3.2,Regulatory Affairs,2020-02-27,2023-02-26,"Artificial Intelligence Usage Policy v3.2 — Regulatory Affairs
+
+1. PURPOSE
+Govern the responsible use of artificial intelligence (AI) and machine learning (ML) systems across the organisation to ensure safety, fairness, transparency, and compliance with regulatory obligations.
+
+2. PROHIBITED USES
+AI must not be used to: make fully automated decisions that affect customer financial outcomes without human review; process sensitive personal information without a completed Privacy Impact Assessment; operate or directly control protection systems without certification under IEC 61511 functional safety standards.
+
+3. AI RISK TIERS
+Tier 1 (High Risk): AI systems that inform regulatory submissions, affect safety-critical operations, or process >10,000 customer records. Require Board approval, independent validation, and ongoing monitoring.
+Tier 2 (Medium Risk): AI systems used for internal operational decisions. Require GM approval and documented testing.
+Tier 3 (Low Risk): AI productivity tools, summarisation, and document assistance. Require IT risk assessment only.
+
+4. DATA RESIDENCY
+All AI model training, inference, and data processing involving customer or grid data must occur within Australian jurisdiction. Use of offshore AI services requires CISO approval and a Data Processing Agreement meeting Australian Privacy Principle 8 requirements.
+
+5. HUMAN OVERSIGHT
+All AI-generated outputs that inform consequential decisions must be reviewed by a qualified human before action. AI systems must log all inputs and outputs for audit purposes for a minimum of 3 years.
+
+6. REVIEW
+This policy is reviewed annually or following any material AI incident or regulatory change.",3.2,internal
+DOC-0011,data_governance,Data Governance — Network Operations v1.5,Network Operations,2020-04-21,2021-04-21,"Data Governance Policy v1.5 — Network Operations
+
+1. PURPOSE
+Establish accountabilities, standards, and controls for the management of data assets across the organisation, ensuring data quality, security, lineage, and regulatory compliance.
+
+2. DATA CLASSIFICATION
+All data assets must be classified as: Public, Internal, Restricted, or Confidential. Customer metering data, personal information, and grid operational data are classified Restricted by default.
+
+3. DATA STEWARDSHIP
+Each business unit must appoint a Data Steward responsible for cataloguing, quality monitoring, and access management of their data products. Data Stewards report quarterly to the Data Governance Committee.
+
+4. RETENTION AND DISPOSAL
+Meter data: retain for 7 years per NEM Rules. Customer personal data: retain for 7 years post-contract end. Operational logs: retain for 3 years. Disposal must be documented and approved.
+
+5. PRIVACY
+All data handling involving personal information must comply with the Privacy Act 1988 (Cth), Australian Privacy Principles, and state privacy legislation. Privacy Impact Assessments are mandatory for new data sharing arrangements and analytics use cases involving personal data.",1.5,internal
+DOC-0012,emergency_response,Emergency Response — Network Operations v1.7,Network Operations,2024-04-22,2025-04-22,"Emergency Response Plan — Major Network Incident — Network Operations v1.7
+
+1. ACTIVATION CRITERIA
+This plan is activated for any event affecting more than 10,000 customers, any 132kV or above circuit fault, or any event declared a Public Safety Power Shutoff (PSPS).
+
+2. INCIDENT COMMAND
+The Network Operations Manager assumes the role of Incident Commander on activation. An Emergency Response Team (ERT) is stood up within 30 minutes, comprising representatives from Operations, Engineering, Media, and Customer Service.
+
+3. NOTIFICATION
+Within 15 minutes of activation: notify General Manager Networks, AER (if affecting reliability targets), AEMO (if affecting wholesale market), state energy regulator, and emergency services if life safety risk exists.
+
+4. CUSTOMER COMMUNICATIONS
+Estimated restoration times must be published via SMS, web, and IVR within 30 minutes. Updates every 60 minutes until restoration.
+
+5. POST-INCIDENT
+A post-incident review must be completed within 5 business days. Findings and corrective actions registered in the asset management system.",1.7,internal
+DOC-0013,ai_usage_policy,Ai Usage Policy — Network Operations v2.4,Network Operations,2018-07-14,2020-07-13,"Artificial Intelligence Usage Policy v2.4 — Network Operations
+
+1. PURPOSE
+Govern the responsible use of artificial intelligence (AI) and machine learning (ML) systems across the organisation to ensure safety, fairness, transparency, and compliance with regulatory obligations.
+
+2. PROHIBITED USES
+AI must not be used to: make fully automated decisions that affect customer financial outcomes without human review; process sensitive personal information without a completed Privacy Impact Assessment; operate or directly control protection systems without certification under IEC 61511 functional safety standards.
+
+3. AI RISK TIERS
+Tier 1 (High Risk): AI systems that inform regulatory submissions, affect safety-critical operations, or process >10,000 customer records. Require Board approval, independent validation, and ongoing monitoring.
+Tier 2 (Medium Risk): AI systems used for internal operational decisions. Require GM approval and documented testing.
+Tier 3 (Low Risk): AI productivity tools, summarisation, and document assistance. Require IT risk assessment only.
+
+4. DATA RESIDENCY
+All AI model training, inference, and data processing involving customer or grid data must occur within Australian jurisdiction. Use of offshore AI services requires CISO approval and a Data Processing Agreement meeting Australian Privacy Principle 8 requirements.
+
+5. HUMAN OVERSIGHT
+All AI-generated outputs that inform consequential decisions must be reviewed by a qualified human before action. AI systems must log all inputs and outputs for audit purposes for a minimum of 3 years.
+
+6. REVIEW
+This policy is reviewed annually or following any material AI incident or regulatory change.",2.4,restricted
+DOC-0014,data_governance,Data Governance — Finance and Strategy v3.9,Finance and Strategy,2018-01-13,2020-01-13,"Data Governance Policy v3.9 — Finance and Strategy
+
+1. PURPOSE
+Establish accountabilities, standards, and controls for the management of data assets across the organisation, ensuring data quality, security, lineage, and regulatory compliance.
+
+2. DATA CLASSIFICATION
+All data assets must be classified as: Public, Internal, Restricted, or Confidential. Customer metering data, personal information, and grid operational data are classified Restricted by default.
+
+3. DATA STEWARDSHIP
+Each business unit must appoint a Data Steward responsible for cataloguing, quality monitoring, and access management of their data products. Data Stewards report quarterly to the Data Governance Committee.
+
+4. RETENTION AND DISPOSAL
+Meter data: retain for 7 years per NEM Rules. Customer personal data: retain for 7 years post-contract end. Operational logs: retain for 3 years. Disposal must be documented and approved.
+
+5. PRIVACY
+All data handling involving personal information must comply with the Privacy Act 1988 (Cth), Australian Privacy Principles, and state privacy legislation. Privacy Impact Assessments are mandatory for new data sharing arrangements and analytics use cases involving personal data.",3.9,restricted
+DOC-0015,data_governance,Data Governance — Information Technology v3.9,Information Technology,2020-05-09,2021-05-09,"Data Governance Policy v3.9 — Information Technology
+
+1. PURPOSE
+Establish accountabilities, standards, and controls for the management of data assets across the organisation, ensuring data quality, security, lineage, and regulatory compliance.
+
+2. DATA CLASSIFICATION
+All data assets must be classified as: Public, Internal, Restricted, or Confidential. Customer metering data, personal information, and grid operational data are classified Restricted by default.
+
+3. DATA STEWARDSHIP
+Each business unit must appoint a Data Steward responsible for cataloguing, quality monitoring, and access management of their data products. Data Stewards report quarterly to the Data Governance Committee.
+
+4. RETENTION AND DISPOSAL
+Meter data: retain for 7 years per NEM Rules. Customer personal data: retain for 7 years post-contract end. Operational logs: retain for 3 years. Disposal must be documented and approved.
+
+5. PRIVACY
+All data handling involving personal information must comply with the Privacy Act 1988 (Cth), Australian Privacy Principles, and state privacy legislation. Privacy Impact Assessments are mandatory for new data sharing arrangements and analytics use cases involving personal data.",3.9,restricted
+DOC-0016,safety_procedure,Safety Procedure — Asset Management v1.8,Asset Management,2020-10-31,2022-10-31,"Safety Procedure SP-1.8 — Isolation and Earthing of High-Voltage Equipment — Asset Management
+
+1. OBJECTIVE
+To prevent injury or death from unintended energisation of high-voltage equipment during maintenance or construction activities.
+
+2. APPLICABILITY
+All authorised HV switching operators and maintenance personnel working on assets rated 1kV to 275kV.
+
+3. PROCEDURE
+Step 1: Obtain isolation authority from the Network Operations Controller.
+Step 2: Identify and confirm correct isolation points using approved single-line diagrams.
+Step 3: Operate isolation devices in the correct sequence — open circuit breaker, open isolator, apply locks and danger tags.
+Step 4: Apply high-voltage earths to all potentially energised conductors on both source and load sides of work zone.
+Step 5: Test for absence of voltage using approved HV test equipment before commencing work.
+
+4. RESTORATION
+Restoration must follow reverse sequence. All earths must be removed and accounted for. Confirmation must be given to NOC before any switching.
+
+5. REFERENCES
+AS/NZS 3000, Electricity Safety Act 1998, Network Safety Rules v4.2.",1.8,public
+DOC-0017,safety_procedure,Safety Procedure — Finance and Strategy v2.0,Finance and Strategy,2023-11-01,2024-10-31,"Safety Procedure SP-2.0 — Isolation and Earthing of High-Voltage Equipment — Finance and Strategy
+
+1. OBJECTIVE
+To prevent injury or death from unintended energisation of high-voltage equipment during maintenance or construction activities.
+
+2. APPLICABILITY
+All authorised HV switching operators and maintenance personnel working on assets rated 1kV to 275kV.
+
+3. PROCEDURE
+Step 1: Obtain isolation authority from the Network Operations Controller.
+Step 2: Identify and confirm correct isolation points using approved single-line diagrams.
+Step 3: Operate isolation devices in the correct sequence — open circuit breaker, open isolator, apply locks and danger tags.
+Step 4: Apply high-voltage earths to all potentially energised conductors on both source and load sides of work zone.
+Step 5: Test for absence of voltage using approved HV test equipment before commencing work.
+
+4. RESTORATION
+Restoration must follow reverse sequence. All earths must be removed and accounted for. Confirmation must be given to NOC before any switching.
+
+5. REFERENCES
+AS/NZS 3000, Electricity Safety Act 1998, Network Safety Rules v4.2.",2.0,restricted
+DOC-0018,data_governance,Data Governance — Customer Experience v2.7,Customer Experience,2023-10-10,2026-10-09,"Data Governance Policy v2.7 — Customer Experience
+
+1. PURPOSE
+Establish accountabilities, standards, and controls for the management of data assets across the organisation, ensuring data quality, security, lineage, and regulatory compliance.
+
+2. DATA CLASSIFICATION
+All data assets must be classified as: Public, Internal, Restricted, or Confidential. Customer metering data, personal information, and grid operational data are classified Restricted by default.
+
+3. DATA STEWARDSHIP
+Each business unit must appoint a Data Steward responsible for cataloguing, quality monitoring, and access management of their data products. Data Stewards report quarterly to the Data Governance Committee.
+
+4. RETENTION AND DISPOSAL
+Meter data: retain for 7 years per NEM Rules. Customer personal data: retain for 7 years post-contract end. Operational logs: retain for 3 years. Disposal must be documented and approved.
+
+5. PRIVACY
+All data handling involving personal information must comply with the Privacy Act 1988 (Cth), Australian Privacy Principles, and state privacy legislation. Privacy Impact Assessments are mandatory for new data sharing arrangements and analytics use cases involving personal data.",2.7,internal
+DOC-0019,data_governance,Data Governance — Safety and Environment v2.3,Safety and Environment,2018-11-01,2021-10-31,"Data Governance Policy v2.3 — Safety and Environment
+
+1. PURPOSE
+Establish accountabilities, standards, and controls for the management of data assets across the organisation, ensuring data quality, security, lineage, and regulatory compliance.
+
+2. DATA CLASSIFICATION
+All data assets must be classified as: Public, Internal, Restricted, or Confidential. Customer metering data, personal information, and grid operational data are classified Restricted by default.
+
+3. DATA STEWARDSHIP
+Each business unit must appoint a Data Steward responsible for cataloguing, quality monitoring, and access management of their data products. Data Stewards report quarterly to the Data Governance Committee.
+
+4. RETENTION AND DISPOSAL
+Meter data: retain for 7 years per NEM Rules. Customer personal data: retain for 7 years post-contract end. Operational logs: retain for 3 years. Disposal must be documented and approved.
+
+5. PRIVACY
+All data handling involving personal information must comply with the Privacy Act 1988 (Cth), Australian Privacy Principles, and state privacy legislation. Privacy Impact Assessments are mandatory for new data sharing arrangements and analytics use cases involving personal data.",2.3,internal
+DOC-0020,safety_procedure,Safety Procedure — Engineering Services v2.3,Engineering Services,2024-05-24,2025-05-24,"Safety Procedure SP-2.3 — Isolation and Earthing of High-Voltage Equipment — Engineering Services
+
+1. OBJECTIVE
+To prevent injury or death from unintended energisation of high-voltage equipment during maintenance or construction activities.
+
+2. APPLICABILITY
+All authorised HV switching operators and maintenance personnel working on assets rated 1kV to 275kV.
+
+3. PROCEDURE
+Step 1: Obtain isolation authority from the Network Operations Controller.
+Step 2: Identify and confirm correct isolation points using approved single-line diagrams.
+Step 3: Operate isolation devices in the correct sequence — open circuit breaker, open isolator, apply locks and danger tags.
+Step 4: Apply high-voltage earths to all potentially energised conductors on both source and load sides of work zone.
+Step 5: Test for absence of voltage using approved HV test equipment before commencing work.
+
+4. RESTORATION
+Restoration must follow reverse sequence. All earths must be removed and accounted for. Confirmation must be given to NOC before any switching.
+
+5. REFERENCES
+AS/NZS 3000, Electricity Safety Act 1998, Network Safety Rules v4.2.",2.3,restricted
+DOC-0021,data_governance,Data Governance — Network Operations v3.5,Network Operations,2021-01-04,2023-01-04,"Data Governance Policy v3.5 — Network Operations
+
+1. PURPOSE
+Establish accountabilities, standards, and controls for the management of data assets across the organisation, ensuring data quality, security, lineage, and regulatory compliance.
+
+2. DATA CLASSIFICATION
+All data assets must be classified as: Public, Internal, Restricted, or Confidential. Customer metering data, personal information, and grid operational data are classified Restricted by default.
+
+3. DATA STEWARDSHIP
+Each business unit must appoint a Data Steward responsible for cataloguing, quality monitoring, and access management of their data products. Data Stewards report quarterly to the Data Governance Committee.
+
+4. RETENTION AND DISPOSAL
+Meter data: retain for 7 years per NEM Rules. Customer personal data: retain for 7 years post-contract end. Operational logs: retain for 3 years. Disposal must be documented and approved.
+
+5. PRIVACY
+All data handling involving personal information must comply with the Privacy Act 1988 (Cth), Australian Privacy Principles, and state privacy legislation. Privacy Impact Assessments are mandatory for new data sharing arrangements and analytics use cases involving personal data.",3.5,restricted
+DOC-0022,emergency_response,Emergency Response — Safety and Environment v4.2,Safety and Environment,2018-07-06,2020-07-05,"Emergency Response Plan — Major Network Incident — Safety and Environment v4.2
+
+1. ACTIVATION CRITERIA
+This plan is activated for any event affecting more than 10,000 customers, any 132kV or above circuit fault, or any event declared a Public Safety Power Shutoff (PSPS).
+
+2. INCIDENT COMMAND
+The Network Operations Manager assumes the role of Incident Commander on activation. An Emergency Response Team (ERT) is stood up within 30 minutes, comprising representatives from Operations, Engineering, Media, and Customer Service.
+
+3. NOTIFICATION
+Within 15 minutes of activation: notify General Manager Networks, AER (if affecting reliability targets), AEMO (if affecting wholesale market), state energy regulator, and emergency services if life safety risk exists.
+
+4. CUSTOMER COMMUNICATIONS
+Estimated restoration times must be published via SMS, web, and IVR within 30 minutes. Updates every 60 minutes until restoration.
+
+5. POST-INCIDENT
+A post-incident review must be completed within 5 business days. Findings and corrective actions registered in the asset management system.",4.2,internal
+DOC-0023,emergency_response,Emergency Response — Engineering Services v4.2,Engineering Services,2019-01-02,2021-01-01,"Emergency Response Plan — Major Network Incident — Engineering Services v4.2
+
+1. ACTIVATION CRITERIA
+This plan is activated for any event affecting more than 10,000 customers, any 132kV or above circuit fault, or any event declared a Public Safety Power Shutoff (PSPS).
+
+2. INCIDENT COMMAND
+The Network Operations Manager assumes the role of Incident Commander on activation. An Emergency Response Team (ERT) is stood up within 30 minutes, comprising representatives from Operations, Engineering, Media, and Customer Service.
+
+3. NOTIFICATION
+Within 15 minutes of activation: notify General Manager Networks, AER (if affecting reliability targets), AEMO (if affecting wholesale market), state energy regulator, and emergency services if life safety risk exists.
+
+4. CUSTOMER COMMUNICATIONS
+Estimated restoration times must be published via SMS, web, and IVR within 30 minutes. Updates every 60 minutes until restoration.
+
+5. POST-INCIDENT
+A post-incident review must be completed within 5 business days. Findings and corrective actions registered in the asset management system.",4.2,internal
+DOC-0024,safety_procedure,Safety Procedure — Regulatory Affairs v1.2,Regulatory Affairs,2024-07-23,2025-07-23,"Safety Procedure SP-1.2 — Isolation and Earthing of High-Voltage Equipment — Regulatory Affairs
+
+1. OBJECTIVE
+To prevent injury or death from unintended energisation of high-voltage equipment during maintenance or construction activities.
+
+2. APPLICABILITY
+All authorised HV switching operators and maintenance personnel working on assets rated 1kV to 275kV.
+
+3. PROCEDURE
+Step 1: Obtain isolation authority from the Network Operations Controller.
+Step 2: Identify and confirm correct isolation points using approved single-line diagrams.
+Step 3: Operate isolation devices in the correct sequence — open circuit breaker, open isolator, apply locks and danger tags.
+Step 4: Apply high-voltage earths to all potentially energised conductors on both source and load sides of work zone.
+Step 5: Test for absence of voltage using approved HV test equipment before commencing work.
+
+4. RESTORATION
+Restoration must follow reverse sequence. All earths must be removed and accounted for. Confirmation must be given to NOC before any switching.
+
+5. REFERENCES
+AS/NZS 3000, Electricity Safety Act 1998, Network Safety Rules v4.2.",1.2,internal
+DOC-0025,network_access_policy,Network Access Policy — Safety and Environment v2.3,Safety and Environment,2019-10-19,2022-10-18,"Network Access Policy v2.3 — Safety and Environment
+
+1. PURPOSE
+This policy establishes the conditions under which third parties, contractors, and internal personnel may access the Safety and Environment high-voltage network, substations, and associated infrastructure.
+
+2. SCOPE
+Applicable to all staff, contractors, visitors, and authorised third parties performing work on or near electrical infrastructure rated 415V and above.
+
+3. AUTHORISATION REQUIREMENTS
+All network access must be authorised by a Network Access Permit (NAP) issued by the duty Network Operations Controller. No work may commence without a valid NAP. Permits are valid for the stated shift period only and must be surrendered upon completion of work.
+
+4. MINIMUM APPROACH DISTANCES
+Personnel must maintain minimum approach distances as specified in AS/NZS 4836 — Safe Working on or near Low-Voltage Electrical Installations, and the relevant state network safety rules.
+
+5. COMPLIANCE
+Breaches of this policy may result in removal from site, suspension of access privileges, and disciplinary or legal action. All breaches must be reported to the Network Operations Manager within 4 hours.",2.3,internal
+DOC-0026,ai_usage_policy,Ai Usage Policy — Safety and Environment v3.9,Safety and Environment,2020-10-01,2022-10-01,"Artificial Intelligence Usage Policy v3.9 — Safety and Environment
+
+1. PURPOSE
+Govern the responsible use of artificial intelligence (AI) and machine learning (ML) systems across the organisation to ensure safety, fairness, transparency, and compliance with regulatory obligations.
+
+2. PROHIBITED USES
+AI must not be used to: make fully automated decisions that affect customer financial outcomes without human review; process sensitive personal information without a completed Privacy Impact Assessment; operate or directly control protection systems without certification under IEC 61511 functional safety standards.
+
+3. AI RISK TIERS
+Tier 1 (High Risk): AI systems that inform regulatory submissions, affect safety-critical operations, or process >10,000 customer records. Require Board approval, independent validation, and ongoing monitoring.
+Tier 2 (Medium Risk): AI systems used for internal operational decisions. Require GM approval and documented testing.
+Tier 3 (Low Risk): AI productivity tools, summarisation, and document assistance. Require IT risk assessment only.
+
+4. DATA RESIDENCY
+All AI model training, inference, and data processing involving customer or grid data must occur within Australian jurisdiction. Use of offshore AI services requires CISO approval and a Data Processing Agreement meeting Australian Privacy Principle 8 requirements.
+
+5. HUMAN OVERSIGHT
+All AI-generated outputs that inform consequential decisions must be reviewed by a qualified human before action. AI systems must log all inputs and outputs for audit purposes for a minimum of 3 years.
+
+6. REVIEW
+This policy is reviewed annually or following any material AI incident or regulatory change.",3.9,public
+DOC-0027,safety_procedure,Safety Procedure — Finance and Strategy v2.0,Finance and Strategy,2022-11-10,2023-11-10,"Safety Procedure SP-2.0 — Isolation and Earthing of High-Voltage Equipment — Finance and Strategy
+
+1. OBJECTIVE
+To prevent injury or death from unintended energisation of high-voltage equipment during maintenance or construction activities.
+
+2. APPLICABILITY
+All authorised HV switching operators and maintenance personnel working on assets rated 1kV to 275kV.
+
+3. PROCEDURE
+Step 1: Obtain isolation authority from the Network Operations Controller.
+Step 2: Identify and confirm correct isolation points using approved single-line diagrams.
+Step 3: Operate isolation devices in the correct sequence — open circuit breaker, open isolator, apply locks and danger tags.
+Step 4: Apply high-voltage earths to all potentially energised conductors on both source and load sides of work zone.
+Step 5: Test for absence of voltage using approved HV test equipment before commencing work.
+
+4. RESTORATION
+Restoration must follow reverse sequence. All earths must be removed and accounted for. Confirmation must be given to NOC before any switching.
+
+5. REFERENCES
+AS/NZS 3000, Electricity Safety Act 1998, Network Safety Rules v4.2.",2.0,internal
+DOC-0028,safety_procedure,Safety Procedure — Regulatory Affairs v4.8,Regulatory Affairs,2023-01-08,2026-01-07,"Safety Procedure SP-4.8 — Isolation and Earthing of High-Voltage Equipment — Regulatory Affairs
+
+1. OBJECTIVE
+To prevent injury or death from unintended energisation of high-voltage equipment during maintenance or construction activities.
+
+2. APPLICABILITY
+All authorised HV switching operators and maintenance personnel working on assets rated 1kV to 275kV.
+
+3. PROCEDURE
+Step 1: Obtain isolation authority from the Network Operations Controller.
+Step 2: Identify and confirm correct isolation points using approved single-line diagrams.
+Step 3: Operate isolation devices in the correct sequence — open circuit breaker, open isolator, apply locks and danger tags.
+Step 4: Apply high-voltage earths to all potentially energised conductors on both source and load sides of work zone.
+Step 5: Test for absence of voltage using approved HV test equipment before commencing work.
+
+4. RESTORATION
+Restoration must follow reverse sequence. All earths must be removed and accounted for. Confirmation must be given to NOC before any switching.
+
+5. REFERENCES
+AS/NZS 3000, Electricity Safety Act 1998, Network Safety Rules v4.2.",4.8,internal
+DOC-0029,ai_usage_policy,Ai Usage Policy — Regulatory Affairs v3.2,Regulatory Affairs,2019-11-14,2022-11-13,"Artificial Intelligence Usage Policy v3.2 — Regulatory Affairs
+
+1. PURPOSE
+Govern the responsible use of artificial intelligence (AI) and machine learning (ML) systems across the organisation to ensure safety, fairness, transparency, and compliance with regulatory obligations.
+
+2. PROHIBITED USES
+AI must not be used to: make fully automated decisions that affect customer financial outcomes without human review; process sensitive personal information without a completed Privacy Impact Assessment; operate or directly control protection systems without certification under IEC 61511 functional safety standards.
+
+3. AI RISK TIERS
+Tier 1 (High Risk): AI systems that inform regulatory submissions, affect safety-critical operations, or process >10,000 customer records. Require Board approval, independent validation, and ongoing monitoring.
+Tier 2 (Medium Risk): AI systems used for internal operational decisions. Require GM approval and documented testing.
+Tier 3 (Low Risk): AI productivity tools, summarisation, and document assistance. Require IT risk assessment only.
+
+4. DATA RESIDENCY
+All AI model training, inference, and data processing involving customer or grid data must occur within Australian jurisdiction. Use of offshore AI services requires CISO approval and a Data Processing Agreement meeting Australian Privacy Principle 8 requirements.
+
+5. HUMAN OVERSIGHT
+All AI-generated outputs that inform consequential decisions must be reviewed by a qualified human before action. AI systems must log all inputs and outputs for audit purposes for a minimum of 3 years.
+
+6. REVIEW
+This policy is reviewed annually or following any material AI incident or regulatory change.",3.2,restricted
+DOC-0030,ai_usage_policy,Ai Usage Policy — Safety and Environment v2.1,Safety and Environment,2022-11-13,2023-11-13,"Artificial Intelligence Usage Policy v2.1 — Safety and Environment
+
+1. PURPOSE
+Govern the responsible use of artificial intelligence (AI) and machine learning (ML) systems across the organisation to ensure safety, fairness, transparency, and compliance with regulatory obligations.
+
+2. PROHIBITED USES
+AI must not be used to: make fully automated decisions that affect customer financial outcomes without human review; process sensitive personal information without a completed Privacy Impact Assessment; operate or directly control protection systems without certification under IEC 61511 functional safety standards.
+
+3. AI RISK TIERS
+Tier 1 (High Risk): AI systems that inform regulatory submissions, affect safety-critical operations, or process >10,000 customer records. Require Board approval, independent validation, and ongoing monitoring.
+Tier 2 (Medium Risk): AI systems used for internal operational decisions. Require GM approval and documented testing.
+Tier 3 (Low Risk): AI productivity tools, summarisation, and document assistance. Require IT risk assessment only.
+
+4. DATA RESIDENCY
+All AI model training, inference, and data processing involving customer or grid data must occur within Australian jurisdiction. Use of offshore AI services requires CISO approval and a Data Processing Agreement meeting Australian Privacy Principle 8 requirements.
+
+5. HUMAN OVERSIGHT
+All AI-generated outputs that inform consequential decisions must be reviewed by a qualified human before action. AI systems must log all inputs and outputs for audit purposes for a minimum of 3 years.
+
+6. REVIEW
+This policy is reviewed annually or following any material AI incident or regulatory change.",2.1,restricted
+DOC-0031,safety_procedure,Safety Procedure — Information Technology v1.8,Information Technology,2019-02-25,2022-02-24,"Safety Procedure SP-1.8 — Isolation and Earthing of High-Voltage Equipment — Information Technology
+
+1. OBJECTIVE
+To prevent injury or death from unintended energisation of high-voltage equipment during maintenance or construction activities.
+
+2. APPLICABILITY
+All authorised HV switching operators and maintenance personnel working on assets rated 1kV to 275kV.
+
+3. PROCEDURE
+Step 1: Obtain isolation authority from the Network Operations Controller.
+Step 2: Identify and confirm correct isolation points using approved single-line diagrams.
+Step 3: Operate isolation devices in the correct sequence — open circuit breaker, open isolator, apply locks and danger tags.
+Step 4: Apply high-voltage earths to all potentially energised conductors on both source and load sides of work zone.
+Step 5: Test for absence of voltage using approved HV test equipment before commencing work.
+
+4. RESTORATION
+Restoration must follow reverse sequence. All earths must be removed and accounted for. Confirmation must be given to NOC before any switching.
+
+5. REFERENCES
+AS/NZS 3000, Electricity Safety Act 1998, Network Safety Rules v4.2.",1.8,restricted
+DOC-0032,emergency_response,Emergency Response — Finance and Strategy v1.9,Finance and Strategy,2023-03-01,2024-02-29,"Emergency Response Plan — Major Network Incident — Finance and Strategy v1.9
+
+1. ACTIVATION CRITERIA
+This plan is activated for any event affecting more than 10,000 customers, any 132kV or above circuit fault, or any event declared a Public Safety Power Shutoff (PSPS).
+
+2. INCIDENT COMMAND
+The Network Operations Manager assumes the role of Incident Commander on activation. An Emergency Response Team (ERT) is stood up within 30 minutes, comprising representatives from Operations, Engineering, Media, and Customer Service.
+
+3. NOTIFICATION
+Within 15 minutes of activation: notify General Manager Networks, AER (if affecting reliability targets), AEMO (if affecting wholesale market), state energy regulator, and emergency services if life safety risk exists.
+
+4. CUSTOMER COMMUNICATIONS
+Estimated restoration times must be published via SMS, web, and IVR within 30 minutes. Updates every 60 minutes until restoration.
+
+5. POST-INCIDENT
+A post-incident review must be completed within 5 business days. Findings and corrective actions registered in the asset management system.",1.9,internal
+DOC-0033,ai_usage_policy,Ai Usage Policy — Safety and Environment v1.2,Safety and Environment,2024-01-19,2027-01-18,"Artificial Intelligence Usage Policy v1.2 — Safety and Environment
+
+1. PURPOSE
+Govern the responsible use of artificial intelligence (AI) and machine learning (ML) systems across the organisation to ensure safety, fairness, transparency, and compliance with regulatory obligations.
+
+2. PROHIBITED USES
+AI must not be used to: make fully automated decisions that affect customer financial outcomes without human review; process sensitive personal information without a completed Privacy Impact Assessment; operate or directly control protection systems without certification under IEC 61511 functional safety standards.
+
+3. AI RISK TIERS
+Tier 1 (High Risk): AI systems that inform regulatory submissions, affect safety-critical operations, or process >10,000 customer records. Require Board approval, independent validation, and ongoing monitoring.
+Tier 2 (Medium Risk): AI systems used for internal operational decisions. Require GM approval and documented testing.
+Tier 3 (Low Risk): AI productivity tools, summarisation, and document assistance. Require IT risk assessment only.
+
+4. DATA RESIDENCY
+All AI model training, inference, and data processing involving customer or grid data must occur within Australian jurisdiction. Use of offshore AI services requires CISO approval and a Data Processing Agreement meeting Australian Privacy Principle 8 requirements.
+
+5. HUMAN OVERSIGHT
+All AI-generated outputs that inform consequential decisions must be reviewed by a qualified human before action. AI systems must log all inputs and outputs for audit purposes for a minimum of 3 years.
+
+6. REVIEW
+This policy is reviewed annually or following any material AI incident or regulatory change.",1.2,internal
+DOC-0034,ai_usage_policy,Ai Usage Policy — Asset Management v2.3,Asset Management,2020-08-19,2023-08-19,"Artificial Intelligence Usage Policy v2.3 — Asset Management
+
+1. PURPOSE
+Govern the responsible use of artificial intelligence (AI) and machine learning (ML) systems across the organisation to ensure safety, fairness, transparency, and compliance with regulatory obligations.
+
+2. PROHIBITED USES
+AI must not be used to: make fully automated decisions that affect customer financial outcomes without human review; process sensitive personal information without a completed Privacy Impact Assessment; operate or directly control protection systems without certification under IEC 61511 functional safety standards.
+
+3. AI RISK TIERS
+Tier 1 (High Risk): AI systems that inform regulatory submissions, affect safety-critical operations, or process >10,000 customer records. Require Board approval, independent validation, and ongoing monitoring.
+Tier 2 (Medium Risk): AI systems used for internal operational decisions. Require GM approval and documented testing.
+Tier 3 (Low Risk): AI productivity tools, summarisation, and document assistance. Require IT risk assessment only.
+
+4. DATA RESIDENCY
+All AI model training, inference, and data processing involving customer or grid data must occur within Australian jurisdiction. Use of offshore AI services requires CISO approval and a Data Processing Agreement meeting Australian Privacy Principle 8 requirements.
+
+5. HUMAN OVERSIGHT
+All AI-generated outputs that inform consequential decisions must be reviewed by a qualified human before action. AI systems must log all inputs and outputs for audit purposes for a minimum of 3 years.
+
+6. REVIEW
+This policy is reviewed annually or following any material AI incident or regulatory change.",2.3,internal
+DOC-0035,safety_procedure,Safety Procedure — Finance and Strategy v4.5,Finance and Strategy,2023-08-05,2025-08-04,"Safety Procedure SP-4.5 — Isolation and Earthing of High-Voltage Equipment — Finance and Strategy
+
+1. OBJECTIVE
+To prevent injury or death from unintended energisation of high-voltage equipment during maintenance or construction activities.
+
+2. APPLICABILITY
+All authorised HV switching operators and maintenance personnel working on assets rated 1kV to 275kV.
+
+3. PROCEDURE
+Step 1: Obtain isolation authority from the Network Operations Controller.
+Step 2: Identify and confirm correct isolation points using approved single-line diagrams.
+Step 3: Operate isolation devices in the correct sequence — open circuit breaker, open isolator, apply locks and danger tags.
+Step 4: Apply high-voltage earths to all potentially energised conductors on both source and load sides of work zone.
+Step 5: Test for absence of voltage using approved HV test equipment before commencing work.
+
+4. RESTORATION
+Restoration must follow reverse sequence. All earths must be removed and accounted for. Confirmation must be given to NOC before any switching.
+
+5. REFERENCES
+AS/NZS 3000, Electricity Safety Act 1998, Network Safety Rules v4.2.",4.5,restricted
+DOC-0036,safety_procedure,Safety Procedure — Regulatory Affairs v2.3,Regulatory Affairs,2022-12-28,2025-12-27,"Safety Procedure SP-2.3 — Isolation and Earthing of High-Voltage Equipment — Regulatory Affairs
+
+1. OBJECTIVE
+To prevent injury or death from unintended energisation of high-voltage equipment during maintenance or construction activities.
+
+2. APPLICABILITY
+All authorised HV switching operators and maintenance personnel working on assets rated 1kV to 275kV.
+
+3. PROCEDURE
+Step 1: Obtain isolation authority from the Network Operations Controller.
+Step 2: Identify and confirm correct isolation points using approved single-line diagrams.
+Step 3: Operate isolation devices in the correct sequence — open circuit breaker, open isolator, apply locks and danger tags.
+Step 4: Apply high-voltage earths to all potentially energised conductors on both source and load sides of work zone.
+Step 5: Test for absence of voltage using approved HV test equipment before commencing work.
+
+4. RESTORATION
+Restoration must follow reverse sequence. All earths must be removed and accounted for. Confirmation must be given to NOC before any switching.
+
+5. REFERENCES
+AS/NZS 3000, Electricity Safety Act 1998, Network Safety Rules v4.2.",2.3,internal
+DOC-0037,data_governance,Data Governance — Network Operations v1.4,Network Operations,2021-04-18,2024-04-17,"Data Governance Policy v1.4 — Network Operations
+
+1. PURPOSE
+Establish accountabilities, standards, and controls for the management of data assets across the organisation, ensuring data quality, security, lineage, and regulatory compliance.
+
+2. DATA CLASSIFICATION
+All data assets must be classified as: Public, Internal, Restricted, or Confidential. Customer metering data, personal information, and grid operational data are classified Restricted by default.
+
+3. DATA STEWARDSHIP
+Each business unit must appoint a Data Steward responsible for cataloguing, quality monitoring, and access management of their data products. Data Stewards report quarterly to the Data Governance Committee.
+
+4. RETENTION AND DISPOSAL
+Meter data: retain for 7 years per NEM Rules. Customer personal data: retain for 7 years post-contract end. Operational logs: retain for 3 years. Disposal must be documented and approved.
+
+5. PRIVACY
+All data handling involving personal information must comply with the Privacy Act 1988 (Cth), Australian Privacy Principles, and state privacy legislation. Privacy Impact Assessments are mandatory for new data sharing arrangements and analytics use cases involving personal data.",1.4,restricted
+DOC-0038,safety_procedure,Safety Procedure — Asset Management v1.0,Asset Management,2018-03-18,2019-03-18,"Safety Procedure SP-1.0 — Isolation and Earthing of High-Voltage Equipment — Asset Management
+
+1. OBJECTIVE
+To prevent injury or death from unintended energisation of high-voltage equipment during maintenance or construction activities.
+
+2. APPLICABILITY
+All authorised HV switching operators and maintenance personnel working on assets rated 1kV to 275kV.
+
+3. PROCEDURE
+Step 1: Obtain isolation authority from the Network Operations Controller.
+Step 2: Identify and confirm correct isolation points using approved single-line diagrams.
+Step 3: Operate isolation devices in the correct sequence — open circuit breaker, open isolator, apply locks and danger tags.
+Step 4: Apply high-voltage earths to all potentially energised conductors on both source and load sides of work zone.
+Step 5: Test for absence of voltage using approved HV test equipment before commencing work.
+
+4. RESTORATION
+Restoration must follow reverse sequence. All earths must be removed and accounted for. Confirmation must be given to NOC before any switching.
+
+5. REFERENCES
+AS/NZS 3000, Electricity Safety Act 1998, Network Safety Rules v4.2.",1.0,internal
+DOC-0039,ai_usage_policy,Ai Usage Policy — Safety and Environment v4.6,Safety and Environment,2020-09-29,2023-09-29,"Artificial Intelligence Usage Policy v4.6 — Safety and Environment
+
+1. PURPOSE
+Govern the responsible use of artificial intelligence (AI) and machine learning (ML) systems across the organisation to ensure safety, fairness, transparency, and compliance with regulatory obligations.
+
+2. PROHIBITED USES
+AI must not be used to: make fully automated decisions that affect customer financial outcomes without human review; process sensitive personal information without a completed Privacy Impact Assessment; operate or directly control protection systems without certification under IEC 61511 functional safety standards.
+
+3. AI RISK TIERS
+Tier 1 (High Risk): AI systems that inform regulatory submissions, affect safety-critical operations, or process >10,000 customer records. Require Board approval, independent validation, and ongoing monitoring.
+Tier 2 (Medium Risk): AI systems used for internal operational decisions. Require GM approval and documented testing.
+Tier 3 (Low Risk): AI productivity tools, summarisation, and document assistance. Require IT risk assessment only.
+
+4. DATA RESIDENCY
+All AI model training, inference, and data processing involving customer or grid data must occur within Australian jurisdiction. Use of offshore AI services requires CISO approval and a Data Processing Agreement meeting Australian Privacy Principle 8 requirements.
+
+5. HUMAN OVERSIGHT
+All AI-generated outputs that inform consequential decisions must be reviewed by a qualified human before action. AI systems must log all inputs and outputs for audit purposes for a minimum of 3 years.
+
+6. REVIEW
+This policy is reviewed annually or following any material AI incident or regulatory change.",4.6,internal
+DOC-0040,network_access_policy,Network Access Policy — Finance and Strategy v1.2,Finance and Strategy,2022-09-30,2023-09-30,"Network Access Policy v1.2 — Finance and Strategy
+
+1. PURPOSE
+This policy establishes the conditions under which third parties, contractors, and internal personnel may access the Finance and Strategy high-voltage network, substations, and associated infrastructure.
+
+2. SCOPE
+Applicable to all staff, contractors, visitors, and authorised third parties performing work on or near electrical infrastructure rated 415V and above.
+
+3. AUTHORISATION REQUIREMENTS
+All network access must be authorised by a Network Access Permit (NAP) issued by the duty Network Operations Controller. No work may commence without a valid NAP. Permits are valid for the stated shift period only and must be surrendered upon completion of work.
+
+4. MINIMUM APPROACH DISTANCES
+Personnel must maintain minimum approach distances as specified in AS/NZS 4836 — Safe Working on or near Low-Voltage Electrical Installations, and the relevant state network safety rules.
+
+5. COMPLIANCE
+Breaches of this policy may result in removal from site, suspension of access privileges, and disciplinary or legal action. All breaches must be reported to the Network Operations Manager within 4 hours.",1.2,internal
+DOC-0041,network_access_policy,Network Access Policy — Customer Experience v1.2,Customer Experience,2024-12-10,2026-12-10,"Network Access Policy v1.2 — Customer Experience
+
+1. PURPOSE
+This policy establishes the conditions under which third parties, contractors, and internal personnel may access the Customer Experience high-voltage network, substations, and associated infrastructure.
+
+2. SCOPE
+Applicable to all staff, contractors, visitors, and authorised third parties performing work on or near electrical infrastructure rated 415V and above.
+
+3. AUTHORISATION REQUIREMENTS
+All network access must be authorised by a Network Access Permit (NAP) issued by the duty Network Operations Controller. No work may commence without a valid NAP. Permits are valid for the stated shift period only and must be surrendered upon completion of work.
+
+4. MINIMUM APPROACH DISTANCES
+Personnel must maintain minimum approach distances as specified in AS/NZS 4836 — Safe Working on or near Low-Voltage Electrical Installations, and the relevant state network safety rules.
+
+5. COMPLIANCE
+Breaches of this policy may result in removal from site, suspension of access privileges, and disciplinary or legal action. All breaches must be reported to the Network Operations Manager within 4 hours.",1.2,public
+DOC-0042,network_access_policy,Network Access Policy — Finance and Strategy v3.7,Finance and Strategy,2018-04-30,2019-04-30,"Network Access Policy v3.7 — Finance and Strategy
+
+1. PURPOSE
+This policy establishes the conditions under which third parties, contractors, and internal personnel may access the Finance and Strategy high-voltage network, substations, and associated infrastructure.
+
+2. SCOPE
+Applicable to all staff, contractors, visitors, and authorised third parties performing work on or near electrical infrastructure rated 415V and above.
+
+3. AUTHORISATION REQUIREMENTS
+All network access must be authorised by a Network Access Permit (NAP) issued by the duty Network Operations Controller. No work may commence without a valid NAP. Permits are valid for the stated shift period only and must be surrendered upon completion of work.
+
+4. MINIMUM APPROACH DISTANCES
+Personnel must maintain minimum approach distances as specified in AS/NZS 4836 — Safe Working on or near Low-Voltage Electrical Installations, and the relevant state network safety rules.
+
+5. COMPLIANCE
+Breaches of this policy may result in removal from site, suspension of access privileges, and disciplinary or legal action. All breaches must be reported to the Network Operations Manager within 4 hours.",3.7,public
+DOC-0043,data_governance,Data Governance — Finance and Strategy v2.0,Finance and Strategy,2019-12-14,2022-12-13,"Data Governance Policy v2.0 — Finance and Strategy
+
+1. PURPOSE
+Establish accountabilities, standards, and controls for the management of data assets across the organisation, ensuring data quality, security, lineage, and regulatory compliance.
+
+2. DATA CLASSIFICATION
+All data assets must be classified as: Public, Internal, Restricted, or Confidential. Customer metering data, personal information, and grid operational data are classified Restricted by default.
+
+3. DATA STEWARDSHIP
+Each business unit must appoint a Data Steward responsible for cataloguing, quality monitoring, and access management of their data products. Data Stewards report quarterly to the Data Governance Committee.
+
+4. RETENTION AND DISPOSAL
+Meter data: retain for 7 years per NEM Rules. Customer personal data: retain for 7 years post-contract end. Operational logs: retain for 3 years. Disposal must be documented and approved.
+
+5. PRIVACY
+All data handling involving personal information must comply with the Privacy Act 1988 (Cth), Australian Privacy Principles, and state privacy legislation. Privacy Impact Assessments are mandatory for new data sharing arrangements and analytics use cases involving personal data.",2.0,internal
+DOC-0044,safety_procedure,Safety Procedure — Regulatory Affairs v4.5,Regulatory Affairs,2021-01-04,2022-01-04,"Safety Procedure SP-4.5 — Isolation and Earthing of High-Voltage Equipment — Regulatory Affairs
+
+1. OBJECTIVE
+To prevent injury or death from unintended energisation of high-voltage equipment during maintenance or construction activities.
+
+2. APPLICABILITY
+All authorised HV switching operators and maintenance personnel working on assets rated 1kV to 275kV.
+
+3. PROCEDURE
+Step 1: Obtain isolation authority from the Network Operations Controller.
+Step 2: Identify and confirm correct isolation points using approved single-line diagrams.
+Step 3: Operate isolation devices in the correct sequence — open circuit breaker, open isolator, apply locks and danger tags.
+Step 4: Apply high-voltage earths to all potentially energised conductors on both source and load sides of work zone.
+Step 5: Test for absence of voltage using approved HV test equipment before commencing work.
+
+4. RESTORATION
+Restoration must follow reverse sequence. All earths must be removed and accounted for. Confirmation must be given to NOC before any switching.
+
+5. REFERENCES
+AS/NZS 3000, Electricity Safety Act 1998, Network Safety Rules v4.2.",4.5,internal
+DOC-0045,emergency_response,Emergency Response — Network Operations v1.7,Network Operations,2022-04-19,2024-04-18,"Emergency Response Plan — Major Network Incident — Network Operations v1.7
+
+1. ACTIVATION CRITERIA
+This plan is activated for any event affecting more than 10,000 customers, any 132kV or above circuit fault, or any event declared a Public Safety Power Shutoff (PSPS).
+
+2. INCIDENT COMMAND
+The Network Operations Manager assumes the role of Incident Commander on activation. An Emergency Response Team (ERT) is stood up within 30 minutes, comprising representatives from Operations, Engineering, Media, and Customer Service.
+
+3. NOTIFICATION
+Within 15 minutes of activation: notify General Manager Networks, AER (if affecting reliability targets), AEMO (if affecting wholesale market), state energy regulator, and emergency services if life safety risk exists.
+
+4. CUSTOMER COMMUNICATIONS
+Estimated restoration times must be published via SMS, web, and IVR within 30 minutes. Updates every 60 minutes until restoration.
+
+5. POST-INCIDENT
+A post-incident review must be completed within 5 business days. Findings and corrective actions registered in the asset management system.",1.7,restricted
+DOC-0046,safety_procedure,Safety Procedure — Customer Experience v2.3,Customer Experience,2019-09-29,2022-09-28,"Safety Procedure SP-2.3 — Isolation and Earthing of High-Voltage Equipment — Customer Experience
+
+1. OBJECTIVE
+To prevent injury or death from unintended energisation of high-voltage equipment during maintenance or construction activities.
+
+2. APPLICABILITY
+All authorised HV switching operators and maintenance personnel working on assets rated 1kV to 275kV.
+
+3. PROCEDURE
+Step 1: Obtain isolation authority from the Network Operations Controller.
+Step 2: Identify and confirm correct isolation points using approved single-line diagrams.
+Step 3: Operate isolation devices in the correct sequence — open circuit breaker, open isolator, apply locks and danger tags.
+Step 4: Apply high-voltage earths to all potentially energised conductors on both source and load sides of work zone.
+Step 5: Test for absence of voltage using approved HV test equipment before commencing work.
+
+4. RESTORATION
+Restoration must follow reverse sequence. All earths must be removed and accounted for. Confirmation must be given to NOC before any switching.
+
+5. REFERENCES
+AS/NZS 3000, Electricity Safety Act 1998, Network Safety Rules v4.2.",2.3,restricted
+DOC-0047,ai_usage_policy,Ai Usage Policy — Regulatory Affairs v2.0,Regulatory Affairs,2021-11-18,2022-11-18,"Artificial Intelligence Usage Policy v2.0 — Regulatory Affairs
+
+1. PURPOSE
+Govern the responsible use of artificial intelligence (AI) and machine learning (ML) systems across the organisation to ensure safety, fairness, transparency, and compliance with regulatory obligations.
+
+2. PROHIBITED USES
+AI must not be used to: make fully automated decisions that affect customer financial outcomes without human review; process sensitive personal information without a completed Privacy Impact Assessment; operate or directly control protection systems without certification under IEC 61511 functional safety standards.
+
+3. AI RISK TIERS
+Tier 1 (High Risk): AI systems that inform regulatory submissions, affect safety-critical operations, or process >10,000 customer records. Require Board approval, independent validation, and ongoing monitoring.
+Tier 2 (Medium Risk): AI systems used for internal operational decisions. Require GM approval and documented testing.
+Tier 3 (Low Risk): AI productivity tools, summarisation, and document assistance. Require IT risk assessment only.
+
+4. DATA RESIDENCY
+All AI model training, inference, and data processing involving customer or grid data must occur within Australian jurisdiction. Use of offshore AI services requires CISO approval and a Data Processing Agreement meeting Australian Privacy Principle 8 requirements.
+
+5. HUMAN OVERSIGHT
+All AI-generated outputs that inform consequential decisions must be reviewed by a qualified human before action. AI systems must log all inputs and outputs for audit purposes for a minimum of 3 years.
+
+6. REVIEW
+This policy is reviewed annually or following any material AI incident or regulatory change.",2.0,restricted
+DOC-0048,data_governance,Data Governance — Regulatory Affairs v4.5,Regulatory Affairs,2023-03-21,2024-03-20,"Data Governance Policy v4.5 — Regulatory Affairs
+
+1. PURPOSE
+Establish accountabilities, standards, and controls for the management of data assets across the organisation, ensuring data quality, security, lineage, and regulatory compliance.
+
+2. DATA CLASSIFICATION
+All data assets must be classified as: Public, Internal, Restricted, or Confidential. Customer metering data, personal information, and grid operational data are classified Restricted by default.
+
+3. DATA STEWARDSHIP
+Each business unit must appoint a Data Steward responsible for cataloguing, quality monitoring, and access management of their data products. Data Stewards report quarterly to the Data Governance Committee.
+
+4. RETENTION AND DISPOSAL
+Meter data: retain for 7 years per NEM Rules. Customer personal data: retain for 7 years post-contract end. Operational logs: retain for 3 years. Disposal must be documented and approved.
+
+5. PRIVACY
+All data handling involving personal information must comply with the Privacy Act 1988 (Cth), Australian Privacy Principles, and state privacy legislation. Privacy Impact Assessments are mandatory for new data sharing arrangements and analytics use cases involving personal data.",4.5,internal
+DOC-0049,emergency_response,Emergency Response — Information Technology v2.1,Information Technology,2022-11-02,2023-11-02,"Emergency Response Plan — Major Network Incident — Information Technology v2.1
+
+1. ACTIVATION CRITERIA
+This plan is activated for any event affecting more than 10,000 customers, any 132kV or above circuit fault, or any event declared a Public Safety Power Shutoff (PSPS).
+
+2. INCIDENT COMMAND
+The Network Operations Manager assumes the role of Incident Commander on activation. An Emergency Response Team (ERT) is stood up within 30 minutes, comprising representatives from Operations, Engineering, Media, and Customer Service.
+
+3. NOTIFICATION
+Within 15 minutes of activation: notify General Manager Networks, AER (if affecting reliability targets), AEMO (if affecting wholesale market), state energy regulator, and emergency services if life safety risk exists.
+
+4. CUSTOMER COMMUNICATIONS
+Estimated restoration times must be published via SMS, web, and IVR within 30 minutes. Updates every 60 minutes until restoration.
+
+5. POST-INCIDENT
+A post-incident review must be completed within 5 business days. Findings and corrective actions registered in the asset management system.",2.1,internal
+DOC-0050,data_governance,Data Governance — Engineering Services v3.2,Engineering Services,2024-04-01,2025-04-01,"Data Governance Policy v3.2 — Engineering Services
+
+1. PURPOSE
+Establish accountabilities, standards, and controls for the management of data assets across the organisation, ensuring data quality, security, lineage, and regulatory compliance.
+
+2. DATA CLASSIFICATION
+All data assets must be classified as: Public, Internal, Restricted, or Confidential. Customer metering data, personal information, and grid operational data are classified Restricted by default.
+
+3. DATA STEWARDSHIP
+Each business unit must appoint a Data Steward responsible for cataloguing, quality monitoring, and access management of their data products. Data Stewards report quarterly to the Data Governance Committee.
+
+4. RETENTION AND DISPOSAL
+Meter data: retain for 7 years per NEM Rules. Customer personal data: retain for 7 years post-contract end. Operational logs: retain for 3 years. Disposal must be documented and approved.
+
+5. PRIVACY
+All data handling involving personal information must comply with the Privacy Act 1988 (Cth), Australian Privacy Principles, and state privacy legislation. Privacy Impact Assessments are mandatory for new data sharing arrangements and analytics use cases involving personal data.",3.2,restricted
