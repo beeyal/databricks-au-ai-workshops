@@ -181,9 +181,31 @@ import os
 import json
 import requests
 
+# COMMAND ----------
+# MAGIC %md
+# MAGIC ### ⚙️ Workshop Configuration
+# MAGIC > **Running in a customer environment?** Change the workspace URL in the widget above to match your workspace.
+
+# COMMAND ----------
+# Widget-based configuration — works in any customer Databricks environment
+dbutils.widgets.text("workspace_url", "https://<your-workspace>.azuredatabricks.net", "Workspace URL")
+dbutils.widgets.text("account_id",    "<your-account-id>",                            "Account ID")
+dbutils.widgets.text("gw_endpoint",   "au-workshop-gateway",                          "AI Gateway endpoint name")
+
+WORKSPACE_URL_W  = dbutils.widgets.get("workspace_url")
+ACCOUNT_ID_W     = dbutils.widgets.get("account_id")
+GW_ENDPOINT      = dbutils.widgets.get("gw_endpoint")
+
+print(f"Workspace URL   : {WORKSPACE_URL_W}")
+print(f"Account ID      : {ACCOUNT_ID_W}")
+print(f"GW endpoint     : {GW_ENDPOINT}")
+
+# COMMAND ----------
+
 # TODO: Replace with your workspace URL (no trailing slash)
 # Example: "https://adb-1234567890123456.7.azuredatabricks.net"
-WORKSPACE_URL = "https://<your-workspace>.azuredatabricks.net"
+# Configurable — change via widget above if running in customer environment
+WORKSPACE_URL = WORKSPACE_URL_W if WORKSPACE_URL_W != "https://<your-workspace>.azuredatabricks.net" else "https://<your-workspace>.azuredatabricks.net"
 
 # TODO: Choose ONE of the following token approaches and comment out the other.
 
@@ -536,7 +558,8 @@ print("Equivalent UI action: ⚙️ Settings → AI & Machine Learning → Genie
 # TODO: Replace with your Databricks Account ID
 # Found in: Account Console → Settings → Account information
 # Or from the URL: accounts.azuredatabricks.net/account/<id>/...
-ACCOUNT_ID = "<your-account-id>"
+# Configurable — change via widget above if running in customer environment
+ACCOUNT_ID = ACCOUNT_ID_W if ACCOUNT_ID_W != "<your-account-id>" else "<your-account-id>"
 
 
 def get_enforce_geography_setting(account_id: str, headers: dict) -> dict:

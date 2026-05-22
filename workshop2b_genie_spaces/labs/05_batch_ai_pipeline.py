@@ -80,13 +80,35 @@ from pyspark.sql import functions as F
 from pyspark.sql.types import StructType, StructField, StringType, DateType, BooleanType
 from databricks.sdk import WorkspaceClient
 
+# COMMAND ----------
+# MAGIC %md
+# MAGIC ### ⚙️ Workshop Configuration
+# MAGIC > **Running in a customer environment?** Change the catalog name in the widget above to match
+# MAGIC > what was set in `setup/00_workspace_setup.py` (default: `workshop_au`)
+
+# COMMAND ----------
+# Widget-based configuration — works in any customer Databricks environment
+# These default values match what 00_workspace_setup.py creates
+dbutils.widgets.text("catalog",     "workshop_au",          "Catalog name")
+dbutils.widgets.text("schema",      "energy",               "Schema name")
+dbutils.widgets.text("pt_endpoint", "au_east_llm_inregion", "PT endpoint name")
+
+CATALOG      = dbutils.widgets.get("catalog")
+SCHEMA       = dbutils.widgets.get("schema")
+PT_ENDPOINT  = dbutils.widgets.get("pt_endpoint")
+
+print(f"Using catalog: {CATALOG}.{SCHEMA}")
+print(f"PT endpoint:   {PT_ENDPOINT}")
+
+# COMMAND ----------
+
 w       = WorkspaceClient()
 HOST    = spark.conf.get("spark.databricks.workspaceUrl")
-CATALOG = "workshop"
-SCHEMA  = "energy_nem"
+# Configurable — change via widget above if running in customer environment
+# CATALOG, SCHEMA, and PT_ENDPOINT are set by widgets above
 
-# TODO: confirm this matches your PT endpoint name from Lab 04
-ENDPOINT_NAME = "au_east_llm_inregion"
+# Configurable — change via widget above if running in customer environment
+ENDPOINT_NAME = PT_ENDPOINT  # from widget, default "au_east_llm_inregion"
 
 # Verify endpoint is ready before proceeding
 try:

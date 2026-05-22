@@ -123,9 +123,37 @@ import requests
 from datetime import datetime, timezone, date, timedelta
 from databricks.sdk import WorkspaceClient
 
+# COMMAND ----------
+# MAGIC %md
+# MAGIC ### ⚙️ Workshop Configuration
+# MAGIC > **Running in a customer environment?** Change the workspace URL, account ID, and catalog/schema widgets above.
+
+# COMMAND ----------
+# Widget-based configuration — works in any customer Databricks environment
+# These default values match what 00_workspace_setup.py creates
+dbutils.widgets.text("workspace_url", "https://<your-workspace>.azuredatabricks.net", "Workspace URL")
+dbutils.widgets.text("account_id",    "<your-account-id>",                            "Account ID")
+dbutils.widgets.text("catalog",       "energy_ai",                                    "Catalog name")
+dbutils.widgets.text("schema",        "compliance",                                   "Schema name")
+dbutils.widgets.text("gw_endpoint",   "pt-llama3-energy",                             "AI Gateway endpoint name")
+
+WORKSPACE_URL_W  = dbutils.widgets.get("workspace_url")
+ACCOUNT_ID_W     = dbutils.widgets.get("account_id")
+CATALOG_W        = dbutils.widgets.get("catalog")
+SCHEMA_W         = dbutils.widgets.get("schema")
+GW_ENDPOINT      = dbutils.widgets.get("gw_endpoint")
+
+print(f"Workspace URL   : {WORKSPACE_URL_W}")
+print(f"Account ID      : {ACCOUNT_ID_W}")
+print(f"Catalog.Schema  : {CATALOG_W}.{SCHEMA_W}")
+print(f"GW endpoint     : {GW_ENDPOINT}")
+
+# COMMAND ----------
+
 # TODO: Fill in your workspace and account details
-WORKSPACE_URL = "https://<your-workspace>.azuredatabricks.net"  # TODO
-ACCOUNT_ID    = "<your-account-id>"                              # TODO
+# Configurable — change via widget above if running in customer environment
+WORKSPACE_URL = WORKSPACE_URL_W if WORKSPACE_URL_W != "https://<your-workspace>.azuredatabricks.net" else "https://<your-workspace>.azuredatabricks.net"
+ACCOUNT_ID    = ACCOUNT_ID_W if ACCOUNT_ID_W != "<your-account-id>" else "<your-account-id>"
 
 try:
     DATABRICKS_TOKEN = dbutils.secrets.get(scope="admin-workshop", key="workspace-token")
@@ -656,8 +684,9 @@ print(json.dumps(compliance_package, indent=2, default=str))
 
 # COMMAND ----------
 
-CATALOG_NAME = "energy_ai"    # TODO: your catalog
-SCHEMA_NAME  = "compliance"   # TODO: your schema
+# Configurable — change via widget above if running in customer environment
+CATALOG_NAME = CATALOG_W   # from widget, default "energy_ai"
+SCHEMA_NAME  = SCHEMA_W    # from widget, default "compliance"
 
 
 def save_compliance_evidence(spark, catalog: str, schema: str, package: dict) -> None:
@@ -1104,9 +1133,9 @@ def print_preflight_report(report: dict) -> None:
         print(f"  Resolve {len(failed)} failing check(s) before enabling AI access.")
 
 
-# TODO: Fill in endpoint name and target group
-PREFLIGHT_ENDPOINT = "pt-llama3-energy"   # TODO
-PREFLIGHT_GROUP    = "grp_analysts"        # TODO
+# Configurable — change via widget above if running in customer environment
+PREFLIGHT_ENDPOINT = GW_ENDPOINT           # from widget, default "pt-llama3-energy"
+PREFLIGHT_GROUP    = "grp_analysts"        # TODO: update to your target group
 
 preflight_report = run_preflight_checklist(
     workspace_url=WORKSPACE_URL,

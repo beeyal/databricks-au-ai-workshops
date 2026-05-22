@@ -119,6 +119,27 @@
 
 # COMMAND ----------
 
+# COMMAND ----------
+# MAGIC %md
+# MAGIC ### ⚙️ Workshop Configuration
+# MAGIC > **Running in a customer environment?** Change the catalog/schema widgets above to match your setup.
+
+# COMMAND ----------
+# Widget-based configuration — works in any customer Databricks environment
+# These default values match what 00_workspace_setup.py creates
+dbutils.widgets.text("catalog",     "energy_ai",  "Catalog name")
+dbutils.widgets.text("schema",      "analytics",  "Schema name")
+dbutils.widgets.text("gw_endpoint", "au-workshop-gateway", "AI Gateway endpoint name")
+
+CATALOG_W   = dbutils.widgets.get("catalog")
+SCHEMA_W    = dbutils.widgets.get("schema")
+GW_ENDPOINT = dbutils.widgets.get("gw_endpoint")
+
+print(f"Catalog.Schema : {CATALOG_W}.{SCHEMA_W}")
+print(f"GW endpoint    : {GW_ENDPOINT}")
+
+# COMMAND ----------
+
 # Verify access to all key system tables before running subsequent sections
 SYSTEM_TABLES = [
     "system.ai_gateway.usage",
@@ -529,9 +550,9 @@ for model, prices in TOKEN_PRICES.items():
 
 # COMMAND ----------
 
-# TODO: Replace with your catalog and schema names
-CATALOG_NAME = "energy_ai"   # TODO
-SCHEMA_NAME  = "analytics"   # TODO
+# Configurable — change via widget above if running in customer environment
+CATALOG_NAME = CATALOG_W   # from widget, default "energy_ai"
+SCHEMA_NAME  = SCHEMA_W    # from widget, default "analytics"
 
 spark.sql(f"CREATE SCHEMA IF NOT EXISTS {CATALOG_NAME}.{SCHEMA_NAME}")
 

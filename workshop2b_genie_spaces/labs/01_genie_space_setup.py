@@ -195,9 +195,27 @@ print(f"Current user : {w.current_user.me().user_name}")
 
 # COMMAND ----------
 
-# TODO: change catalog name if your UC catalog differs from "workshop"
-CATALOG = "workshop"
-SCHEMA  = "energy_nem"
+# COMMAND ----------
+# MAGIC %md
+# MAGIC ### ⚙️ Workshop Configuration
+# MAGIC > **Running in a customer environment?** Change the catalog name in the widget above to match
+# MAGIC > what was set in `setup/00_workspace_setup.py` (default: `workshop_au`)
+
+# COMMAND ----------
+# Widget-based configuration — works in any customer Databricks environment
+# These default values match what 00_workspace_setup.py creates
+dbutils.widgets.text("catalog",     "workshop_au",          "Catalog name")
+dbutils.widgets.text("schema",      "energy",               "Schema name")
+dbutils.widgets.text("pt_endpoint", "au_east_llm_inregion", "PT endpoint name")
+
+CATALOG      = dbutils.widgets.get("catalog")
+SCHEMA       = dbutils.widgets.get("schema")
+PT_ENDPOINT  = dbutils.widgets.get("pt_endpoint")
+
+print(f"Using catalog: {CATALOG}.{SCHEMA}")
+print(f"PT endpoint:   {PT_ENDPOINT}")
+
+# COMMAND ----------
 
 spark.sql(f"CREATE CATALOG IF NOT EXISTS {CATALOG}")
 spark.sql(f"CREATE SCHEMA  IF NOT EXISTS {CATALOG}.{SCHEMA}")

@@ -128,13 +128,35 @@ dbutils.library.restartPython()
 import requests
 from databricks.sdk import WorkspaceClient
 
+# COMMAND ----------
+# MAGIC %md
+# MAGIC ### ⚙️ Workshop Configuration
+# MAGIC > **Running in a customer environment?** Change the catalog name in the widget above to match
+# MAGIC > what was set in `setup/00_workspace_setup.py` (default: `workshop_au`)
+
+# COMMAND ----------
+# Widget-based configuration — works in any customer Databricks environment
+# These default values match what 00_workspace_setup.py creates
+dbutils.widgets.text("catalog",     "workshop_au",          "Catalog name")
+dbutils.widgets.text("schema",      "energy",               "Schema name")
+dbutils.widgets.text("pt_endpoint", "au_east_llm_inregion", "PT endpoint name")
+
+CATALOG      = dbutils.widgets.get("catalog")
+SCHEMA       = dbutils.widgets.get("schema")
+PT_ENDPOINT  = dbutils.widgets.get("pt_endpoint")
+
+print(f"Using catalog: {CATALOG}.{SCHEMA}")
+print(f"PT endpoint:   {PT_ENDPOINT}")
+
+# COMMAND ----------
+
 w    = WorkspaceClient()
 HOST = spark.conf.get("spark.databricks.workspaceUrl")
 
 # TODO: paste the SPACE_ID from Lab 01 output
 SPACE_ID = ""  # e.g. "01ef1234-abcd-5678-efgh-000000000001"
-CATALOG  = "workshop"
-SCHEMA   = "energy_nem"
+# Configurable — change via widget above if running in customer environment
+# CATALOG and SCHEMA are set by widgets above
 
 assert SPACE_ID, "Paste your SPACE_ID from Lab 01 before proceeding."
 

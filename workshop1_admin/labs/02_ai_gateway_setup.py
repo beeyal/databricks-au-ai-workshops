@@ -172,8 +172,34 @@ from databricks.sdk.service.serving import (
     EndpointCoreConfigInput,
 )
 
+# COMMAND ----------
+# MAGIC %md
+# MAGIC ### ⚙️ Workshop Configuration
+# MAGIC > **Running in a customer environment?** Change the workspace URL and catalog/schema widgets above to match your setup.
+
+# COMMAND ----------
+# Widget-based configuration — works in any customer Databricks environment
+# These default values match what 00_workspace_setup.py creates
+dbutils.widgets.text("workspace_url", "https://<your-workspace>.azuredatabricks.net", "Workspace URL")
+dbutils.widgets.text("catalog",       "energy_ai",               "Catalog name (for payload logs)")
+dbutils.widgets.text("schema",        "audit_logs",              "Schema name (for payload logs)")
+dbutils.widgets.text("gw_endpoint",   "au-workshop-gateway",     "AI Gateway endpoint name")
+
+WORKSPACE_URL_W = dbutils.widgets.get("workspace_url")
+CATALOG_W       = dbutils.widgets.get("catalog")
+SCHEMA_W        = dbutils.widgets.get("schema")
+GW_ENDPOINT     = dbutils.widgets.get("gw_endpoint")
+
+print(f"Workspace URL  : {WORKSPACE_URL_W}")
+print(f"Catalog        : {CATALOG_W}")
+print(f"Schema         : {SCHEMA_W}")
+print(f"GW endpoint    : {GW_ENDPOINT}")
+
+# COMMAND ----------
+
 # TODO: Set your workspace URL (no trailing slash)
-WORKSPACE_URL = "https://<your-workspace>.azuredatabricks.net"
+# Configurable — change via widget above if running in customer environment
+WORKSPACE_URL = WORKSPACE_URL_W if WORKSPACE_URL_W != "https://<your-workspace>.azuredatabricks.net" else "https://<your-workspace>.azuredatabricks.net"
 
 # TODO: Choose ONE of the following token approaches
 # Option A (recommended): pull from a Databricks secret scope
@@ -322,10 +348,11 @@ print(f"Auth : {w.config.auth_type}")
 # COMMAND ----------
 
 # TODO: Fill in these values before running
-PT_ENDPOINT_NAME    = "au-workshop-gateway"                       # TODO: name for the new endpoint
+# Configurable — change via widget above if running in customer environment
+PT_ENDPOINT_NAME    = GW_ENDPOINT                                 # from widget, default "au-workshop-gateway"
 PT_MODEL_NAME       = "databricks-meta-llama-3-3-70b-instruct"   # TODO: your PT model
-CATALOG_NAME        = "energy_ai"                                 # TODO: catalog for payload log table
-SCHEMA_NAME         = "audit_logs"                                # TODO: schema for payload log table
+CATALOG_NAME        = CATALOG_W                                   # from widget, default "energy_ai"
+SCHEMA_NAME         = SCHEMA_W                                    # from widget, default "audit_logs"
 PAYLOAD_TABLE_NAME  = "ai_gw_payloads"                           # TODO: Delta table name prefix
 ADMIN_GROUP         = "grp_ai_admins"
 CONSUMER_GROUP      = "grp_analysts"

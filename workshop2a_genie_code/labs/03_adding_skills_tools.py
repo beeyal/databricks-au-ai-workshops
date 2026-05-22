@@ -167,9 +167,29 @@ dbutils.library.restartPython()
 
 # COMMAND ----------
 
+# COMMAND ----------
+# MAGIC %md
+# MAGIC ### ⚙️ Workshop Configuration
+# MAGIC > **Running in a customer environment?** Change the catalog name in the widget above to match
+# MAGIC > what was set in `setup/00_workspace_setup.py` (default: `workshop_au`)
+
+# COMMAND ----------
+# Widget-based configuration — works in any customer Databricks environment
+# These default values match what 00_workspace_setup.py creates
+dbutils.widgets.text("catalog",       "workshop_au",          "Catalog name")
+dbutils.widgets.text("schema",        "workshop_lab",         "Schema name")
+dbutils.widgets.text("pt_endpoint",   "au_east_llm_inregion", "PT endpoint name")
+
+CATALOG      = dbutils.widgets.get("catalog")
+SCHEMA       = dbutils.widgets.get("schema")
+PT_ENDPOINT  = dbutils.widgets.get("pt_endpoint")
+
+print(f"Using catalog: {CATALOG}.{SCHEMA}")
+print(f"PT endpoint:   {PT_ENDPOINT}")
+
+# COMMAND ----------
+
 # TODO: Update these values for your workspace
-CATALOG       = "main"          # TODO: your catalog name
-SCHEMA        = "workshop_lab"  # TODO: your schema (must exist from Lab 02, or it will be created)
 WORKSPACE_URL = "https://adb-XXXXXXXXXXXXXXXXX.X.azuredatabricks.net"  # TODO: your workspace URL
 
 spark.sql(f"CREATE SCHEMA IF NOT EXISTS {CATALOG}.{SCHEMA}")

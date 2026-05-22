@@ -10,6 +10,34 @@
 # MAGIC Expected runtime: ~4 minutes
 
 # COMMAND ----------
+# MAGIC %md
+# MAGIC ### ⚙️ Configuration — fill these in before running
+# MAGIC Change these values to match your customer environment. Leave defaults for a Databricks Credit Program workspace.
+
+# COMMAND ----------
+dbutils.widgets.removeAll()
+dbutils.widgets.text("catalog",           "workshop_au",          "1. Catalog name")
+dbutils.widgets.text("schema_energy",     "energy",               "2. Energy data schema")
+dbutils.widgets.text("schema_governance", "ai_governance",        "3. Governance schema")
+dbutils.widgets.text("vs_endpoint",       "workshop_vs",          "4. Vector Search endpoint name")
+dbutils.widgets.text("pt_endpoint",       "au_east_llm_inregion", "5. PT endpoint name")
+
+# COMMAND ----------
+CATALOG           = dbutils.widgets.get("catalog")
+SCHEMA_ENERGY     = dbutils.widgets.get("schema_energy")
+SCHEMA_GOVERNANCE = dbutils.widgets.get("schema_governance")
+VS_ENDPOINT       = dbutils.widgets.get("vs_endpoint")
+PT_ENDPOINT       = dbutils.widgets.get("pt_endpoint")
+
+print(f"Catalog:              {CATALOG}")
+print(f"Energy schema:        {SCHEMA_ENERGY}")
+print(f"Governance schema:    {SCHEMA_GOVERNANCE}")
+print(f"Vector Search:        {VS_ENDPOINT}")
+print(f"PT endpoint:          {PT_ENDPOINT}")
+print()
+print("Running pre-flight checks against the configured environment...")
+
+# COMMAND ----------
 
 # MAGIC %md ## 0 — Setup
 
@@ -602,7 +630,8 @@ def check_workshop_catalog():
     from databricks.sdk import WorkspaceClient
     w = WorkspaceClient()
 
-    catalog_name = "workshop_au"
+    # Use the catalog name from the widget (set at the top of this notebook)
+    catalog_name = CATALOG
 
     try:
         catalogs = {c.name for c in w.catalogs.list()}
@@ -611,7 +640,7 @@ def check_workshop_catalog():
             "Workshop catalog",
             WARN,
             f"Could not list catalogs via SDK: {exc}",
-            remediation="Run the setup notebook (00_workspace_setup.py) to create workshop_au catalog.",
+            remediation=f"Run the setup notebook (00_workspace_setup.py) to create '{catalog_name}' catalog.",
         )
         return
 
@@ -619,7 +648,7 @@ def check_workshop_catalog():
         # Check schemas
         try:
             schemas = {s.name for s in w.schemas.list(catalog_name=catalog_name)}
-            expected = {"energy", "audit", "ai_governance"}
+            expected = {SCHEMA_ENERGY, "audit", SCHEMA_GOVERNANCE}
             missing  = expected - schemas
             if not missing:
                 record(
@@ -637,18 +666,22 @@ def check_workshop_catalog():
         except Exception as exc:
             record("Workshop catalog", WARN, f"Catalog exists but schema list failed: {exc}")
     else:
+        # Catalog not found — this is a WARN (not FAIL) because setup creates it
         record(
             "Workshop catalog",
             WARN,
-            f"Catalog '{catalog_name}' does not exist yet.",
-            remediation="Run the setup notebook (00_workspace_setup.py) to create the catalog and schemas.",
+            f"Catalog '{catalog_name}' does not exist yet — this is expected if running pre-flight before setup.",
+            remediation=(
+                f"Run 00_workspace_setup.py to create the '{catalog_name}' catalog and all schemas. "
+                "If you intended to use an existing catalog, update the 'catalog' widget above."
+            ),
         )
 
 
 safe_run(
     check_workshop_catalog,
     "Workshop catalog",
-    "Run 00_workspace_setup.py to create workshop_au catalog.",
+    f"Run 00_workspace_setup.py to create the '{CATALOG}' catalog.",
 )
 
 # COMMAND ----------

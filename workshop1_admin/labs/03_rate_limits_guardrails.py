@@ -120,9 +120,34 @@ import concurrent.futures
 from datetime import datetime, timezone
 from databricks.sdk import WorkspaceClient
 
+# COMMAND ----------
+# MAGIC %md
+# MAGIC ### ⚙️ Workshop Configuration
+# MAGIC > **Running in a customer environment?** Change the workspace URL and endpoint name in the widgets above.
+
+# COMMAND ----------
+# Widget-based configuration — works in any customer Databricks environment
+# These default values match what 00_workspace_setup.py and Lab 02 create
+dbutils.widgets.text("workspace_url", "https://<your-workspace>.azuredatabricks.net", "Workspace URL")
+dbutils.widgets.text("gw_endpoint",   "pt-llama3-energy",                             "AI Gateway endpoint name")
+dbutils.widgets.text("catalog",       "workshop_au",                                  "Catalog name")
+dbutils.widgets.text("schema",        "ai_governance",                                "Schema name")
+
+WORKSPACE_URL_W = dbutils.widgets.get("workspace_url")
+GW_ENDPOINT     = dbutils.widgets.get("gw_endpoint")
+CATALOG_W       = dbutils.widgets.get("catalog")
+SCHEMA_W        = dbutils.widgets.get("schema")
+
+print(f"Workspace URL  : {WORKSPACE_URL_W}")
+print(f"GW endpoint    : {GW_ENDPOINT}")
+print(f"Catalog.Schema : {CATALOG_W}.{SCHEMA_W}")
+
+# COMMAND ----------
+
 # TODO: Fill in your workspace URL and endpoint name from Lab 02
-WORKSPACE_URL  = "https://<your-workspace>.azuredatabricks.net"
-ENDPOINT_NAME  = "pt-llama3-energy"   # TODO: endpoint created in Lab 02
+# Configurable — change via widget above if running in customer environment
+WORKSPACE_URL  = WORKSPACE_URL_W if WORKSPACE_URL_W != "https://<your-workspace>.azuredatabricks.net" else "https://<your-workspace>.azuredatabricks.net"
+ENDPOINT_NAME  = GW_ENDPOINT   # from widget, default "pt-llama3-energy"
 
 try:
     DATABRICKS_TOKEN = dbutils.secrets.get(scope="admin-workshop", key="workspace-token")
@@ -866,8 +891,9 @@ def hash_prompt(prompt: str) -> str:
 
 
 # Demo: show what would be logged without writing to Delta
-CATALOG_NAME = "workshop_au"   # Workshop catalog (created by 00_workspace_setup.py)
-SCHEMA_NAME  = "ai_governance" # Schema for audit event logging
+# Configurable — change via widget above if running in customer environment
+CATALOG_NAME = CATALOG_W   # from widget, default "workshop_au"
+SCHEMA_NAME  = SCHEMA_W    # from widget, default "ai_governance"
 
 print("Keyword block logging demo (no Delta write — showing what would be logged):")
 for prompt in KEYWORD_TEST_CASES:

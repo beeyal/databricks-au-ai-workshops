@@ -17,26 +17,52 @@
 # MAGIC **Re-runnable:** all steps are idempotent — safe to re-run after failures.
 
 # COMMAND ----------
+# MAGIC %md
+# MAGIC ### ⚙️ Configuration — fill these in before running
+# MAGIC Change these values to match your customer environment. Leave defaults for a Databricks Credit Program workspace.
 
-# MAGIC %md ## 0 — Configuration
+# COMMAND ----------
+dbutils.widgets.removeAll()
+dbutils.widgets.text("catalog",           "workshop_au",          "1. Catalog name")
+dbutils.widgets.text("schema_energy",     "energy",               "2. Energy data schema")
+dbutils.widgets.text("schema_governance", "ai_governance",        "3. Governance schema")
+dbutils.widgets.text("vs_endpoint",       "workshop_vs",          "4. Vector Search endpoint name")
+dbutils.widgets.text("pt_endpoint",       "au_east_llm_inregion", "5. PT endpoint name")
+
+# COMMAND ----------
+CATALOG           = dbutils.widgets.get("catalog")
+SCHEMA_ENERGY     = dbutils.widgets.get("schema_energy")
+SCHEMA_GOVERNANCE = dbutils.widgets.get("schema_governance")
+VS_ENDPOINT       = dbutils.widgets.get("vs_endpoint")
+PT_ENDPOINT       = dbutils.widgets.get("pt_endpoint")
+
+print(f"Catalog:              {CATALOG}")
+print(f"Energy schema:        {SCHEMA_ENERGY}")
+print(f"Governance schema:    {SCHEMA_GOVERNANCE}")
+print(f"Vector Search:        {VS_ENDPOINT}")
+print(f"PT endpoint:          {PT_ENDPOINT}")
+print()
+print("If running in a customer environment, change these to avoid conflicts with production data.")
+print("All resources created will be under the specified catalog and can be dropped via setup/99_teardown.py")
 
 # COMMAND ----------
 
-# ── Modify these if needed ──────────────────────────────────────────────────
+# MAGIC %md ## 0 — Configuration (derived variables)
 
-# Workshop catalog name (created if it doesn't exist)
-CATALOG = "workshop_au"
+# COMMAND ----------
 
-# Schemas
-SCHEMAS = ["energy", "audit", "ai_governance"]
+# ── Derived from widgets — do not edit these directly ────────────────────────
+
+# Schemas (audit is always fixed; energy and ai_governance come from widgets)
+SCHEMAS = [SCHEMA_ENERGY, "audit", SCHEMA_GOVERNANCE]
 
 # Location of the sample CSV files (relative to Databricks workspace, or DBFS/Volumes path)
 # Adjust to where you uploaded the CSVs — e.g. after running:
 #   databricks fs cp -r ./data/sample_data dbfs:/tmp/au_workshop/
 SAMPLE_DATA_PATH = "dbfs:/tmp/au_workshop/sample_data"
 
-# Vector Search endpoint name (created if it doesn't exist)
-VS_ENDPOINT_NAME = "workshop_vs"
+# Vector Search endpoint name — sourced from widget VS_ENDPOINT
+VS_ENDPOINT_NAME = VS_ENDPOINT
 
 # Embedding model — in-region for Azure australiaeast
 EMBEDDING_MODEL = "databricks-qwen3-embedding-0-6b"
@@ -227,25 +253,25 @@ print("=" * 60)
 TABLE_DEFS = [
     (
         "energy_assets.csv",
-        f"{CATALOG}.energy.energy_assets",
+        f"{CATALOG}.{SCHEMA_ENERGY}.energy_assets",
         "Network assets — transformers, substations, cables, poles, meters",
         ["region"],
     ),
     (
         "meter_readings.csv",
-        f"{CATALOG}.energy.meter_readings",
+        f"{CATALOG}.{SCHEMA_ENERGY}.meter_readings",
         "30-minute interval meter readings (NEM12-style)",
         ["customer_type"],
     ),
     (
         "outage_events.csv",
-        f"{CATALOG}.energy.outage_events",
+        f"{CATALOG}.{SCHEMA_ENERGY}.outage_events",
         "Planned and unplanned network outage events with SAIDI/SAIFI",
         ["region", "event_type"],
     ),
     (
         "maintenance_work_orders.csv",
-        f"{CATALOG}.energy.maintenance_work_orders",
+        f"{CATALOG}.{SCHEMA_ENERGY}.maintenance_work_orders",
         "Maintenance work orders linked to energy assets",
         ["work_type", "status"],
     ),
@@ -257,7 +283,7 @@ TABLE_DEFS = [
     ),
     (
         "policy_documents.csv",
-        f"{CATALOG}.ai_governance.policy_documents",
+        f"{CATALOG}.{SCHEMA_GOVERNANCE}.policy_documents",
         "Internal policy documents for Vector Search RAG demo",
         ["doc_type"],
     ),
@@ -378,8 +404,8 @@ print("=" * 60)
 print("STEP 5 — VECTOR SEARCH INDEX ON policy_documents")
 print("=" * 60)
 
-POLICY_TABLE   = f"{CATALOG}.ai_governance.policy_documents"
-VS_INDEX_NAME  = f"{CATALOG}.ai_governance.policy_docs_index"
+POLICY_TABLE   = f"{CATALOG}.{SCHEMA_GOVERNANCE}.policy_documents"
+VS_INDEX_NAME  = f"{CATALOG}.{SCHEMA_GOVERNANCE}.policy_docs_index"
 
 # Enable Change Data Feed on the source table (required for Delta Sync)
 print(f"\nEnabling Change Data Feed on '{POLICY_TABLE}'...")
@@ -486,12 +512,12 @@ Use Australian terminology (kWh, MVA, SAIDI, SAIFI, NMI, NER, AER, AEMO, ESC).
 
 # Tables to expose in the Genie space
 GENIE_TABLES = [
-    f"{CATALOG}.energy.energy_assets",
-    f"{CATALOG}.energy.meter_readings",
-    f"{CATALOG}.energy.outage_events",
-    f"{CATALOG}.energy.maintenance_work_orders",
+    f"{CATALOG}.{SCHEMA_ENERGY}.energy_assets",
+    f"{CATALOG}.{SCHEMA_ENERGY}.meter_readings",
+    f"{CATALOG}.{SCHEMA_ENERGY}.outage_events",
+    f"{CATALOG}.{SCHEMA_ENERGY}.maintenance_work_orders",
     f"{CATALOG}.audit.regulatory_reports",
-    f"{CATALOG}.ai_governance.policy_documents",
+    f"{CATALOG}.{SCHEMA_GOVERNANCE}.policy_documents",
 ]
 
 # Seed questions to pre-populate the Genie space
@@ -604,19 +630,19 @@ smoke(
 )
 smoke(
     "energy_assets row count",
-    lambda: f"{spark.table(f'{CATALOG}.energy.energy_assets').count():,} rows",
+    lambda: f"{spark.table(f'{CATALOG}.{SCHEMA_ENERGY}.energy_assets').count():,} rows",
 )
 smoke(
     "meter_readings row count",
-    lambda: f"{spark.table(f'{CATALOG}.energy.meter_readings').count():,} rows",
+    lambda: f"{spark.table(f'{CATALOG}.{SCHEMA_ENERGY}.meter_readings').count():,} rows",
 )
 smoke(
     "outage_events row count",
-    lambda: f"{spark.table(f'{CATALOG}.energy.outage_events').count():,} rows",
+    lambda: f"{spark.table(f'{CATALOG}.{SCHEMA_ENERGY}.outage_events').count():,} rows",
 )
 smoke(
     "maintenance_work_orders row count",
-    lambda: f"{spark.table(f'{CATALOG}.energy.maintenance_work_orders').count():,} rows",
+    lambda: f"{spark.table(f'{CATALOG}.{SCHEMA_ENERGY}.maintenance_work_orders').count():,} rows",
 )
 smoke(
     "regulatory_reports row count",
@@ -624,7 +650,7 @@ smoke(
 )
 smoke(
     "policy_documents row count",
-    lambda: f"{spark.table(f'{CATALOG}.ai_governance.policy_documents').count():,} rows",
+    lambda: f"{spark.table(f'{CATALOG}.{SCHEMA_GOVERNANCE}.policy_documents').count():,} rows",
 )
 
 print("\n[B] Analytics queries")
@@ -632,7 +658,7 @@ smoke(
     "SAIDI by region (GROUP BY)",
     lambda: spark.sql(f"""
         SELECT region, ROUND(AVG(saidi_minutes), 4) AS avg_saidi
-        FROM   {CATALOG}.energy.outage_events
+        FROM   {CATALOG}.{SCHEMA_ENERGY}.outage_events
         GROUP  BY region
         ORDER  BY avg_saidi DESC
         LIMIT  1
@@ -640,13 +666,13 @@ smoke(
 )
 smoke(
     "Assets needing maintenance (condition_score < 4)",
-    lambda: f"{spark.sql(f'SELECT COUNT(*) AS n FROM {CATALOG}.energy.energy_assets WHERE condition_score < 4').collect()[0][0]} assets",
+    lambda: f"{spark.sql(f'SELECT COUNT(*) AS n FROM {CATALOG}.{SCHEMA_ENERGY}.energy_assets WHERE condition_score < 4').collect()[0][0]} assets",
 )
 smoke(
     "Average interval kWh by customer_type",
     lambda: spark.sql(f"""
         SELECT customer_type, ROUND(AVG(interval_kwh), 4) AS avg_kwh
-        FROM   {CATALOG}.energy.meter_readings
+        FROM   {CATALOG}.{SCHEMA_ENERGY}.meter_readings
         GROUP  BY customer_type
         ORDER  BY avg_kwh DESC
         LIMIT  1

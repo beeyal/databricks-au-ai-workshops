@@ -98,10 +98,32 @@ from databricks.sdk.service.serving import (
     ServedEntityInput, EndpointCoreConfigInput, TrafficConfig, Route
 )
 
+# COMMAND ----------
+# MAGIC %md
+# MAGIC ### ⚙️ Workshop Configuration
+# MAGIC > **Running in a customer environment?** Change the catalog name in the widget above to match
+# MAGIC > what was set in `setup/00_workspace_setup.py` (default: `workshop_au`)
+
+# COMMAND ----------
+# Widget-based configuration — works in any customer Databricks environment
+# These default values match what 00_workspace_setup.py creates
+dbutils.widgets.text("catalog",     "workshop_au",          "Catalog name")
+dbutils.widgets.text("schema",      "energy",               "Schema name")
+dbutils.widgets.text("pt_endpoint", "au_east_llm_inregion", "PT endpoint name")
+
+CATALOG      = dbutils.widgets.get("catalog")
+SCHEMA       = dbutils.widgets.get("schema")
+PT_ENDPOINT  = dbutils.widgets.get("pt_endpoint")
+
+print(f"Using catalog: {CATALOG}.{SCHEMA}")
+print(f"PT endpoint:   {PT_ENDPOINT}")
+
+# COMMAND ----------
+
 w    = WorkspaceClient()
 HOST = spark.conf.get("spark.databricks.workspaceUrl")
-CATALOG = "workshop"
-SCHEMA  = "energy_nem"
+# Configurable — change via widget above if running in customer environment
+# CATALOG, SCHEMA, and PT_ENDPOINT are set by widgets above
 
 def hdrs():
     token = dbutils.notebook.entry_point.getDbutils().notebook().getContext().apiToken().get()
@@ -187,8 +209,8 @@ print(f"Schema:    {SCHEMA}")
 
 # COMMAND ----------
 
-# TODO: set your endpoint name -- must be unique in the workspace
-PT_ENDPOINT_NAME = "au_east_llm_inregion"  # TODO: change if name is already taken
+# Configurable — change via widget above if running in customer environment
+PT_ENDPOINT_NAME = PT_ENDPOINT  # from widget, default "au_east_llm_inregion"
 
 # Available IN-REGION models for AU East (confirmed May 2026):
 # - meta-llama/Meta-Llama-3.1-8B-Instruct   (smallest / fastest / cheapest -- use for this workshop)
