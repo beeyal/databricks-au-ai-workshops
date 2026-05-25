@@ -38,8 +38,10 @@ HEADERS = {
 }
 
 # SOLUTION: Endpoint and catalog values
-PT_ENDPOINT_NAME   = "pt-llama3-energy"
-PT_MODEL_NAME      = "databricks-meta-llama-3-3-70b-instruct"
+# ✅ databricks-claude-haiku-4-5 — available on PT in AU East (in-region)
+# ⚠️  DO NOT use databricks-meta-llama-* — Llama has no committed AU East date
+PT_ENDPOINT_NAME   = "pt-claude-energy"
+PT_MODEL_NAME      = "databricks-claude-haiku-4-5"
 CATALOG_NAME       = "energy_ai"
 SCHEMA_NAME        = "audit_logs"
 PAYLOAD_TABLE_NAME = "ai_gateway_payloads"

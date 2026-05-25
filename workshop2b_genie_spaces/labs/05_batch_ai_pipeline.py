@@ -38,29 +38,17 @@
 # MAGIC | 6 | Schedule the pipeline as a Databricks Job with monitoring |
 # MAGIC | 7 | Estimate and optimise cost before running a production batch |
 # MAGIC
-# MAGIC ---
-# MAGIC
 # MAGIC ### Pipeline Architecture
 # MAGIC
 # MAGIC ```
-# MAGIC regulatory_reports (Bronze Delta -- raw document text)
-# MAGIC         |
-# MAGIC         v  ai_query (in-region PT endpoint -- AU East)
-# MAGIC         |  +-- classify document type
-# MAGIC         |  +-- extract key dates and entities
-# MAGIC         |  +-- summarise for dashboard display
-# MAGIC         |
-# MAGIC         v
-# MAGIC processed_reports (Silver Delta -- AI-enriched metadata)
-# MAGIC         |
-# MAGIC         v
+# MAGIC regulatory_reports (Bronze -- raw document text)
+# MAGIC     |  ai_query (AU East PT endpoint -- in-region)
+# MAGIC     |  classify -> extract -> summarise
+# MAGIC     v
+# MAGIC processed_reports (Silver -- AI-enriched metadata)
+# MAGIC     v
 # MAGIC Genie Space + AI/BI Dashboard
 # MAGIC ```
-# MAGIC
-# MAGIC <div style="background: #E8F8E8; padding: 12px 16px; border-radius: 6px; border-left: 4px solid #28A745; margin: 8px 0">
-# MAGIC <strong>Data residency:</strong> Every <code>ai_query()</code> call in this pipeline uses the PT endpoint
-# MAGIC deployed in Lab 04. No document text leaves Australia East.
-# MAGIC </div>
 
 # COMMAND ----------
 
@@ -81,14 +69,8 @@ from pyspark.sql.types import StructType, StructField, StringType, DateType, Boo
 from databricks.sdk import WorkspaceClient
 
 # COMMAND ----------
-# MAGIC %md
-# MAGIC ### ⚙️ Workshop Configuration
-# MAGIC > **Running in a customer environment?** Change the catalog name in the widget above to match
-# MAGIC > what was set in `setup/00_workspace_setup.py` (default: `workshop_au`)
 
-# COMMAND ----------
-# Widget-based configuration — works in any customer Databricks environment
-# These default values match what 00_workspace_setup.py creates
+# Widget-based configuration -- works in any customer Databricks environment
 dbutils.widgets.text("catalog",     "workshop_au",          "Catalog name")
 dbutils.widgets.text("schema",      "energy",               "Schema name")
 dbutils.widgets.text("pt_endpoint", "au_east_llm_inregion", "PT endpoint name")
@@ -102,15 +84,10 @@ print(f"PT endpoint:   {PT_ENDPOINT}")
 
 # COMMAND ----------
 
-w       = WorkspaceClient()
-HOST    = spark.conf.get("spark.databricks.workspaceUrl")
-# Configurable — change via widget above if running in customer environment
-# CATALOG, SCHEMA, and PT_ENDPOINT are set by widgets above
+w             = WorkspaceClient()
+HOST          = spark.conf.get("spark.databricks.workspaceUrl")
+ENDPOINT_NAME = PT_ENDPOINT
 
-# Configurable — change via widget above if running in customer environment
-ENDPOINT_NAME = PT_ENDPOINT  # from widget, default "au_east_llm_inregion"
-
-# Verify endpoint is ready before proceeding
 try:
     ep = w.serving_endpoints.get(ENDPOINT_NAME)
     print(f"PT endpoint '{ENDPOINT_NAME}': {ep.state.ready}")
@@ -124,68 +101,52 @@ except Exception as e:
 # MAGIC ---
 # MAGIC ## Step 1 -- Cost Estimation Before Running the Batch
 # MAGIC
-# MAGIC Run this cell before any AI processing. It calculates how many records are unprocessed
-# MAGIC and estimates the inference cost so you can make an informed decision before committing
-# MAGIC compute.
-# MAGIC
-# MAGIC <div style="background: #E8F4FD; padding: 12px 16px; border-radius: 6px; border-left: 4px solid #1B3A5C; margin: 8px 0">
-# MAGIC <strong>Best practice:</strong> Always run cost estimation before a batch job in production.
-# MAGIC For a daily pipeline processing 500 documents/day, a surprise 10x doc volume increase
-# MAGIC will be caught here before it hits your PT endpoint budget.
-# MAGIC </div>
+# MAGIC Run this before any AI processing to see how many records are unprocessed and get an indicative cost. Always run cost estimation in production -- a 10x surprise volume increase is caught here before it hits your PT endpoint budget.
 
 # COMMAND ----------
 
 def estimate_batch_cost(
     pending_count: int,
     avg_doc_chars: int = 3000,
-    model_name: str = "databricks-claude-haiku-4-5",  # ✅ in-region PT model for AU East
+    model_name: str = "databricks-claude-haiku-4-5",
 ) -> dict:
     """
     Estimates AI inference cost for a pending batch.
     Assumes 4 AI passes per document (classify + extract + 2x summarise).
-
-    Cost model (approximate, check current Databricks pricing):
-      PT Llama 3.1 8B: ~$0.004 per 1k input tokens, ~$0.006 per 1k output tokens
     """
     if pending_count == 0:
         return {"pending_count": 0, "estimated_cost_usd": 0.0, "estimated_cost_aud": 0.0}
 
-    # Token estimation
-    chars_per_doc    = avg_doc_chars
-    prompt_overhead  = 300   # prompt template tokens per pass (instructions, schema)
-    passes_per_doc   = 4     # classify + extract + executive summary + technical summary
-
-    input_tokens_per_doc  = (chars_per_doc // 4) + prompt_overhead
-    output_tokens_per_doc = 200  # avg output per pass
+    prompt_overhead  = 300
+    passes_per_doc   = 4
+    input_tokens_per_doc  = (avg_doc_chars // 4) + prompt_overhead
+    output_tokens_per_doc = 200
 
     total_input_tokens  = pending_count * passes_per_doc * input_tokens_per_doc
     total_output_tokens = pending_count * passes_per_doc * output_tokens_per_doc
 
-    PRICE_INPUT_PER_1K  = 0.004  # USD per 1k input tokens (PT Llama 3.1 8B, approx)
-    PRICE_OUTPUT_PER_1K = 0.006  # USD per 1k output tokens
+    PRICE_INPUT_PER_1K  = 0.004
+    PRICE_OUTPUT_PER_1K = 0.006
+    AUD_USD_RATE        = 0.65
 
     cost_usd = (
         (total_input_tokens  / 1000) * PRICE_INPUT_PER_1K +
         (total_output_tokens / 1000) * PRICE_OUTPUT_PER_1K
     )
 
-    AUD_USD_RATE = 0.65  # approximate -- update with current rate for accurate budgeting
-
     return {
-        "model":                     model_name,
-        "pending_count":             pending_count,
-        "passes_per_doc":            passes_per_doc,
-        "total_input_tokens":        total_input_tokens,
-        "total_output_tokens":       total_output_tokens,
-        "estimated_cost_usd":        round(cost_usd, 4),
-        "estimated_cost_aud":        round(cost_usd / AUD_USD_RATE, 4),
-        "cost_per_doc_usd":          round(cost_usd / pending_count, 6),
+        "model":               model_name,
+        "pending_count":       pending_count,
+        "passes_per_doc":      passes_per_doc,
+        "total_input_tokens":  total_input_tokens,
+        "total_output_tokens": total_output_tokens,
+        "estimated_cost_usd":  round(cost_usd, 4),
+        "estimated_cost_aud":  round(cost_usd / AUD_USD_RATE, 4),
+        "cost_per_doc_usd":    round(cost_usd / pending_count, 6),
     }
 
 
 def print_cost_estimate(estimate: dict) -> None:
-    """Prints a cost estimate in a readable table format."""
     print("=" * 55)
     print("  PRE-RUN COST ESTIMATE")
     print("=" * 55)
@@ -207,7 +168,6 @@ def print_cost_estimate(estimate: dict) -> None:
     print("=" * 55)
 
 
-# Count pending records now (before seeding, so may show 0 until Step 2)
 try:
     pending_now = spark.sql(f"""
         SELECT COUNT(*) AS n
@@ -219,7 +179,7 @@ try:
           AND LENGTH(r.document_text) > 100
     """).collect()[0][0]
 except Exception:
-    pending_now = 0  # table may not exist yet -- will be created in Step 2
+    pending_now = 0
 
 estimate = estimate_batch_cost(pending_count=pending_now)
 print_cost_estimate(estimate)
@@ -227,33 +187,8 @@ print_cost_estimate(estimate)
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC **Expected output (after seeding in Step 2, re-run this cell):**
-# MAGIC ```
-# MAGIC =======================================================
-# MAGIC   PRE-RUN COST ESTIMATE
-# MAGIC =======================================================
-# MAGIC   Model              : meta-llama/Meta-Llama-3.1-8B-Instruct
-# MAGIC   Documents pending  : 5
-# MAGIC   AI passes / doc    : 4
-# MAGIC   Input tokens total : 7,000
-# MAGIC   Output tokens total: 4,000
-# MAGIC   Estimated cost     : USD $0.0520
-# MAGIC                        AUD $0.0800
-# MAGIC   Cost per document  : USD $0.010400
-# MAGIC =======================================================
-# MAGIC   Cost within normal range. Safe to proceed.
-# MAGIC =======================================================
-# MAGIC ```
-
-# COMMAND ----------
-
-# MAGIC %md
 # MAGIC ---
 # MAGIC ## Step 2 -- Seed Regulatory Reports with Realistic Document Text
-# MAGIC
-# MAGIC The `regulatory_reports` table from Lab 01 has placeholder text.
-# MAGIC Replace it with longer, realistic regulatory document extracts that give the model
-# MAGIC something meaningful to classify, extract, and summarise.
 
 # COMMAND ----------
 
@@ -448,7 +383,7 @@ CREATE TABLE IF NOT EXISTS {CATALOG}.{SCHEMA}.processed_reports (
     ai_summary_technical   STRING    COMMENT 'AI-generated technical summary (100 words)',
     ai_extracted_json      STRING    COMMENT 'AI-extracted structured metadata as JSON string',
     ai_key_dates           STRING    COMMENT 'Extracted key dates and deadlines as JSON array',
-    ai_capital_value_m     DOUBLE    COMMENT 'Extracted capital expenditure value in AUD millions (null if not found)',
+    ai_capital_value_m     DOUBLE    COMMENT 'Extracted capital expenditure value in AUD millions',
     ai_compliance_urgency  STRING    COMMENT 'AI-assessed urgency: IMMEDIATE, HIGH, MEDIUM, LOW',
     processing_status      STRING    COMMENT 'PROCESSED, FAILED, SKIPPED',
     processing_error       STRING    COMMENT 'Error message if processing_status = FAILED',
@@ -470,29 +405,19 @@ print(f"Created: {CATALOG}.{SCHEMA}.processed_reports")
 # MAGIC ---
 # MAGIC ## Step 4 -- The Incremental Processing Pattern
 # MAGIC
-# MAGIC Processing all documents on every run is wasteful and expensive.
-# MAGIC The incremental pattern processes only records that do not yet have a corresponding
-# MAGIC row in the output table.
+# MAGIC The incremental pattern avoids reprocessing documents on every run. It uses a LEFT ANTI JOIN to find records with no successful row in the output table. Failed records from previous runs are automatically included for retry.
 # MAGIC
-# MAGIC ```
-# MAGIC regulatory_reports  LEFT ANTI JOIN  processed_reports  -->  only new records
-# MAGIC ```
-# MAGIC
-# MAGIC | Pattern | Behaviour |
-# MAGIC |---------|-----------|
-# MAGIC | New document | No matching row in processed_reports -- included in batch |
-# MAGIC | Already processed | `processing_status = 'PROCESSED'` exists -- excluded |
-# MAGIC | Previously failed | No PROCESSED row -- included for retry |
-# MAGIC | Empty document | `LENGTH(document_text) <= 100` -- excluded (no useful content) |
+# MAGIC | Record state | Behaviour |
+# MAGIC |---|---|
+# MAGIC | New document | No matching row included |
+# MAGIC | PROCESSED | Excluded |
+# MAGIC | Previously FAILED | No PROCESSED row -- retried |
+# MAGIC | Empty document | `LENGTH <= 100` -- excluded |
 
 # COMMAND ----------
 
 def get_unprocessed_reports(batch_size: int = 50):
-    """
-    Returns regulatory reports that have not yet been successfully processed.
-    Uses LEFT ANTI JOIN to identify new or re-processable records.
-    Failed records from previous runs are automatically included for retry.
-    """
+    """Returns regulatory reports not yet successfully processed."""
     return spark.sql(f"""
         SELECT r.*
         FROM {CATALOG}.{SCHEMA}.regulatory_reports r
@@ -511,7 +436,6 @@ pending_count = pending.count()
 print(f"Pending records to process: {pending_count}")
 pending.select("report_id", "report_type", "title", F.length("document_text").alias("text_len")).show()
 
-# Re-run cost estimate now that we have actual pending count
 estimate = estimate_batch_cost(pending_count=pending_count)
 print_cost_estimate(estimate)
 
@@ -521,14 +445,13 @@ print_cost_estimate(estimate)
 # MAGIC ---
 # MAGIC ## Step 5 -- Build the AI Enrichment Pipeline
 # MAGIC
-# MAGIC Three AI passes per document run in a single Spark query plan.
-# MAGIC Spark optimises the physical plan and distributes inference across workers.
+# MAGIC Three AI passes per document run in a single Spark query plan. Spark distributes inference across workers automatically.
 # MAGIC
-# MAGIC | Pass | What it does | Output column |
-# MAGIC |------|--------------|---------------|
-# MAGIC | Classification | Document category + compliance urgency | `ai_document_category`, `ai_compliance_urgency` |
-# MAGIC | Extraction | Key dates, capital values, regulatory body | `ai_extracted_json` |
-# MAGIC | Summarisation | 60-word executive + 100-word technical summary | `ai_summary_executive`, `ai_summary_technical` |
+# MAGIC | Pass | Output columns |
+# MAGIC |---|---|
+# MAGIC | Classification | `ai_document_category`, `ai_compliance_urgency` |
+# MAGIC | Extraction | `ai_extracted_json` |
+# MAGIC | Summarisation | `ai_summary_executive`, `ai_summary_technical` |
 
 # COMMAND ----------
 
@@ -538,10 +461,7 @@ print_cost_estimate(estimate)
 # COMMAND ----------
 
 def run_classification_pass(df) -> "DataFrame":
-    """
-    Adds AI classification columns.
-    Uses failOnError => false -- a row-level error returns null instead of failing the job.
-    """
+    """Adds AI classification columns. failOnError => false returns null on row-level error instead of failing the job."""
     return df.withColumn(
         "ai_document_category",
         F.expr(f"""
@@ -634,7 +554,6 @@ def run_summarisation_pass(df) -> "DataFrame":
             )
         """)
     )
-
     return df_exec.withColumn(
         "ai_summary_technical",
         F.expr(f"""
@@ -662,10 +581,7 @@ def run_summarisation_pass(df) -> "DataFrame":
 from pyspark.sql.functions import get_json_object
 
 def run_post_processing(df) -> "DataFrame":
-    """
-    Parses the extracted JSON to materialise commonly-queried fields as typed columns.
-    Also derives processing_status and adds audit metadata.
-    """
+    """Parses extracted JSON to typed columns, derives processing_status, adds audit metadata."""
     return (
         df
         .withColumn("ai_capital_value_m",
@@ -695,18 +611,12 @@ def run_post_processing(df) -> "DataFrame":
 
 def run_batch_pipeline(batch_size: int = 50, dry_run: bool = False) -> dict:
     """
-    Full incremental pipeline:
-      1. Get unprocessed records
-      2. Run cost estimate
-      3. Run classification, extraction, summarisation passes
-      4. Post-process
-      5. Merge into output table (MERGE INTO handles upserts)
-    Returns a summary dict with counts and elapsed time.
+    Full incremental pipeline: get unprocessed -> classify -> extract -> summarise -> MERGE.
+    Returns summary dict with counts and elapsed time.
     """
     import time
     start = time.time()
 
-    # Step 1: Get pending records
     pending_df = get_unprocessed_reports(batch_size)
     count = pending_df.count()
 
@@ -714,19 +624,16 @@ def run_batch_pipeline(batch_size: int = 50, dry_run: bool = False) -> dict:
         print("No new records to process.")
         return {"processed": 0, "failed": 0, "elapsed_s": 0}
 
-    # Step 2: Show cost estimate for this batch
     est = estimate_batch_cost(pending_count=count)
     print_cost_estimate(est)
     print(f"Starting pipeline for {count} records...")
 
-    # Step 3: Run AI passes (lazy -- Spark builds one query plan for all passes)
     df = pending_df
     df = run_classification_pass(df)
     df = run_extraction_pass(df)
     df = run_summarisation_pass(df)
     df = run_post_processing(df)
 
-    # Select final output columns
     output_df = df.select(
         "report_id",
         "title",
@@ -751,7 +658,6 @@ def run_batch_pipeline(batch_size: int = 50, dry_run: bool = False) -> dict:
         output_df.show(1, truncate=60, vertical=True)
         return {"dry_run": True, "pending_count": count}
 
-    # Step 4: Merge into processed_reports (upsert by report_id)
     output_df.createOrReplaceTempView("_batch_results")
     spark.sql(f"""
         MERGE INTO {CATALOG}.{SCHEMA}.processed_reports AS target
@@ -773,8 +679,7 @@ def run_batch_pipeline(batch_size: int = 50, dry_run: bool = False) -> dict:
     for row in result_counts:
         summary[row.processing_status.lower()] = row.n
 
-    print(f"\nPipeline complete in {elapsed:.1f}s")
-    print(f"Results: {summary}")
+    print(f"\nPipeline complete in {elapsed:.1f}s -- {summary}")
     return summary
 
 
@@ -794,37 +699,15 @@ print(pipeline_summary)
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC **Expected output (dry run):**
-# MAGIC ```
-# MAGIC DRY RUN
-# MAGIC ==================================================
-# MAGIC =======================================================
-# MAGIC   PRE-RUN COST ESTIMATE
-# MAGIC =======================================================
-# MAGIC   Documents pending  : 2
-# MAGIC   Estimated cost     : USD $0.0208
-# MAGIC =======================================================
-# MAGIC DRY RUN -- showing schema and first row preview:
-# MAGIC root
-# MAGIC  |-- report_id: string (nullable = true)
-# MAGIC  |-- title: string (nullable = true)
-# MAGIC  ...
-# MAGIC ```
-
-# COMMAND ----------
-
-# MAGIC %md
 # MAGIC ---
 # MAGIC ## Step 7 -- Inspect and Validate Results
 
 # COMMAND ----------
 
-# Show all processed results
 display(spark.table(f"{CATALOG}.{SCHEMA}.processed_reports"))
 
 # COMMAND ----------
 
-# Validate: check for failures and null AI outputs
 spark.sql(f"""
 SELECT
     COUNT(*)                                           AS total_processed,
@@ -838,7 +721,6 @@ FROM {CATALOG}.{SCHEMA}.processed_reports
 
 # COMMAND ----------
 
-# Review AI summaries for quality spot-check
 spark.sql(f"""
 SELECT
     title,
@@ -855,14 +737,7 @@ ORDER BY ai_compliance_urgency, ai_capital_value_m DESC NULLS LAST
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC **Expected output:**
-# MAGIC ```
-# MAGIC +---------------+------+------------+----------+-----------+
-# MAGIC | total_processed | successful | failed | avg_doc_chars | max_capital_m |
-# MAGIC +---------------+------+------------+----------+-----------+
-# MAGIC |             5 |          5 |      0 |          2420 |         445.0 |
-# MAGIC +---------------+------+------------+----------+-----------+
-# MAGIC ```
+# MAGIC **Checkpoint:** Expect 5 rows, 5 successful, 0 failed. `max_capital_m` should be 445.0.
 
 # COMMAND ----------
 
@@ -870,14 +745,7 @@ ORDER BY ai_compliance_urgency, ai_capital_value_m DESC NULLS LAST
 # MAGIC ---
 # MAGIC ## Step 8 -- Optimise the Output Table
 # MAGIC
-# MAGIC Run `OPTIMIZE` with `ZORDER` after each batch load. This improves query performance
-# MAGIC for downstream Genie and dashboard queries.
-# MAGIC
-# MAGIC <div style="background: #E8F4FD; padding: 12px 16px; border-radius: 6px; border-left: 4px solid #1B3A5C; margin: 8px 0">
-# MAGIC <strong>Why ZORDER on these columns?</strong> Genie and dashboard queries most commonly
-# MAGIC filter on compliance urgency, report type, and entity. ZORDER co-locates data for these
-# MAGIC common filter patterns, reducing data scanned per query.
-# MAGIC </div>
+# MAGIC Run `OPTIMIZE` with `ZORDER` after each batch. ZORDER on `ai_compliance_urgency, report_type_recorded, submitting_entity` co-locates data for the filter patterns Genie and dashboards use most, reducing data scanned per query.
 
 # COMMAND ----------
 
@@ -888,12 +756,9 @@ ZORDER BY (ai_compliance_urgency, report_type_recorded, submitting_entity)
 """)
 print("OPTIMIZE complete.")
 
-# Check table health
 spark.sql(f"""
 DESCRIBE DETAIL {CATALOG}.{SCHEMA}.processed_reports
-""").select(
-    "format", "numFiles", "sizeInBytes", "numOutputRows"
-).show()
+""").select("format", "numFiles", "sizeInBytes", "numOutputRows").show()
 
 # COMMAND ----------
 
@@ -901,71 +766,38 @@ DESCRIBE DETAIL {CATALOG}.{SCHEMA}.processed_reports
 # MAGIC ---
 # MAGIC ## Step 9 -- Schedule as a Databricks Job
 # MAGIC
-# MAGIC ### Option A -- Create the job via the UI (recommended)
+# MAGIC ### Option A -- Schedule via the UI
 # MAGIC
-# MAGIC **Navigate:** Workflows (left sidebar) -> [+ Create job]
+# MAGIC **Navigate:** Left sidebar -> Workflows -> **[+ Create job]** button
 # MAGIC
-# MAGIC **Step 9.1 -- Name the job and add first task**
 # MAGIC ```
-# MAGIC +--- Create job -------------------------------------------------------+
-# MAGIC |                                                                      |
-# MAGIC |  Job name: [ ai_regulatory_processing_pipeline               ]      |
-# MAGIC |                                                                      |
-# MAGIC |  Task 1:                                                             |
-# MAGIC |  +-- Task name: [ process_new_reports                        ]      |
-# MAGIC |  +-- Type:  (*) Notebook  ( ) Python script  ( ) SQL  ( ) JAR       |
-# MAGIC |  +-- Source: [ Workspace v ]                                        |
-# MAGIC |  +-- Path: [ /Workspace/workshops/.../05_batch_ai_pipeline  ]       |
-# MAGIC |  +-- Cluster: [ Use existing cluster v ] (select your cluster)      |
-# MAGIC |                                                                      |
-# MAGIC +----------------------------------------------------------------------+
+# MAGIC  Job name:    ai_regulatory_processing_pipeline
+# MAGIC  Task type:   Notebook
+# MAGIC  Path:        /Workspace/workshops/.../05_batch_ai_pipeline
+# MAGIC  Cluster:     Use existing cluster (or new cluster for production)
+# MAGIC
+# MAGIC  [+ Add trigger] -> Scheduled
+# MAGIC  Cron:        0 30 2 * * ?   (2:30 AM daily)
+# MAGIC  Timezone:    Australia/Melbourne
+# MAGIC  Status:      Paused  <- leave paused until ready for production
 # MAGIC ```
 # MAGIC
-# MAGIC **Step 9.2 -- Set the schedule**
+# MAGIC **Monitoring:** Left sidebar -> Workflows -> [job name] -> **Runs tab**
+# MAGIC Click any run to see notebook output, timing, and errors.
 # MAGIC
-# MAGIC Click **[+ Add schedule / trigger]** then fill in:
-# MAGIC ```
-# MAGIC +--- Trigger ----------------------------------------------------------+
-# MAGIC |                                                                      |
-# MAGIC |  (*) Scheduled                                                       |
-# MAGIC |  Cron expression: [ 0 30 2 * * ?  ]  (2:30 AM daily)               |
-# MAGIC |  Timezone:        [ Australia/Melbourne v ]                          |
-# MAGIC |                                                                      |
-# MAGIC |  Preview: "Runs daily at 2:30 AM AEST"                              |
-# MAGIC |                                                                      |
-# MAGIC |  Status: ( ) Active  (*) Paused  <- leave paused until ready         |
-# MAGIC |                                                                      |
-# MAGIC +----------------------------------------------------------------------+
-# MAGIC ```
-# MAGIC
-# MAGIC **Step 9.3 -- Configure notifications (recommended for production)**
-# MAGIC ```
-# MAGIC +--- Notifications ----------------------------------------------------+
-# MAGIC |  On failure: [ your.email@company.com.au             ]              |
-# MAGIC |  On success: (leave blank -- only alert on failure for daily jobs)   |
-# MAGIC +----------------------------------------------------------------------+
-# MAGIC ```
-# MAGIC
-# MAGIC ---
-# MAGIC
-# MAGIC ### Option B -- Create the job via SDK (run the cell below)
+# MAGIC ### Option B -- Schedule via SDK (cell below)
 
 # COMMAND ----------
 
 from databricks.sdk.service.jobs import JobSettings, Task, NotebookTask
 
-# TODO: replace with your actual notebook path
 NOTEBOOK_PATH = f"/Workspace/workshops/workshop2b_genie_spaces/labs/05_batch_ai_pipeline"
 
 
 def create_or_update_pipeline_job() -> int:
-    """
-    Creates (or updates) a scheduled job for the regulatory reports AI pipeline.
-    Returns the job_id.
-    """
+    """Creates (or updates) a scheduled job for the regulatory reports AI pipeline."""
     JOB_NAME = "Regulatory Reports AI Pipeline -- Daily"
 
-    # Check if job already exists
     existing_jobs = list(w.jobs.list(name=JOB_NAME))
     if existing_jobs:
         job_id = existing_jobs[0].job_id
@@ -986,18 +818,12 @@ def create_or_update_pipeline_job() -> int:
                     }
                 },
                 "existing_cluster_id": spark.conf.get("spark.databricks.clusterUsageTags.clusterId", ""),
-                # For production, use a new dedicated cluster instead:
-                # "new_cluster": {
-                #     "spark_version": "15.4.x-scala2.12",
-                #     "node_type_id": "Standard_D4s_v3",
-                #     "num_workers": 2,
-                # }
             }
         ],
         "schedule": {
-            "quartz_cron_expression": "0 30 2 * * ?",  # 2:30 AM daily AEST (UTC+10 = 16:30 UTC prev day)
+            "quartz_cron_expression": "0 30 2 * * ?",  # 2:30 AM daily AEST
             "timezone_id": "Australia/Melbourne",
-            "pause_status": "PAUSED"  # unpause when ready for production
+            "pause_status": "PAUSED"
         },
         "email_notifications": {
             # TODO: replace with your email
@@ -1027,42 +853,16 @@ try:
 except Exception as e:
     print(f"Job creation skipped (workshop environment): {e}")
     JOB_ID = None
-    print("In production: configure the job via the Jobs UI or Databricks Asset Bundles.")
 
 # COMMAND ----------
 
 # MAGIC %md
 # MAGIC ---
 # MAGIC ## Step 10 -- Monitor Pipeline Runs
-# MAGIC
-# MAGIC ### Monitoring from the UI
-# MAGIC
-# MAGIC **Navigate:** Workflows -> [job name] -> **Runs** tab
-# MAGIC
-# MAGIC ```
-# MAGIC +--- Job Runs ---------------------------------------------------------+
-# MAGIC |                                                                      |
-# MAGIC |  Run 1 | 2026-05-22 02:30 | Duration: 4m 32s | Success              |
-# MAGIC |  Run 2 | 2026-05-21 02:30 | Duration: 3m 58s | Success              |
-# MAGIC |  Run 3 | 2026-05-20 02:30 | Duration: 12m 3s | Failed               |
-# MAGIC |        |  ^ click to see logs and error details                     |
-# MAGIC |                                                                      |
-# MAGIC +----------------------------------------------------------------------+
-# MAGIC ```
-# MAGIC
-# MAGIC Click any run row to see:
-# MAGIC - Full cluster logs
-# MAGIC - Notebook output cell-by-cell
-# MAGIC - Spark UI for query plans and stage timings
-# MAGIC - Error stack trace for failed runs
 
 # COMMAND ----------
 
-# MAGIC %md
-# MAGIC ### 10a -- Daily processing metrics
-
-# COMMAND ----------
-
+# Daily processing metrics
 spark.sql(f"""
 SELECT
     DATE(processed_at)                                 AS processing_date,
@@ -1073,8 +873,7 @@ SELECT
         SUM(CASE WHEN processing_status='PROCESSED' THEN 1 ELSE 0 END) * 100.0 / COUNT(*),
         1
     )                                                   AS success_pct,
-    ROUND(AVG(source_text_length), 0)                  AS avg_doc_chars,
-    SUM(source_text_length)                            AS total_chars_processed
+    ROUND(AVG(source_text_length), 0)                  AS avg_doc_chars
 FROM {CATALOG}.{SCHEMA}.processed_reports
 GROUP BY DATE(processed_at)
 ORDER BY processing_date DESC
@@ -1082,18 +881,9 @@ ORDER BY processing_date DESC
 
 # COMMAND ----------
 
-# MAGIC %md
-# MAGIC ### 10b -- Failed records for investigation
-
-# COMMAND ----------
-
+# Failed records for investigation
 spark.sql(f"""
-SELECT
-    report_id,
-    title,
-    processing_status,
-    processing_error,
-    processed_at
+SELECT report_id, title, processing_status, processing_error, processed_at
 FROM {CATALOG}.{SCHEMA}.processed_reports
 WHERE processing_status = 'FAILED'
 ORDER BY processed_at DESC
@@ -1102,11 +892,7 @@ LIMIT 20
 
 # COMMAND ----------
 
-# MAGIC %md
-# MAGIC ### 10c -- Compliance urgency dashboard
-
-# COMMAND ----------
-
+# Compliance urgency summary
 spark.sql(f"""
 SELECT
     ai_compliance_urgency,
@@ -1130,72 +916,8 @@ ORDER BY
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC **Expected output:**
-# MAGIC ```
-# MAGIC +---------------------+---------------+-------+------------+
-# MAGIC | ai_compliance_urgency | document_count | total_capex_m | sample_title |
-# MAGIC +---------------------+---------------+-------+------------+
-# MAGIC | HIGH                |             2 |        312.0 | NEM Annual Planning Report... |
-# MAGIC | MEDIUM              |             2 |        235.0 | RIT-T Assessment Report...   |
-# MAGIC | LOW                 |             1 |          6.0 | STPIS Annual Performance...  |
-# MAGIC +---------------------+---------------+-------+------------+
-# MAGIC ```
-
-# COMMAND ----------
-
-# MAGIC %md
 # MAGIC ---
-# MAGIC ## Step 11 -- Cost Optimisation Strategies
-
-# COMMAND ----------
-
-print("""
-BATCH AI PIPELINE -- COST OPTIMISATION STRATEGIES
-===================================================
-
-1. USE SMALLER MODELS FOR SIMPLE TASKS
-   - Classification (pick from list): 8B model -- accuracy comparable to 70B
-   - Extraction (structured JSON): 8B is usually sufficient
-   - Summarisation (quality matters): consider 70B for executive summaries
-   Savings: up to 60% if you select model per task type
-
-2. TRUNCATE INPUT TEXT INTELLIGENTLY
-   - Regulatory documents: first 2,000 chars usually contains all key info
-   - Work orders: typically < 1,000 chars total
-   - Do NOT truncate when extracting dates/references from end of document
-   Current implementation truncates to 2,000 chars -- review for your documents
-
-3. CACHE RESULTS AGGRESSIVELY
-   - Incremental pattern (LEFT ANTI JOIN) avoids reprocessing
-   - Add a content_hash column to detect changed documents
-   - Only reprocess if content_hash changes
-
-4. SCHEDULE DURING OFF-PEAK HOURS
-   - PT endpoints charged per provisioned throughput-second
-   - Run batch jobs at 2 AM AEST when cluster is otherwise idle
-   - Use scale-to-zero PT endpoint (min_provisioned_throughput=0)
-
-5. RIGHT-SIZE THE PT ENDPOINT
-   - For 200 docs/day batch (2 AM run): 100 tokens/s PT is sufficient
-   - Over-provisioning wastes DBU allocation even when idle
-   - Monitor utilisation in: Serving -> endpoint -> Metrics tab
-
-6. SELECTIVE RE-PROCESSING
-   - Only re-run failed records, not all records
-   - Failed records automatically retried via LEFT ANTI JOIN pattern
-   - Failed records usually have a correctable cause (prompt fix, not model failure)
-
-MONTHLY COST SCENARIOS (Llama 3.1 8B, 4 passes, 3,000 char avg doc):
-   100 docs/month:    USD ~$0.52  (AUD ~$0.80)
-   1,000 docs/month:  USD ~$5.20  (AUD ~$8.00)
-   10,000 docs/month: USD ~$52.00 (AUD ~$80.00)
-""")
-
-# COMMAND ----------
-
-# MAGIC %md
-# MAGIC ---
-# MAGIC ## Lab 05 -- Final Summary
+# MAGIC ## Step 11 -- Final Summary
 
 # COMMAND ----------
 
@@ -1204,15 +926,13 @@ print("WORKSHOP 2B -- COMPLETE LAB SUMMARY")
 print("=" * 65)
 print()
 print("WHAT WAS BUILT:")
-print()
-print("  workshop.energy_nem schema:")
 spark.sql(f"SHOW TABLES IN {CATALOG}.{SCHEMA}").select("tableName").show(20, truncate=False)
 
-print("  UC AI Functions:")
+print("UC AI Functions:")
 try:
     spark.sql(f"SHOW FUNCTIONS IN {CATALOG}.ai_functions").select("function").show(10, truncate=False)
 except Exception:
-    print("    (run Lab 04 to create AI functions)")
+    print("  (run Lab 04 to create AI functions)")
 
 print()
 print("KEY ARCHITECTURE DECISIONS:")
@@ -1224,16 +944,9 @@ print("  5. OPTIMIZE + ZORDER after each batch improves downstream query perform
 print("  6. Genie Space uses databricks-qwen3-embedding-0-6b (in-region) for RAG")
 print()
 print("IN-REGION MODEL REFERENCE:")
-print("  LLM inference:  meta-llama/Meta-Llama-3.1-8B-Instruct (AU East PT)")
-print("  Embeddings:     databricks-qwen3-embedding-0-6b (AU East)")
-print("  Do NOT use:     databricks-gte-large-en (cross-geo)")
-print("  Do NOT use:     ai_classify/ai_summarize built-ins (cross-geo)")
-print()
-print("NEXT STEPS:")
-print("  - Add processed_reports to your Genie Space as a trusted asset")
-print("  - Create AI/BI dashboard tiles from v_dashboard_outage_summary")
-print("  - Enable Genie Agent mode for cross-table questions")
-print("  - Schedule the batch pipeline job for daily incremental processing")
+print("  LLM (PT):   databricks-claude-haiku-4-5  ✅ AU East")
+print("  Embeddings: databricks-qwen3-embedding-0-6b  ✅ AU East")
+print("  Avoid:      ai_classify / ai_summarize built-ins  ✗ cross-geo")
 print("=" * 65)
 
 # COMMAND ----------
@@ -1242,27 +955,15 @@ print("=" * 65)
 # MAGIC ---
 # MAGIC ## Lab 05 -- Review Questions
 # MAGIC
-# MAGIC <div style="background: #F4F4F4; padding: 16px 20px; border-radius: 8px; margin: 8px 0">
+# MAGIC **Q1.** A document was processed but `processing_status = 'FAILED'`. Will it be reprocessed on the next run? Why or why not?
 # MAGIC
-# MAGIC **Q1.** The incremental pipeline uses `LEFT ANTI JOIN` to find unprocessed records.
-# MAGIC A document was processed but the result had `processing_status = 'FAILED'`.
-# MAGIC Will it be reprocessed on the next run? Why or why not?
+# MAGIC **Q2.** A colleague suggests using `ai_summarize()` instead of `ai_query(endpoint, ...)` to save the PT endpoint deployment effort. What are the two objections you raise?
 # MAGIC
-# MAGIC **Q2.** A colleague suggests using `ai_summarize()` instead of `ai_query(endpoint, ...)`
-# MAGIC to save the PT endpoint deployment effort. What are the two objections you raise?
+# MAGIC **Q3.** The pipeline processes 500 regulatory documents per month. Estimate the monthly cost in AUD (AUD/USD rate of 0.65) for Claude Haiku 4.5 with 4 passes per doc and 3,000 char average document.
 # MAGIC
-# MAGIC **Q3.** The pipeline processes 500 regulatory documents per month.
-# MAGIC Using the cost model above, estimate the monthly cost in AUD
-# MAGIC (use an AUD/USD rate of 0.65) for Llama 3.1 8B with 4 passes per doc.
+# MAGIC **Q4.** Why do we run `OPTIMIZE ZORDER BY (ai_compliance_urgency, report_type_recorded)` rather than `OPTIMIZE ZORDER BY (report_id)`?
 # MAGIC
-# MAGIC **Q4.** Why do we run `OPTIMIZE ZORDER BY (ai_compliance_urgency, report_type_recorded)`
-# MAGIC rather than `OPTIMIZE ZORDER BY (report_id)`?
-# MAGIC
-# MAGIC **Q5.** A document extraction returns `ai_capital_value_m = null` even though the document
-# MAGIC says "$143.6M". The extract schema specifies `"capital_value_m": "number in AUD millions"`.
-# MAGIC List two prompt changes you would try to fix this.
-# MAGIC
-# MAGIC </div>
+# MAGIC **Q5.** A document extraction returns `ai_capital_value_m = null` even though the document says "$143.6M". List two prompt changes you would try to fix this.
 # MAGIC
 # MAGIC ---
 # MAGIC

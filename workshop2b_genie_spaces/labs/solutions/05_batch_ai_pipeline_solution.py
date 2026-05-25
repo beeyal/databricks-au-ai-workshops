@@ -876,7 +876,7 @@ ORDER BY
 def estimate_pipeline_cost(
     monthly_new_docs: int,
     avg_doc_chars: int = 3000,
-    model_name: str = "meta-llama/Meta-Llama-3.1-8B-Instruct",
+    model_name: str = "databricks-claude-haiku-4-5",
 ) -> dict:
     """
     Estimates monthly AI inference cost for the batch pipeline.
@@ -1014,7 +1014,7 @@ print("  5. OPTIMIZE + ZORDER after each batch improves downstream query perform
 print("  6. Genie Space uses databricks-qwen3-embedding-0-6b (in-region) for RAG")
 print()
 print("IN-REGION MODEL REFERENCE:")
-print("  LLM inference:   meta-llama/Meta-Llama-3.1-8B-Instruct (AU East PT)")
+print("  LLM inference:   databricks-claude-haiku-4-5 (AU East PT)")
 print("  Embeddings:      databricks-qwen3-embedding-0-6b (AU East)")
 print("  Do NOT use:      databricks-gte-large-en (cross-geo)")
 print("  Do NOT use:      ai_classify/ai_summarize built-ins (cross-geo)")

@@ -115,7 +115,7 @@ PT_ENDPOINT_NAME = "au_east_llm_inregion"
 #
 # Use Meta-Llama-3.1-8B for this workshop (most cost-effective, in-region)
 
-PT_MODEL_NAME = "meta-llama/Meta-Llama-3.1-8B-Instruct"
+PT_MODEL_NAME = "databricks-claude-haiku-4-5"
 
 # Minimum scale (0 = scale to zero when idle, reduces cost for workshop)
 PT_SCALE_TO_ZERO = True
@@ -752,7 +752,7 @@ AU EAST AI FUNCTIONS — IN-REGION PATTERN REFERENCE
 SETUP (once per workspace):
   1. Deploy PT endpoint:
        endpoint_name = "au_east_llm_inregion"
-       model_name    = "meta-llama/Meta-Llama-3.1-8B-Instruct"
+       model_name    = "databricks-claude-haiku-4-5"
 
   2. Create UC wrapper functions in catalog.ai_functions:
        classify_text(text, categories, domain_context)

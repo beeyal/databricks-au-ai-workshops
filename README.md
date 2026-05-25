@@ -10,8 +10,8 @@ This repository contains three complementary workshops covering the full spectru
 
 | # | Workshop | Track | Duration |
 |---|----------|-------|----------|
-| 1 | **Governing Databricks AI Features** | Platform Admin / Security | 4 hours |
-| 2a | **Genie Code for Developers** | Data Engineer / ML Engineer | 3 hours |
+| 1 | **Governing Databricks AI Features** | Platform Admin / Security | 3.5–4 hours |
+| 2a | **Genie Code for Developers** | Data Engineer / ML Engineer | 3.5–4 hours |
 | 2b | **Genie Spaces for Business Users** | Analyst / Business Stakeholder | 3 hours |
 
 Workshop 2a and 2b are independent and can be run on the same day or on separate days. Workshop 1 should be completed (or at least facilitated) before either Workshop 2.
@@ -64,11 +64,11 @@ Navigate to `setup/preflight_check.py` and run it. All checks should return `[PA
 
 ## Workshop Overview
 
-| Workshop | Audience | Duration | Prerequisites | Slide Deck |
-|----------|----------|----------|---------------|------------|
-| [Workshop 1: Governing Databricks AI Features](workshop1_admin/) | Workspace admins, security architects, platform engineers | 4 hours | Workspace Admin or Account Admin role | *(link to be added by facilitator)* |
-| [Workshop 2a: Genie Code for Developers](workshop2a_genie_code/) | Data engineers, ML engineers, analytics engineers | 3 hours | Workshop 1 complete, or Databricks workspace access with Data Engineer role | *(link to be added by facilitator)* |
-| [Workshop 2b: Genie Spaces for Business Users](workshop2b_genie_spaces/) | Business analysts, data analysts, reporting leads | 3 hours | Workshop 1 complete, or Databricks workspace access with at least Viewer role on Genie Spaces | *(link to be added by facilitator)* |
+| Workshop | Audience | Duration | Labs | Prerequisites | Slide Deck |
+|----------|----------|----------|------|---------------|------------|
+| [Workshop 1: Governing Databricks AI Features](workshop1_admin/) | Workspace admins, security architects, platform engineers | 3.5–4 hours | Lab 01 Workspace AI Settings (45 min) · Lab 02 AI Gateway Setup (50 min) · Lab 03 Rate Limits & Guardrails (30 min) · Lab 04 Usage Tracking (25 min) · Lab 05 Data Residency & Compliance (40 min) | Workspace Admin or Account Admin role | *(link to be added by facilitator)* |
+| [Workshop 2a: Genie Code for Developers](workshop2a_genie_code/) | Data engineers, ML engineers, analytics engineers | 3.5–4 hours | Lab 01 Genie Code Intro (30 min) · Lab 02 Notebook AI Features (30 min) · Lab 03 Custom Instructions, Skills & Tools (60 min) · Lab 04 MCP Integration (45 min) | Workshop 1 complete, or Databricks workspace access with Data Engineer role | *(link to be added by facilitator)* |
+| [Workshop 2b: Genie Spaces for Business Users](workshop2b_genie_spaces/) | Business analysts, data analysts, reporting leads | 3 hours | Lab 01 Genie Space Setup (30 min) · Lab 02 Genie Space Admin (35 min) · Lab 03 Genie End User (35 min) · Lab 04 AI Functions In-Region (30 min) · Lab 05 Batch AI Pipeline (30 min) | Workshop 1 complete, or Databricks workspace access with at least Viewer role on Genie Spaces | *(link to be added by facilitator)* |
 
 ---
 

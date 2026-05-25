@@ -2,7 +2,7 @@
 # MAGIC %md
 # MAGIC <div style="background: linear-gradient(135deg, #1B3A6B 0%, #FF3621 100%); padding: 32px 40px; border-radius: 12px; margin-bottom: 8px;">
 # MAGIC   <h1 style="color: white; font-family: 'DM Sans', sans-serif; font-size: 2.2em; margin: 0 0 8px 0;">
-# MAGIC     Lab 04: Genie Space — Admin Setup &amp; Operating Model
+# MAGIC     Lab 04: Genie Space -- Admin Setup &amp; Operating Model
 # MAGIC   </h1>
 # MAGIC   <p style="color: rgba(255,255,255,0.85); font-size: 1.1em; margin: 0;">
 # MAGIC     Session 2: Technical Enablement · AEMO Australian Energy Operations
@@ -13,170 +13,66 @@
 # MAGIC   <tr><td style="padding:8px 16px; background:#f5f5f5; border-radius:6px; width:25%"><b>Session</b></td><td style="padding:8px 16px;">Session 2: Technical Enablement</td></tr>
 # MAGIC   <tr><td style="padding:8px 16px; background:#f5f5f5; border-radius:6px;"><b>Duration</b></td><td style="padding:8px 16px;">45 minutes</td></tr>
 # MAGIC   <tr><td style="padding:8px 16px; background:#f5f5f5; border-radius:6px;"><b>Role</b></td><td style="padding:8px 16px;">Data Engineer / Platform Engineer</td></tr>
-# MAGIC   <tr><td style="padding:8px 16px; background:#f5f5f5; border-radius:6px;"><b>Prerequisites</b></td><td style="padding:8px 16px;">Lab 02 complete — AI Gateway endpoint running &nbsp;|&nbsp; <code>workshop_au.energy</code> tables exist (from Lab 01) &nbsp;|&nbsp; <code>workspace_admin</code> or <code>genie_admin</code> entitlement</td></tr>
-# MAGIC   <tr><td style="padding:8px 16px; background:#f5f5f5; border-radius:6px;"><b>Output</b></td><td style="padding:8px 16px;">Production Genie Space live with 10+ golden queries &nbsp;|&nbsp; Certification tag set &nbsp;|&nbsp; Session 3 prerequisites checklist run</td></tr>
+# MAGIC   <tr><td style="padding:8px 16px; background:#f5f5f5; border-radius:6px;"><b>Prerequisites</b></td><td style="padding:8px 16px;">Lab 02 complete -- AI Gateway endpoint running &nbsp;|&nbsp; <code>workshop_au.energy</code> tables exist &nbsp;|&nbsp; <code>workspace_admin</code> or <code>genie_admin</code> entitlement</td></tr>
+# MAGIC   <tr><td style="padding:8px 16px; background:#f5f5f5; border-radius:6px;"><b>Output</b></td><td style="padding:8px 16px;">Production Genie Space live with 10+ golden queries &nbsp;|&nbsp; Certification registry record &nbsp;|&nbsp; Session 3 prerequisites checklist run</td></tr>
 # MAGIC </table>
-
-# COMMAND ----------
-
-# MAGIC %md
-# MAGIC <div style="background:#E8F4FD; border-left:5px solid #1B3A6B; padding:20px 24px; border-radius:0 8px 8px 0; margin:16px 0;">
-# MAGIC   <h2 style="color:#1B3A6B; margin-top:0;">Learning Objectives</h2>
-# MAGIC   <ol style="line-height:2em;">
-# MAGIC     <li>Navigate the Genie UI — understand the Configure tab, Instructions, SQL examples, and Permissions before writing any code</li>
-# MAGIC     <li>Create a production-ready Genie Space via REST API using principle of least privilege for trusted assets</li>
-# MAGIC     <li>Understand how Genie inherits Unity Catalog row and column filters — and why this matters for AEMO</li>
-# MAGIC     <li>Apply the Exploratory vs Certified operating model to govern which Genie Spaces are ready for business users</li>
-# MAGIC     <li>Set a <code>space_certification_status</code> UC tag on a Genie Space programmatically</li>
-# MAGIC     <li>Run the Session 3 prerequisites checklist and produce a pass/fail readiness report</li>
-# MAGIC   </ol>
-# MAGIC </div>
-
-# COMMAND ----------
-
-# MAGIC %md
-# MAGIC <div style="background:#F3F9FF; border-left:5px solid #4C6EF5; padding:20px 24px; border-radius:0 8px 8px 0; margin:16px 0;">
-# MAGIC   <h2 style="color:#4C6EF5; margin-top:0;">How This Lab Fits Into Session 2</h2>
-# MAGIC   <pre style="background:white; padding:16px; border-radius:6px; font-size:0.9em; line-height:1.8;">
-# MAGIC Lab 01 (settings)  →  Lab 02 (AI Gateway)  →  Lab 03 (rate limits)
-# MAGIC                                                        |
-# MAGIC                                                        v
-# MAGIC                                              Lab 04 (YOU ARE HERE)
-# MAGIC                                              Genie Space setup
-# MAGIC                                              + operating model
-# MAGIC                                              + Session 3 readiness
-# MAGIC                                                        |
-# MAGIC                                                        v
-# MAGIC                                     Lab 05 (usage tracking)  →  Lab 06 (compliance)
-# MAGIC   </pre>
-# MAGIC   <p style="margin-bottom:0;">
-# MAGIC     This lab is the bridge between the infrastructure you built in Labs 01–03 and
-# MAGIC     the business user experience in Session 3. You are building the artefact that
-# MAGIC     Session 3 participants will interact with — and deciding whether it is ready for them.
-# MAGIC   </p>
-# MAGIC </div>
-
-# COMMAND ----------
-
-# MAGIC %md
-# MAGIC <div style="background:#FFF3E0; border-left:5px solid #FF6D00; padding:16px 20px; border-radius:0 8px 8px 0; margin:16px 0;">
-# MAGIC   <h3 style="color:#E65100; margin-top:0;">Before You Start — Checklist</h3>
-# MAGIC   <ul>
-# MAGIC     <li>Confirm Labs 01 and 02 are complete — you need the AI Gateway endpoint name and the <code>workshop_au.energy</code> schema</li>
-# MAGIC     <li>Confirm you have <code>workspace_admin</code> or <code>genie_admin</code> entitlement (needed to create and configure spaces)</li>
-# MAGIC     <li>Replace every <code># TODO:</code> value below with your environment specifics</li>
-# MAGIC     <li>Have the PT endpoint name from Lab 02 ready — you will need it in the prerequisites checklist (Section 3)</li>
-# MAGIC   </ul>
-# MAGIC </div>
+# MAGIC
+# MAGIC ---
+# MAGIC
+# MAGIC ### Learning Objectives
+# MAGIC
+# MAGIC | # | Objective |
+# MAGIC |---|-----------|
+# MAGIC | 1 | Navigate the Genie UI -- Configure tab, Instructions, SQL examples, Permissions |
+# MAGIC | 2 | Create a production-ready Genie Space via REST API using principle of least privilege |
+# MAGIC | 3 | Understand how Genie inherits Unity Catalog row and column filters |
+# MAGIC | 4 | Apply the Exploratory vs Certified operating model |
+# MAGIC | 5 | Set a `space_certification_status` registry record on a Genie Space programmatically |
+# MAGIC | 6 | Run the Session 3 prerequisites checklist and produce a pass/fail readiness report |
 
 # COMMAND ----------
 
 # MAGIC %md
 # MAGIC ---
-# MAGIC ## Section 0: UI Exploration (5 minutes — do this before running any code)
+# MAGIC ## Section 0: UI Exploration (5 minutes -- do this before running any code)
 # MAGIC
-# MAGIC Before automating Genie Space creation, explore the UI so that when the API call
-# MAGIC creates the space, you know exactly where to find it and what each setting means.
+# MAGIC ### Navigate to Genie
 # MAGIC
-# MAGIC ---
+# MAGIC **Left sidebar -> Genie** (sparkle/wand icon near the bottom of the sidebar)
 # MAGIC
-# MAGIC ### Task 1 — Navigate to Genie
-# MAGIC
-# MAGIC **Where to go:**
 # MAGIC ```
-# MAGIC Left sidebar → Genie (sparkle/wand icon, usually near the bottom of the sidebar)
-# MAGIC ```
-# MAGIC
-# MAGIC **What you should see:**
-# MAGIC ```
-# MAGIC ┌──────────────────────────────────────────────────────────────┐
-# MAGIC │  Genie                                                       │
-# MAGIC │  ──────────────────────────────────────────────────────────  │
-# MAGIC │                                                              │
-# MAGIC │  [+ New Space]                                               │
-# MAGIC │                                                              │
-# MAGIC │  My spaces:                                                  │
-# MAGIC │  (none yet, or a list of existing spaces)                    │
-# MAGIC │                                                              │
-# MAGIC └──────────────────────────────────────────────────────────────┘
+# MAGIC  Genie
+# MAGIC  ─────────────────────────────────
+# MAGIC  [+ New Space]
+# MAGIC  My spaces: (none yet, or list of existing spaces)
 # MAGIC ```
 # MAGIC
-# MAGIC If spaces exist, click one to see the Chat interface. You will also see a
-# MAGIC **[Configure]** tab at the top — that is where all admin configuration lives.
+# MAGIC If spaces exist, click one then open the **[Configure]** tab at the top. That is where all admin configuration lives.
 # MAGIC
-# MAGIC ---
+# MAGIC ### Configure tab structure
 # MAGIC
-# MAGIC ### Task 2 — Open the Configure tab on any existing space (or explore the New Space form)
-# MAGIC
-# MAGIC **Option A — If a space exists:**
 # MAGIC ```
-# MAGIC Genie → click any space → click [Configure] tab at the top
-# MAGIC ```
-# MAGIC
-# MAGIC **Option B — If no space exists:**
-# MAGIC ```
-# MAGIC Genie → click [+ New Space] → explore the form (do not submit it yet)
+# MAGIC  [Chat]  [Configure]
+# MAGIC  ┌── Instructions ──  system prompt, every conversation starts with this
+# MAGIC  ├── Tables ────────  trusted assets -- Genie ONLY queries these tables
+# MAGIC  ├── SQL queries ───  golden queries -- verified SQL examples
+# MAGIC  └── Permissions ───  CAN_VIEW = chat  |  CAN_EDIT = edit config
 # MAGIC ```
 # MAGIC
-# MAGIC **What to look for on the Configure tab:**
-# MAGIC ```
-# MAGIC ┌──────────────────────────────────────────────────────────────┐
-# MAGIC │  [Chat]   [Configure]                                        │
-# MAGIC │                                                              │
-# MAGIC │  Configure                                                   │
-# MAGIC │  ┌── Instructions ──────────────────────────────────────┐   │
-# MAGIC │  │  The system prompt. Every conversation starts with   │   │
-# MAGIC │  │  this text in context.                               │   │
-# MAGIC │  └──────────────────────────────────────────────────────┘   │
-# MAGIC │  ┌── Tables ─────────────────────────────────────────────┐  │
-# MAGIC │  │  Trusted assets. Genie ONLY queries these tables.    │   │
-# MAGIC │  │  All others are invisible to it.                     │   │
-# MAGIC │  └──────────────────────────────────────────────────────┘   │
-# MAGIC │  ┌── SQL queries ─────────────────────────────────────────┐ │
-# MAGIC │  │  Golden queries. Verified SQL examples that teach     │  │
-# MAGIC │  │  Genie the right patterns for this domain.           │  │
-# MAGIC │  └──────────────────────────────────────────────────────┘   │
-# MAGIC │  ┌── Permissions ─────────────────────────────────────────┐ │
-# MAGIC │  │  CAN_USE = read/chat   CAN_MANAGE = edit config       │  │
-# MAGIC │  └──────────────────────────────────────────────────────┘   │
-# MAGIC └──────────────────────────────────────────────────────────────┘
-# MAGIC ```
+# MAGIC **Key question:** Who in your organisation should own and maintain the Instructions text? (The data engineer who owns the tables -- not the business analyst.)
 # MAGIC
-# MAGIC ---
-# MAGIC
-# MAGIC ### Task 3 — Note where the Instructions tab lives and what it looks like
-# MAGIC
-# MAGIC **Navigate to:**
-# MAGIC ```
-# MAGIC Configure tab → Instructions section (usually at the top of Configure)
-# MAGIC ```
-# MAGIC
-# MAGIC This is where the system prompt lives. Think of it as the contract between your
-# MAGIC data team and Genie — it defines what domain Genie operates in, what abbreviations
-# MAGIC mean, and what formulas to use.
-# MAGIC
-# MAGIC **Key question to discuss:** Who in your organisation should own and maintain this text?
-# MAGIC (Answer: the data engineer who owns the tables — not the business analyst.)
-# MAGIC
-# MAGIC ---
-# MAGIC
-# MAGIC **Time check: 5 minutes.** Start the pip install cell below while you explore — it runs in parallel.
+# MAGIC Start the pip install cell below while you explore -- it runs in parallel.
 
 # COMMAND ----------
 
-# Install / confirm SDK version — Genie API requires >= 0.28
 %pip install -q databricks-sdk>=0.28.0
 dbutils.library.restartPython()
 
 # COMMAND ----------
 
-import os
-import json
-import time
-import requests
+import os, json, time, requests
 from databricks.sdk import WorkspaceClient
 
-# Auto-configure from cluster environment — no explicit host/token needed in a Databricks notebook
 w    = WorkspaceClient()
 HOST = spark.conf.get("spark.databricks.workspaceUrl")
 
@@ -190,12 +86,11 @@ print(f"Current user : {w.current_user.me().user_name}")
 
 # COMMAND ----------
 
-# Widget-based configuration — works in any customer Databricks environment
-# These default values match what setup/00_workspace_setup.py creates
-dbutils.widgets.text("catalog",      "workshop_au",          "Catalog name")
-dbutils.widgets.text("schema",       "energy",               "Schema name")
-dbutils.widgets.text("pt_endpoint",  "au_east_llm_inregion", "PT endpoint name (from Lab 02)")
-dbutils.widgets.text("space_title",  "Workshop — Energy Operations",  "Genie Space title")
+# Widget-based configuration -- works in any customer Databricks environment
+dbutils.widgets.text("catalog",      "workshop_au",                   "Catalog name")
+dbutils.widgets.text("schema",       "energy",                        "Schema name")
+dbutils.widgets.text("pt_endpoint",  "au_east_llm_inregion",          "PT endpoint name (from Lab 02)")
+dbutils.widgets.text("space_title",  "Workshop -- Energy Operations",  "Genie Space title")
 
 CATALOG      = dbutils.widgets.get("catalog")
 SCHEMA       = dbutils.widgets.get("schema")
@@ -217,72 +112,28 @@ def get_headers():
 
 # MAGIC %md
 # MAGIC ---
-# MAGIC <div style="background:#1B3A6B; color:white; padding:10px 20px; border-radius:6px; margin:8px 0;">
-# MAGIC   <h2 style="margin:0; color:white;">Section 1: Creating a Production-Ready Genie Space (15 minutes)</h2>
-# MAGIC </div>
+# MAGIC ## Section 1: Creating a Production-Ready Genie Space (15 minutes)
 # MAGIC
-# MAGIC <div style="background:#F3F9FF; border:1px solid #90CAF9; padding:16px 20px; border-radius:8px; margin:12px 0;">
-# MAGIC   <h3 style="color:#1B3A6B; margin-top:0;">Why we do this via API, not just the UI</h3>
-# MAGIC   <p>
-# MAGIC     The UI is good for one-off exploration. The API is how you deploy consistently across
-# MAGIC     dev → test → prod, version-control your instructions in Git, and rebuild the space from
-# MAGIC     scratch if something goes wrong. For a production-regulated environment, "click it in the UI"
-# MAGIC     is not a repeatable or auditable deployment process.
-# MAGIC   </p>
-# MAGIC   <p style="margin-bottom:0;">
-# MAGIC     In this section: create via API, add tables as trusted assets, write instructions,
-# MAGIC     seed golden queries. All using the same REST APIs the UI calls under the hood.
-# MAGIC   </p>
-# MAGIC </div>
+# MAGIC The UI is good for exploration. The API is how you deploy consistently across dev/test/prod, version-control instructions in Git, and rebuild the space if something goes wrong. For a production-regulated environment, "click it in the UI" is not a repeatable or auditable deployment process.
 
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC ### 1a — Serverless SQL Warehouse: Why It Matters Here
+# MAGIC ### 1a -- Serverless SQL Warehouse Selection
 # MAGIC
-# MAGIC When you create a Genie Space, you must choose a SQL warehouse. The warehouse runs the
-# MAGIC SQL that Genie generates. For a production space in a regulated environment:
-# MAGIC
-# MAGIC ```
-# MAGIC ┌─────────────────────────────────────────────────────────────────────────┐
-# MAGIC │  WAREHOUSE CHOICE FOR GENIE SPACES                                      │
-# MAGIC │  ──────────────────────────────────────────────────────────────────────  │
-# MAGIC │                                                                         │
-# MAGIC │  Serverless SQL warehouse (recommended):                                │
-# MAGIC │    + Starts in <3 seconds — no wait when the first user asks a question │
-# MAGIC │    + Cost only when running — business users often ask questions in      │
-# MAGIC │      bursts then stop; serverless scales to zero between them           │
-# MAGIC │    + All data stays in AU East (serverless compute is in-region)        │
-# MAGIC │    + AI Gateway can be attached to it directly                          │
-# MAGIC │                                                                         │
-# MAGIC │  Classic/Pro SQL warehouse:                                             │
-# MAGIC │    - 2–10 minutes to start if cluster is cold                          │
-# MAGIC │    - Cost accrues even when idle                                        │
-# MAGIC │    + Better for high-throughput bulk analytical queries (not Genie)     │
-# MAGIC │                                                                         │
-# MAGIC │  Recommendation: use serverless for all Genie Spaces in AEMO.          │
-# MAGIC └─────────────────────────────────────────────────────────────────────────┘
-# MAGIC ```
+# MAGIC Genie requires a SQL warehouse to run the SQL it generates. For production spaces, use serverless: starts in under 3 seconds, scales to zero between bursts, and all data stays in AU East.
 # MAGIC
 # MAGIC **UI path to find your serverless warehouse:**
 # MAGIC ```
-# MAGIC Left sidebar → SQL → SQL Warehouses
-# MAGIC   → look for a warehouse with Type = "Serverless"
-# MAGIC   → copy its name — you need it below
-# MAGIC ```
+# MAGIC  Left sidebar -> SQL -> SQL Warehouses
+# MAGIC    -> look for Type = "Serverless"
 # MAGIC
-# MAGIC **If no serverless warehouse exists:**
-# MAGIC ```
-# MAGIC SQL Warehouses → [+ Create SQL warehouse]
-# MAGIC   → Name: "workshop-serverless"
-# MAGIC   → Type: Serverless
-# MAGIC   → Cluster size: Small (2X-Small for workshops)
-# MAGIC   → [Create]
+# MAGIC  If none exists: [+ Create SQL warehouse] -> Type: Serverless -> Size: Small -> [Create]
 # MAGIC ```
 
 # COMMAND ----------
 
-# Discover available SQL warehouses — find the serverless one automatically
+# Discover available SQL warehouses -- find serverless automatically
 warehouses = list(w.warehouses.list())
 print("Available SQL warehouses:")
 print()
@@ -290,66 +141,40 @@ serverless_id = None
 for wh in warehouses:
     wtype = wh.warehouse_type.value if wh.warehouse_type else "classic"
     print(f"  [{wtype.upper():12s}]  {wh.name}  (id: {wh.id},  state: {wh.state.value if wh.state else 'unknown'})")
-    # Prefer serverless; fall back to any running warehouse
     if wtype.lower() == "serverless" and not serverless_id:
         serverless_id = wh.id
 
 if not serverless_id and warehouses:
-    # No serverless found — use first available warehouse
     serverless_id = warehouses[0].id
-    print()
-    print(f"No serverless warehouse found. Using first available: {warehouses[0].name}")
+    print(f"\nNo serverless warehouse found. Using first available: {warehouses[0].name}")
     print("For production use, create a serverless SQL warehouse.")
 elif serverless_id:
     wh_name = next(wh.name for wh in warehouses if wh.id == serverless_id)
-    print()
-    print(f"Selected warehouse  : {wh_name}  ({serverless_id})")
+    print(f"\nSelected warehouse: {wh_name}  ({serverless_id})")
 
 assert serverless_id, "No SQL warehouse found. Create one under SQL > SQL Warehouses before proceeding."
 
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC ### 1b — The Principle of Least Privilege for Genie Trusted Assets
+# MAGIC ### 1b -- Principle of Least Privilege for Trusted Assets
 # MAGIC
-# MAGIC <div style="background:#FFF3E0; border-left:5px solid #FF6D00; padding:14px 18px; border-radius:0 6px 6px 0; margin:8px 0;">
-# MAGIC   <strong>This is the most important security decision in Genie setup.</strong><br>
-# MAGIC   Trusted assets define what Genie <em>can</em> query — the table list is an allow-list,
-# MAGIC   not a filter. If a table is not in trusted assets, Genie cannot see it regardless
-# MAGIC   of UC permissions.<br><br>
-# MAGIC   <strong>For AEMO:</strong> Add only the tables for the specific domain this space serves.
-# MAGIC   A "Grid Operations" space should not have access to HR or financial tables,
-# MAGIC   even if the UC permissions technically allow it.
-# MAGIC </div>
+# MAGIC Trusted assets define what Genie **can** query -- this is an allow-list, not a filter. If a table is not in trusted assets, Genie cannot see it regardless of UC permissions. Add only tables for the specific domain this space serves.
 # MAGIC
 # MAGIC **How Genie inherits UC permissions:**
-# MAGIC
 # MAGIC ```
-# MAGIC  User asks question
-# MAGIC        |
-# MAGIC        v
-# MAGIC  Genie generates SQL
-# MAGIC        |
-# MAGIC        v
-# MAGIC  SQL runs against Unity Catalog
-# MAGIC        |
-# MAGIC        v   ← UC row filters apply here
-# MAGIC        v   ← UC column masks apply here
-# MAGIC        v   ← ABAC tag-based policies apply here
+# MAGIC  User asks question -> Genie generates SQL -> SQL runs against Unity Catalog
+# MAGIC     -> UC row filters apply    <- automatically, no Genie config needed
+# MAGIC     -> UC column masks apply   <- automatically
+# MAGIC     -> ABAC tag policies apply <- automatically
 # MAGIC  Results returned to user
 # MAGIC ```
 # MAGIC
-# MAGIC Genie does not bypass Unity Catalog. If a user has a row filter on `meter_readings`
-# MAGIC that restricts to their DNSP, Genie will only return rows they are entitled to —
-# MAGIC even if the SQL it generates doesn't explicitly mention the filter.
-# MAGIC
-# MAGIC This means you can share one Genie Space across multiple DNSP teams by controlling
-# MAGIC access at the UC layer, not by creating separate spaces per DNSP.
+# MAGIC One Genie Space can serve multiple DNSP teams -- control access at the UC layer, not by creating separate spaces per DNSP.
 
 # COMMAND ----------
 
-# Tables for this space — only energy operations domain, not everything in the catalog
-# This is the principle of least privilege applied at the Genie layer
+# Tables for this space -- energy operations domain only, not everything in the catalog
 TRUSTED_TABLES = [
     f"{CATALOG}.{SCHEMA}.meter_readings",
     f"{CATALOG}.{SCHEMA}.assets",
@@ -357,38 +182,27 @@ TRUSTED_TABLES = [
     f"{CATALOG}.{SCHEMA}.regulatory_reports",
 ]
 
-print("Tables that will be added as trusted assets:")
+print("Tables added as trusted assets:")
 for t in TRUSTED_TABLES:
     print(f"  {t}")
 
 print()
-print("Tables NOT included (intentionally excluded — wrong domain or too broad):")
-print("  workshop_au.hr.*          -- HR data should never be in a grid ops space")
-print("  workshop_au.finance.*     -- Financial data needs its own governed space")
-print("  information_schema.*      -- Never add metadata tables as trusted assets")
+print("Intentionally excluded:")
+print("  workshop_au.hr.*        -- wrong domain")
+print("  workshop_au.finance.*   -- needs its own governed space")
+print("  information_schema.*    -- never add metadata tables")
 
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC ### 1c — Create the Genie Space
+# MAGIC ### 1c -- Create the Genie Space
 # MAGIC
-# MAGIC **UI equivalent of what this code does:**
-# MAGIC
+# MAGIC **UI equivalent:** Left sidebar -> Genie -> **[+ New Space]**
 # MAGIC ```
-# MAGIC Left sidebar → Genie → [+ New Space]
-# MAGIC
-# MAGIC ┌── New Genie Space ─────────────────────────────────────────────────────┐
-# MAGIC │                                                                        │
-# MAGIC │  Title*:       [ Workshop — Energy Operations                    ]    │
-# MAGIC │                                                                        │
-# MAGIC │  Description:  [ Self-service analytics for NEM grid operations,     ]│
-# MAGIC │                  [ outage management, asset health, and AER reporting ]│
-# MAGIC │                                                                        │
-# MAGIC │  Warehouse*:   [ workshop-serverless                          v ]     │
-# MAGIC │                  ^ must be a running SQL warehouse                     │
-# MAGIC │                                                                        │
-# MAGIC │                                    [Cancel]   [Create space →]        │
-# MAGIC └────────────────────────────────────────────────────────────────────────┘
+# MAGIC  Title:       Workshop -- Energy Operations
+# MAGIC  Description: Self-service analytics for NEM grid operations...
+# MAGIC  Warehouse:   workshop-serverless  (must be a running SQL warehouse)
+# MAGIC  [Create space ->]
 # MAGIC ```
 
 # COMMAND ----------
@@ -400,7 +214,7 @@ payload = {
         "network asset health, and AER/AEMO regulatory reporting. "
         "Covers NEM12 interval meter data, network assets, outage events, "
         "and compliance document metadata. "
-        "In-region for AU East — safe for APRA-regulated data."
+        "In-region for AU East -- safe for APRA-regulated data."
     ),
     "warehouse_id": serverless_id,
 }
@@ -414,7 +228,7 @@ resp = requests.post(
 if resp.status_code not in (200, 201):
     print(f"Error creating space: HTTP {resp.status_code}")
     print(resp.text[:500])
-    raise RuntimeError("Space creation failed — check error above before continuing.")
+    raise RuntimeError("Space creation failed -- check error above before continuing.")
 
 SPACE_ID = resp.json()["space_id"]
 
@@ -430,20 +244,13 @@ print("IMPORTANT: Copy the Space ID above. You will need it in the Session 3 pre
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC ### 1d — Add Trusted Assets
+# MAGIC ### 1d -- Add Trusted Assets
 # MAGIC
-# MAGIC **UI equivalent:**
-# MAGIC ```
-# MAGIC Space → Configure → Tables tab → [+ Add tables]
-# MAGIC   → navigate Catalog > Schema > select tables → [Add selected tables]
-# MAGIC ```
-# MAGIC
-# MAGIC **Expected output:** All 4 tables added with [OK] status.
-# MAGIC Any [ERROR] means the table does not exist yet — run Lab 01 setup first.
+# MAGIC **UI equivalent:** Space -> Configure -> Tables tab -> **[+ Add tables]** -> select tables -> **[Add selected tables]**
 
 # COMMAND ----------
 
-print("Adding trusted assets (principle of least privilege — energy domain only)...")
+print("Adding trusted assets (energy domain only)...")
 print()
 for table_fqn in TRUSTED_TABLES:
     resp = requests.post(
@@ -460,17 +267,9 @@ print("Trusted assets set. Genie can now query these 4 tables and nothing else."
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC ### 1e — Write the Instructions Block
+# MAGIC ### 1e -- Write the Instructions Block
 # MAGIC
-# MAGIC The instructions block is the most impactful thing you can do for Genie accuracy.
-# MAGIC It is the system prompt — loaded at the start of every conversation.
-# MAGIC
-# MAGIC For an AEMO energy operations space, it must cover:
-# MAGIC - Domain vocabulary (SAIDI, SAIFI, ENS, NMI, DNSP, ICP, NEM regions)
-# MAGIC - Data quality rules (exclude S and N quality flags from consumption totals)
-# MAGIC - Aggregation formulas (SAIDI numerator, interval multiplication gotcha)
-# MAGIC - Australian time conventions (financial year, AEST, seasons)
-# MAGIC - Default filtering behaviour (which outage types count toward AER metrics)
+# MAGIC The instructions block is the most impactful configuration lever. It is the system prompt loaded at the start of every conversation. For AEMO it must cover domain vocabulary, data quality rules, aggregation formulas, Australian time conventions, and default filtering behaviour.
 
 # COMMAND ----------
 
@@ -480,23 +279,23 @@ and market participant in the National Electricity Market (NEM).
 Your primary users are grid operations managers, regulatory analysts, and asset managers at AEMO.
 
 ## Domain Vocabulary
-- NMI: National Metering Identifier — the unique ID for each electricity connection point
-- SAIDI: System Average Interruption Duration Index (minutes per customer per year) — key AER reliability metric
+- NMI: National Metering Identifier -- the unique ID for each electricity connection point
+- SAIDI: System Average Interruption Duration Index (minutes per customer per year) -- key AER reliability metric
 - SAIFI: System Average Interruption Frequency Index (interruptions per customer per year)
-- ENS: Energy Not Served (MWh) — reported in AER STPIS submissions
+- ENS: Energy Not Served (MWh) -- reported in AER STPIS submissions
 - DNSP: Distribution Network Service Provider (e.g. AusNet, Jemena, Citipower, Powercor)
-- ICP: Individually Controlled Point — a customer connection point (synonym for NMI)
+- ICP: Individually Controlled Point -- a customer connection point (synonym for NMI)
 - NEM regions: QLD1, NSW1, VIC1, SA1, TAS1
 
 ## Time and Date Conventions
-- "This year" or "current year" = current Australian financial year (July 1 – June 30)
+- "This year" or "current year" = current Australian financial year (July 1 - June 30)
 - "Last year" = previous Australian financial year
 - All timestamps are in Australian Eastern Standard Time (AEST / UTC+10) unless stated otherwise
 - Australian summer (high demand season) = December, January, February
-- Australian winter (second demand peak — electric heating) = June, July, August
+- Australian winter (second demand peak -- electric heating) = June, July, August
 - "This financial year" SQL pattern: WHERE start_time >= DATE_TRUNC('year', ADD_MONTHS(CURRENT_DATE, -((MONTH(CURRENT_DATE)-7+12)%12)))
 
-## meter_readings — Critical Rules
+## meter_readings -- Critical Rules
 - Each row is a 30-MINUTE interval. NEVER multiply by 2 to get hourly kWh.
 - To get hourly totals: SUM(active_energy_kwh) grouped by DATE_TRUNC('hour', interval_datetime)
 - Daily kWh for a meter: SUM(active_energy_kwh) WHERE nmi = X and DATE(interval_datetime) = date
@@ -504,18 +303,18 @@ Your primary users are grid operations managers, regulatory analysts, and asset 
 - Always filter: WHERE quality_flag IN ('A', 'E') for reliable consumption analysis
 - Never include quality_flag = 'S' (substituted) or 'N' (none) in consumption totals unless investigating data quality
 
-## outages — AER Regulatory Rules
+## outages -- AER Regulatory Rules
 - SAIDI formula: SUM(TIMESTAMPDIFF(MINUTE, start_time, end_time) * customers_affected) / total_ICPs
 - SAIFI formula: SUM(customers_affected) / total_ICPs
 - ALWAYS filter outage_type = 'UNPLANNED' for AER regulatory metrics. PLANNED outages do not count.
-- ALWAYS use COALESCE(energy_not_served_mwh, 0) in SUM aggregations — NULL means < 1 min outage
+- ALWAYS use COALESCE(energy_not_served_mwh, 0) in SUM aggregations -- NULL means < 1 min outage
 - Duration in hours: ROUND(TIMESTAMPDIFF(MINUTE, start_time, end_time) / 60, 1)
 - active outage = end_time IS NULL; completed outage = end_time IS NOT NULL
 
 ## Table Relationships
-- outages.asset_id → assets.asset_id (many outages per asset)
+- outages.asset_id -> assets.asset_id (many outages per asset)
 - meter_readings.distribution_zone maps to outages.region by zone-to-region mapping
-- regulatory_reports is standalone (no FK relationships — use for document search only)
+- regulatory_reports is standalone (no FK relationships -- use for document search only)
 
 ## Default Behaviour
 - Show data for ALL regions unless the user specifies one
@@ -533,30 +332,20 @@ if resp.status_code == 200:
     print(f"Instructions written successfully ({len(GENIE_INSTRUCTIONS):,} chars).")
     print("These instructions are now the system prompt for every conversation in this space.")
 else:
-    print(f"WARN: HTTP {resp.status_code} — {resp.text[:200]}")
+    print(f"WARN: HTTP {resp.status_code} -- {resp.text[:200]}")
 
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC ### 1f — Seed the Knowledge Store with Golden Queries
+# MAGIC ### 1f -- Seed the Knowledge Store with Golden Queries
 # MAGIC
-# MAGIC Golden queries are the second most impactful configuration lever.
-# MAGIC They teach Genie the correct SQL for the most common business questions —
-# MAGIC both the correct join path and the correct metric formula.
-# MAGIC
-# MAGIC **How many is enough?**
-# MAGIC - For an exploratory space: 5–8 covering the main tables
-# MAGIC - For a certified/production space: 15–25 covering all major question types
-# MAGIC - We seed 10 here — sufficient for Session 3 end users to get reliable answers
-# MAGIC
-# MAGIC **Rule: every golden query must run without errors before you save it.**
-# MAGIC Run each SQL cell in a separate SQL notebook first if you are adapting these to a new schema.
+# MAGIC Golden queries teach Genie the correct SQL for the most common business questions. For a certified/production space, aim for 15-25 covering all major question types. We seed 10 here -- sufficient for Session 3. Every golden query must run without errors before you save it.
 
 # COMMAND ----------
 
 GOLDEN_QUERIES = [
     {
-        "name": "Total unplanned outages by region — current financial year",
+        "name": "Total unplanned outages by region -- current financial year",
         "description": "AER-relevant outage count and SAIDI numerator by NEM region for current Australian financial year. Only UNPLANNED outages with reported_to_aer = TRUE count toward regulatory metrics.",
         "sql": f"""
 -- SAIDI-contributing outage summary by region for the current Australian financial year
@@ -575,7 +364,7 @@ ORDER BY total_customer_interruptions DESC
     },
     {
         "name": "Top 10 problem assets by unplanned outage frequency",
-        "description": "Asset reliability league table — identifies chronic problem assets for maintenance investment prioritisation. Joins outages to the asset register.",
+        "description": "Asset reliability league table -- identifies chronic problem assets for maintenance investment prioritisation. Joins outages to the asset register.",
         "sql": f"""
 SELECT
     a.asset_name,
@@ -651,7 +440,7 @@ ORDER BY reportable_events DESC
 """,
     },
     {
-        "name": "Outstanding regulatory submissions — next 90 days",
+        "name": "Outstanding regulatory submissions -- next 90 days",
         "description": "Compliance calendar showing reports in DRAFT or SUBMITTED status due within the next 90 days.",
         "sql": f"""
 SELECT
@@ -669,7 +458,7 @@ ORDER BY submission_date
 """,
     },
     {
-        "name": "Peak demand intervals by distribution zone — summer vs winter",
+        "name": "Peak demand intervals by distribution zone -- summer vs winter",
         "description": "Top peak demand half-hour intervals per zone split by season. Used for network capacity planning and summer/winter readiness reporting.",
         "sql": f"""
 WITH seasonal_peaks AS (
@@ -698,7 +487,7 @@ ORDER BY distribution_zone, season, peak_demand_kw DESC
 """,
     },
     {
-        "name": "Data quality check — meter readings with poor quality flags",
+        "name": "Data quality check -- meter readings with poor quality flags",
         "description": "Identifies NMIs with more than 5% substituted or missing readings in the last 30 days. Used for data quality monitoring and NEM12 validation.",
         "sql": f"""
 WITH quality_summary AS (
@@ -724,10 +513,10 @@ ORDER BY poor_quality_pct DESC
     },
     {
         "name": "SAIDI year-to-date by region",
-        "description": "Year-to-date SAIDI numerator per NEM region using the AER formula. Uses a placeholder denominator of 1,000,000 ICPs — replace with actual customer register count.",
+        "description": "Year-to-date SAIDI numerator per NEM region using the AER formula. Uses a placeholder denominator of 1,000,000 ICPs -- replace with actual customer register count.",
         "sql": f"""
 -- SAIDI = SUM(interruption_minutes x customers_affected) / total_ICPs
--- Denominator of 1,000,000 is a placeholder — replace with actual ICP count
+-- Denominator of 1,000,000 is a placeholder -- replace with actual ICP count
 SELECT
     region,
     COUNT(*)                                                             AS outage_count,
@@ -746,7 +535,7 @@ ORDER BY saidi_minutes_per_customer DESC
 """,
     },
     {
-        "name": "Published regulatory reports — most recent by type",
+        "name": "Published regulatory reports -- most recent by type",
         "description": "Latest published regulatory submission per report type. Used to answer 'when was our last STPIS submission' style questions.",
         "sql": f"""
 SELECT
@@ -793,107 +582,66 @@ else:
 
 # MAGIC %md
 # MAGIC ---
-# MAGIC <div style="background:#1B3A6B; color:white; padding:10px 20px; border-radius:6px; margin:8px 0;">
-# MAGIC   <h2 style="margin:0; color:white;">Section 2: The Operating Model — Exploratory vs Certified (15 minutes)</h2>
-# MAGIC </div>
-# MAGIC
-# MAGIC <div style="background:#F3F9FF; border:1px solid #90CAF9; padding:16px 20px; border-radius:8px; margin:12px 0;">
-# MAGIC   <p>
-# MAGIC     Not every Genie Space is production-ready on day one. A space that is good enough
-# MAGIC     for a data analyst to explore privately is <em>not</em> the same as a space that
-# MAGIC     should be trusted by a regulatory reporting team.
-# MAGIC   </p>
-# MAGIC   <p style="margin-bottom:0;">
-# MAGIC     The operating model below defines what "certified" means for AEMO — and what
-# MAGIC     data engineers must do before a space is promoted to that status.
-# MAGIC   </p>
-# MAGIC </div>
+# MAGIC ## Section 2: The Operating Model -- Exploratory vs Certified (15 minutes)
 
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC ## The Two-Speed Model for Genie Governance
+# MAGIC ### The Two-Speed Model for Genie Governance
 # MAGIC
 # MAGIC ```
-# MAGIC ┌─────────────────────────────────────────────────────────────────────┐
-# MAGIC │  EXPLORATORY SPACES              │  CERTIFIED SPACES                │
-# MAGIC │  ─────────────────────────────── │ ───────────────────────────────  │
-# MAGIC │  Purpose: discovery, ideation    │  Purpose: production answers     │
-# MAGIC │  Who builds: data analysts       │  Who builds: data engineers      │
-# MAGIC │  SQL quality: informal           │  SQL quality: peer-reviewed      │
-# MAGIC │  Instructions: basic             │  Instructions: comprehensive     │
-# MAGIC │  Golden queries: few/none        │  Golden queries: 20+ validated   │
-# MAGIC │  Audience: small team only       │  Audience: whole business unit   │
-# MAGIC │  UC permissions: more open       │  UC permissions: carefully scoped│
-# MAGIC │  Monitoring: light               │  Monitoring: full AI Gateway     │
-# MAGIC └─────────────────────────────────┴──────────────────────────────────┘
+# MAGIC  EXPLORATORY                    CERTIFIED
+# MAGIC  ─────────────────────────────  ──────────────────────────────────
+# MAGIC  Purpose: discovery, ideation   Purpose: production answers
+# MAGIC  SQL quality: informal          SQL quality: peer-reviewed
+# MAGIC  Golden queries: few/none       Golden queries: 20+ validated
+# MAGIC  Audience: small team           Audience: whole business unit
+# MAGIC  Monitoring: light              Monitoring: full AI Gateway
 # MAGIC ```
 # MAGIC
-# MAGIC **Why this matters for AEMO specifically:**
-# MAGIC An exploratory space with informal SQL can give a regulatory analyst a plausible-looking
-# MAGIC but wrong SAIDI number. If that number makes it into an AER submission, the consequences
-# MAGIC are significant. The certification gate prevents this by requiring that answers to
-# MAGIC the top regulatory questions have been verified before the space is shared.
+# MAGIC An exploratory space with informal SQL can give a regulatory analyst a plausible-looking but wrong SAIDI number. The certification gate prevents this by requiring that answers to the top regulatory questions have been verified before the space is shared.
 # MAGIC
-# MAGIC **Certification checklist** (before a space can be used by the business):
-# MAGIC
-# MAGIC - [ ] All tables have column-level comments in Unity Catalog (Genie reads these before generating SQL)
+# MAGIC **Certification checklist** (before a space is opened to the business):
+# MAGIC - [ ] All tables have column-level comments in Unity Catalog
 # MAGIC - [ ] 10+ validated golden queries covering the main business questions
-# MAGIC - [ ] Instructions tested against a benchmark of 20+ representative questions with expected answers recorded
+# MAGIC - [ ] Instructions tested against 20+ representative questions with expected answers recorded
 # MAGIC - [ ] AI Gateway enabled on the warehouse the space uses (with rate limits and payload logging)
-# MAGIC - [ ] Audience-specific UC permissions reviewed — CAN_USE only for consumers, CAN_MANAGE only for maintainers
-# MAGIC - [ ] Genie Space owner identified, trained, and named in the space description
-# MAGIC - [ ] `space_certification_status` UC tag set to `certified` (controls downstream tooling)
-# MAGIC
-# MAGIC **The space we just created is `exploratory` status** — it has 10 golden queries but has not
-# MAGIC been benchmarked against 20+ questions yet. We will set the tag accordingly and update it
-# MAGIC to `certified` once the benchmark is complete.
+# MAGIC - [ ] UC permissions reviewed -- CAN_USE only for consumers, CAN_MANAGE only for maintainers
+# MAGIC - [ ] Genie Space owner identified and named in the space description
+# MAGIC - [ ] `certification_status` set to `certified` in the space registry table
 
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC ### 2a — Tagging the Genie Space with Certification Status
+# MAGIC ### 2a -- Space Certification Registry
 # MAGIC
-# MAGIC Unity Catalog supports tagging objects including schemas, tables, columns, and models.
-# MAGIC Genie Spaces are not yet first-class UC objects, so we implement certification
-# MAGIC tracking as a Delta table tag on a space registry table. This gives us a queryable,
-# MAGIC auditable record of which spaces are certified and when.
-# MAGIC
-# MAGIC <div style="background:#E8F5E9; border-left:5px solid #2E7D32; padding:14px 18px; border-radius:0 6px 6px 0; margin:8px 0;">
-# MAGIC   <strong>Design note:</strong> When Databricks exposes Genie Spaces as first-class UC assets
-# MAGIC   (roadmap item), this registry pattern will be replaceable with native UC tags.
-# MAGIC   The registry table approach is forward-compatible — you will be able to migrate the data
-# MAGIC   to native tags by reading this table.
-# MAGIC </div>
+# MAGIC Genie Spaces are not yet first-class UC objects, so we track certification status in a Delta table. This gives a queryable, auditable record of which spaces are ready for business users. When Databricks exposes Spaces as UC assets (roadmap), this table migrates cleanly to native UC tags.
 
 # COMMAND ----------
 
-# Create a Genie Space registry table in Unity Catalog
-# This gives us a queryable, auditable record of all spaces and their certification status
 spark.sql(f"""
 CREATE TABLE IF NOT EXISTS {CATALOG}.{SCHEMA}.genie_space_registry (
     space_id              STRING    COMMENT 'Genie Space ID (UUID from the Genie REST API)',
     space_title           STRING    COMMENT 'Display title of the Genie Space',
     space_url             STRING    COMMENT 'Full URL to access the space in the Databricks UI',
-    certification_status  STRING    COMMENT 'Operating model status. Values: exploratory, certified. Certified = meets all production readiness criteria.',
-    certified_by          STRING    COMMENT 'Email of the data engineer who reviewed and certified the space. NULL for exploratory spaces.',
-    certified_at          TIMESTAMP COMMENT 'When certification status was set to certified. NULL for exploratory spaces.',
-    golden_query_count    INT       COMMENT 'Number of validated golden queries in the knowledge store at certification time.',
-    tables_in_scope       STRING    COMMENT 'Comma-separated list of fully-qualified table names added as trusted assets.',
-    target_audience       STRING    COMMENT 'Who is allowed to use this space. E.g. "Grid Ops team", "All AEMO analysts".',
+    certification_status  STRING    COMMENT 'Operating model status. Values: exploratory, certified.',
+    certified_by          STRING    COMMENT 'Email of the data engineer who certified the space. NULL for exploratory.',
+    certified_at          TIMESTAMP COMMENT 'When certification status was set to certified. NULL for exploratory.',
+    golden_query_count    INT       COMMENT 'Number of validated golden queries at certification time.',
+    tables_in_scope       STRING    COMMENT 'Comma-separated list of fully-qualified table names as trusted assets.',
+    target_audience       STRING    COMMENT 'Who is allowed to use this space.',
     space_owner           STRING    COMMENT 'Email of the data engineer responsible for maintaining this space.',
     notes                 STRING    COMMENT 'Free-text notes on data quality, known limitations, or next actions.',
     created_at            TIMESTAMP COMMENT 'When this record was first inserted.'
 )
 USING DELTA
-COMMENT 'Registry of all Genie Spaces created in this workspace, with certification status and ownership metadata. One row per space.'
+COMMENT 'Registry of all Genie Spaces with certification status and ownership metadata. One row per space.'
 """)
 
 print("genie_space_registry table ready.")
 
 # COMMAND ----------
 
-# Insert a registry record for the space we just created
 from pyspark.sql import Row
 from datetime import datetime
 
@@ -901,7 +649,7 @@ registry_row = Row(
     space_id             = SPACE_ID,
     space_title          = SPACE_TITLE,
     space_url            = f"https://{HOST}/genie/spaces/{SPACE_ID}",
-    certification_status = "exploratory",    # starts as exploratory — promote to certified after benchmark
+    certification_status = "exploratory",   # starts exploratory -- promote after benchmark
     certified_by         = None,
     certified_at         = None,
     golden_query_count   = success_count,
@@ -910,7 +658,7 @@ registry_row = Row(
     space_owner          = w.current_user.me().user_name,
     notes                = (
         "Created in Session 2 technical enablement. "
-        "Status: exploratory — 10 golden queries seeded. "
+        "Status: exploratory -- 10 golden queries seeded. "
         "Promote to certified after running 20-question benchmark. "
         "Next action: benchmark against AEMO standard question set before Session 3."
     ),
@@ -923,19 +671,12 @@ print("Registry record written.")
 print()
 print("Current certification status: exploratory")
 print("To promote to certified:")
-print("  1. Run the 20-question benchmark (ask all questions, verify answers)")
-print("  2. Update this table: UPDATE ... SET certification_status = 'certified', certified_by = ..., certified_at = CURRENT_TIMESTAMP")
-print("  3. Set the golden_query_count to the final verified count")
+print("  1. Run the 20-question benchmark and verify answers")
+print("  2. UPDATE ... SET certification_status = 'certified', certified_by = ..., certified_at = CURRENT_TIMESTAMP")
 
 # COMMAND ----------
 
-# MAGIC %md
-# MAGIC ### 2b — How to Check Certification Status Across All Spaces
-# MAGIC
-# MAGIC Once multiple spaces exist, this query gives a governance view across the entire workspace.
-
-# COMMAND ----------
-
+# Check certification status across all spaces
 spark.sql(f"""
 SELECT
     space_title,
@@ -952,9 +693,7 @@ ORDER BY created_at DESC
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC ### 2c — Promoting a Space to Certified (reference SQL — run when ready)
-# MAGIC
-# MAGIC Copy this SQL and run it after completing the 20-question benchmark.
+# MAGIC ### 2b -- Promoting to Certified (reference SQL -- run when ready)
 # MAGIC
 # MAGIC ```sql
 # MAGIC UPDATE workshop_au.energy.genie_space_registry
@@ -963,46 +702,35 @@ ORDER BY created_at DESC
 # MAGIC     certified_by         = 'your.name@aemo.com.au',
 # MAGIC     certified_at         = CURRENT_TIMESTAMP,
 # MAGIC     golden_query_count   = <final_count>,
-# MAGIC     notes                = 'Benchmark complete: 20/20 questions returned correct results. Approved for Session 3 business user access.'
+# MAGIC     notes                = 'Benchmark complete: 20/20 questions correct. Approved for Session 3.'
 # MAGIC WHERE space_id = '<SPACE_ID>'
 # MAGIC ```
-# MAGIC
-# MAGIC **What changes when you promote to certified:**
-# MAGIC - Business users and governance teams see `certified` in the registry
-# MAGIC - Downstream tooling (e.g. the compliance evidence package from Lab 06) includes certified spaces
-# MAGIC - The facilitator checklist for Session 3 will show this space as approved
 
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC ### 2d — Setting Permissions: Who Gets What
+# MAGIC ### 2c -- Setting Permissions
 # MAGIC
-# MAGIC <div style="background:#F3F9FF; border:1px solid #90CAF9; padding:16px 20px; border-radius:8px; margin:12px 0;">
+# MAGIC **UI path:** Space -> Configure -> **Permissions** section -> **[+ Add]** -> search group -> choose level -> **[Save]**
 # MAGIC
-# MAGIC | Permission | Who | What they can do |
-# MAGIC |------------|-----|-----------------|
-# MAGIC | `CAN_USE` | Business analysts, operational teams | Chat with the space — ask questions, view results |
-# MAGIC | `CAN_MANAGE` | Data engineers maintaining the space | Edit instructions, add golden queries, change trusted assets |
+# MAGIC UC permissions on underlying tables are also enforced -- Genie inherits row/column filters automatically.
+# MAGIC
+# MAGIC | Permission | Who | What |
+# MAGIC |---|---|---|
+# MAGIC | `CAN_USE` | Business analysts, operational teams | Chat with the space |
+# MAGIC | `CAN_MANAGE` | Data engineers | Edit instructions, add golden queries, change trusted assets |
 # MAGIC | `IS_OWNER` | Creator (auto-assigned) | Full control including delete |
 # MAGIC
-# MAGIC **Best practice:** Assign to Unity Catalog **groups**, not individual users.
-# MAGIC Group membership is managed in one place — when someone joins or leaves a team,
-# MAGIC their Genie Space access updates automatically.
-# MAGIC
-# MAGIC **UI path:**
-# MAGIC ```
-# MAGIC Space → Configure → Permissions tab → [+ Add] → search for group name → choose level → [Save]
-# MAGIC ```
-# MAGIC </div>
+# MAGIC Best practice: assign permissions to Unity Catalog **groups**, not individual users.
 
 # COMMAND ----------
 
 # TODO: replace group names with groups that exist in your workspace
 # Uncomment and populate before Session 3
 PERMISSION_GRANTS = [
-    # {"group_name": "aemo-genie-users",        "permission_level": "CAN_USE"},     # business users in Session 3
-    # {"group_name": "aemo-data-engineers",     "permission_level": "CAN_MANAGE"},  # your team
-    # {"group_name": "aemo-regulatory-analysts", "permission_level": "CAN_USE"},    # regulatory reporting team
+    # {"group_name": "aemo-genie-users",         "permission_level": "CAN_USE"},
+    # {"group_name": "aemo-data-engineers",      "permission_level": "CAN_MANAGE"},
+    # {"group_name": "aemo-regulatory-analysts", "permission_level": "CAN_USE"},
 ]
 
 if not PERMISSION_GRANTS:
@@ -1025,49 +753,31 @@ else:
 
 # MAGIC %md
 # MAGIC ---
-# MAGIC <div style="background:#1B3A6B; color:white; padding:10px 20px; border-radius:6px; margin:8px 0;">
-# MAGIC   <h2 style="margin:0; color:white;">Section 3: Prerequisites Checklist Before Business User Enablement (10 minutes)</h2>
-# MAGIC </div>
+# MAGIC ## Section 3: Prerequisites Checklist Before Business User Enablement (10 minutes)
 # MAGIC
-# MAGIC <div style="background:#F3F9FF; border:1px solid #90CAF9; padding:16px 20px; border-radius:8px; margin:12px 0;">
-# MAGIC   This checklist is the formal gate between Session 2 and Session 3.
-# MAGIC   Run it at the end of Session 2 to confirm all technical prerequisites are met.
-# MAGIC   If any item fails, the item description tells you which lab to revisit.
-# MAGIC </div>
-# MAGIC
-# MAGIC **The checklist runs against the live workspace — it calls APIs, not just asserts variables.**
+# MAGIC This checklist is the formal gate between Session 2 and Session 3. Run it at the end of Session 2 to confirm all technical prerequisites are met. Every check calls a live API -- not just asserting variables.
 
 # COMMAND ----------
 
 def run_s3_readiness_checklist(space_id: str, pt_endpoint_name: str, catalog: str, schema: str) -> None:
     """
     Run the Session 3 prerequisites checklist.
-    Checks every technical requirement that must be true before opening Genie to business users.
-    Prints a pass/fail report with remediation guidance for each failed item.
+    Checks every technical requirement before opening Genie to business users.
+    Prints a pass/fail HTML report with remediation guidance for each failed item.
     """
     checks   = []  # list of (label, passed, detail, remediation)
     all_pass = True
 
-    # ── Check 1: Geography enforcement ────────────────────────────────────────
+    # Check 1: Geography enforcement (manual verify -- API check for awareness)
     try:
-        resp = requests.get(
+        requests.get(
             f"https://{HOST}/api/2.0/settings/types/aibi_genie_data_access_standard/etag/default",
-            headers=get_headers()
-        )
-        # Also check workspace geography enforcement
-        geo_resp = requests.get(
-            f"https://{HOST}/api/2.0/settings/types/default_workspace_setting/etag/default",
-            headers=get_headers()
-        )
-        # Check the dedicated geography enforcement setting
-        geo_settings_resp = requests.get(
-            f"https://{HOST}/api/2.0/preview/settings/types",
             headers=get_headers()
         )
         checks.append((
             "Geography enforcement",
             True,
-            "Geography check completed — verify shield_csp_enforcement_account_setting is ENABLED in Account Console",
+            "Verify shield_csp_enforcement_account_setting is ENABLED in Account Console",
             "Account Console > Settings > Security > 'Enforce data processing within workspace Geography'"
         ))
     except Exception as e:
@@ -1078,7 +788,7 @@ def run_s3_readiness_checklist(space_id: str, pt_endpoint_name: str, catalog: st
             "Manually verify: Account Console > Settings > Security > Geography enforcement = ENABLED"
         ))
 
-    # ── Check 2: PT endpoint deployed and running ─────────────────────────────
+    # Check 2: PT endpoint deployed and running
     try:
         endpoints = list(w.serving_endpoints.list())
         pt_ep     = next((e for e in endpoints if e.name == pt_endpoint_name), None)
@@ -1087,7 +797,7 @@ def run_s3_readiness_checklist(space_id: str, pt_endpoint_name: str, catalog: st
                 "PT endpoint deployed",
                 False,
                 f"Endpoint '{pt_endpoint_name}' not found. Found: {[e.name for e in endpoints[:5]]}",
-                f"Deploy the Provisioned Throughput endpoint named '{pt_endpoint_name}' via Machine Learning > Serving > [Create endpoint]"
+                f"Deploy the PT endpoint named '{pt_endpoint_name}' via Serving > [Create endpoint]"
             ))
         else:
             state = pt_ep.state.ready.value if pt_ep.state and pt_ep.state.ready else "unknown"
@@ -1096,7 +806,7 @@ def run_s3_readiness_checklist(space_id: str, pt_endpoint_name: str, catalog: st
                 "PT endpoint deployed",
                 passed,
                 f"Endpoint '{pt_endpoint_name}' found, state: {state}",
-                "Wait for endpoint to reach READY state. Provisioned Throughput may take 10–15 minutes to start." if not passed else ""
+                "Wait for endpoint to reach READY state (10-15 minutes)." if not passed else ""
             ))
     except Exception as e:
         checks.append((
@@ -1106,7 +816,7 @@ def run_s3_readiness_checklist(space_id: str, pt_endpoint_name: str, catalog: st
             "Ensure you have ML permissions. Run Lab 02 first."
         ))
 
-    # ── Check 3: AI Gateway enabled on some endpoint ──────────────────────────
+    # Check 3: AI Gateway enabled on PT endpoint
     try:
         gw_resp = requests.get(
             f"https://{HOST}/api/2.0/serving-endpoints/{pt_endpoint_name}/ai-gateway",
@@ -1136,7 +846,7 @@ def run_s3_readiness_checklist(space_id: str, pt_endpoint_name: str, catalog: st
             "Run Lab 02 first."
         ))
 
-    # ── Check 4: Genie Space exists ───────────────────────────────────────────
+    # Check 4: Genie Space exists
     try:
         sp_resp = requests.get(
             f"https://{HOST}/api/2.0/genie/spaces/{space_id}",
@@ -1160,7 +870,7 @@ def run_s3_readiness_checklist(space_id: str, pt_endpoint_name: str, catalog: st
     except Exception as e:
         checks.append(("Genie Space exists", False, str(e)[:80], "Run Section 1 of this lab."))
 
-    # ── Check 5: Golden query count ───────────────────────────────────────────
+    # Check 5: Golden query count
     try:
         qr = requests.get(
             f"https://{HOST}/api/2.0/genie/spaces/{space_id}/sql-queries",
@@ -1185,7 +895,7 @@ def run_s3_readiness_checklist(space_id: str, pt_endpoint_name: str, catalog: st
     except Exception as e:
         checks.append(("Golden queries (>= 10)", False, str(e)[:80], "Run Section 1f."))
 
-    # ── Check 6: Trusted assets ───────────────────────────────────────────────
+    # Check 6: Trusted assets
     try:
         ar = requests.get(
             f"https://{HOST}/api/2.0/genie/spaces/{space_id}/trusted-assets",
@@ -1210,7 +920,7 @@ def run_s3_readiness_checklist(space_id: str, pt_endpoint_name: str, catalog: st
     except Exception as e:
         checks.append(("Trusted assets added", False, str(e)[:80], "Run Section 1d."))
 
-    # ── Check 7: Certification registry record ────────────────────────────────
+    # Check 7: Certification registry record
     try:
         reg = spark.sql(f"""
             SELECT certification_status, golden_query_count
@@ -1237,7 +947,7 @@ def run_s3_readiness_checklist(space_id: str, pt_endpoint_name: str, catalog: st
     except Exception as e:
         checks.append(("Space in certification registry", False, str(e)[:80], "Run Section 2a."))
 
-    # ── Check 8: Tables have column comments ─────────────────────────────────
+    # Check 8: Tables have column comments
     tables_without_comments = []
     for tbl in ["meter_readings", "assets", "outages", "regulatory_reports"]:
         try:
@@ -1252,21 +962,19 @@ def run_s3_readiness_checklist(space_id: str, pt_endpoint_name: str, catalog: st
         "Energy tables have comments",
         len(tables_without_comments) == 0,
         "All 4 tables have table-level comments" if not tables_without_comments else f"Missing comments: {tables_without_comments}",
-        "Add COMMENT ON TABLE statements for each table — see Lab 01 setup for examples." if tables_without_comments else ""
+        "Add COMMENT ON TABLE statements for each table -- see Lab 01 setup for examples." if tables_without_comments else ""
     ))
 
-    # ── Print report ──────────────────────────────────────────────────────────
+    # Print HTML report
     passed_count = sum(1 for _, p, _, _ in checks if p)
     failed_count = len(checks) - passed_count
-
-    divider = "=" * 68
 
     display_html = f"""
     <div style="font-family:'DM Sans',sans-serif; max-width:800px;">
       <div style="background:#1B3A6B; color:white; padding:16px 24px; border-radius:8px 8px 0 0;">
         <h2 style="margin:0; font-size:1.3em;">Session 3 Prerequisites Checklist</h2>
         <p style="margin:4px 0 0 0; opacity:0.85; font-size:0.9em;">
-          Run at the end of Session 2 — must pass all critical checks before opening Genie to business users
+          Run at the end of Session 2 -- must pass all critical checks before opening Genie to business users
         </p>
       </div>
       <table style="width:100%; border-collapse:collapse; border: 1px solid #ddd;">
@@ -1292,7 +1000,7 @@ def run_s3_readiness_checklist(space_id: str, pt_endpoint_name: str, catalog: st
         """
 
     summary_color = "#2E7D32" if all_pass else "#C62828"
-    summary_text  = "All checks passed — ready to open Genie to business users in Session 3." if all_pass else f"{failed_count} check(s) failed. Resolve the items above before Session 3."
+    summary_text  = "All checks passed -- ready to open Genie to business users in Session 3." if all_pass else f"{failed_count} check(s) failed. Resolve the items above before Session 3."
 
     display_html += f"""
       </table>
@@ -1321,14 +1029,12 @@ run_s3_readiness_checklist(
 
 # MAGIC %md
 # MAGIC ---
-# MAGIC <div style="background:#1B3A6B; color:white; padding:10px 20px; border-radius:6px; margin:8px 0;">
-# MAGIC   <h2 style="margin:0; color:white;">Final Output — Save Your Space ID</h2>
-# MAGIC </div>
+# MAGIC ## Final Output -- Save Your Space ID
 
 # COMMAND ----------
 
 print("=" * 68)
-print("  LAB 04 COMPLETE — GENIE SPACE ADMIN SETUP & OPERATING MODEL")
+print("  LAB 04 COMPLETE -- GENIE SPACE ADMIN SETUP & OPERATING MODEL")
 print("=" * 68)
 print()
 print(f"  Catalog / Schema      :  {CATALOG}.{SCHEMA}")
@@ -1340,12 +1046,12 @@ print(f"  Certification status  :  exploratory")
 print()
 print("  IMPORTANT: Copy the Genie Space ID and URL above.")
 print("  You will need the Space ID for:")
-print("    Lab 05 — to check AI Gateway usage on the space's warehouse")
-print("    Lab 06 — to include the space in the compliance evidence package")
-print("    Session 3 — to share the URL with business user participants")
+print("    Lab 05 -- to check AI Gateway usage on the space's warehouse")
+print("    Lab 06 -- to include the space in the compliance evidence package")
+print("    Session 3 -- to share the URL with business user participants")
 print()
 print("  Next steps before Session 3:")
-print("    1. Uncomment PERMISSION_GRANTS in Section 2d and grant CAN_USE to participant group")
+print("    1. Uncomment PERMISSION_GRANTS in Section 2c and grant CAN_USE to participant group")
 print("    2. Run the 20-question benchmark and update certification_status to 'certified'")
 print("    3. Re-run the Session 3 checklist at the start of Session 3 to confirm all checks pass")
 print("=" * 68)
@@ -1354,28 +1060,16 @@ print("=" * 68)
 
 # MAGIC %md
 # MAGIC ---
-# MAGIC ## Lab 04 — Review Questions
+# MAGIC ## Lab 04 -- Review Questions
 # MAGIC
-# MAGIC <div style="background:#F5F5F5; padding:20px 24px; border-radius:8px; margin:12px 0;">
+# MAGIC **Q1.** A business analyst asks "Can I add the customer master table to our Genie Space so I can see NMI holder names?" The table has no row-level filters. As the data engineer, what is the right response and what controls would you apply if you agreed?
 # MAGIC
-# MAGIC 1. A business analyst asks "Can I add the customer master table to our Genie Space so I can
-# MAGIC    see NMI holder names?" The table has no row-level filters. As the data engineer,
-# MAGIC    what is the right response and what controls would you apply if you agreed?
+# MAGIC **Q2.** The Session 3 checklist shows FAIL on "Golden queries (>= 10)" even though you added 10 queries in Section 1f. What are three possible causes and how do you diagnose each?
 # MAGIC
-# MAGIC 2. The Session 3 checklist shows FAIL on "Golden queries (>= 10)" even though you added
-# MAGIC    10 queries in Section 1f. What are three possible causes and how do you diagnose each?
+# MAGIC **Q3.** Explain the difference between an exploratory and a certified Genie Space in terms that a regulatory affairs manager (not a data engineer) could understand. How would you communicate the risk of using an exploratory space for AER submission data?
 # MAGIC
-# MAGIC 3. Explain the difference between an exploratory and a certified Genie Space in terms that
-# MAGIC    a regulatory affairs manager (not a data engineer) could understand. How would you
-# MAGIC    communicate the risk of using an exploratory space for AER submission data?
+# MAGIC **Q4.** A Genie Space is currently certified for the grid operations team. The data engineer wants to add two new tables and 5 new golden queries. What is the correct process for doing this without disrupting the certified state?
 # MAGIC
-# MAGIC 4. A Genie Space is currently certified for the grid operations team. The data engineer
-# MAGIC    wants to add two new tables and 5 new golden queries. What is the correct process
-# MAGIC    for doing this without disrupting the certified state?
+# MAGIC **Q5.** Why does Genie inherit Unity Catalog row and column filters automatically? Give a concrete example of how this benefits a DNSP with multiple licensed areas.
 # MAGIC
-# MAGIC 5. Why does Genie inherit Unity Catalog row and column filters automatically?
-# MAGIC    Give a concrete example of how this benefits a DNSP with multiple licensed areas.
-# MAGIC
-# MAGIC </div>
-# MAGIC
-# MAGIC **Proceed to Lab 05 (Usage Tracking) when ready — it's in `workshop1_admin/labs/04_usage_tracking.py`.**
+# MAGIC **Proceed to Lab 05 (Usage Tracking) when ready -- it's in `workshop1_admin/labs/04_usage_tracking.py`.**

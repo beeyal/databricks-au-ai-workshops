@@ -1,153 +1,63 @@
 # Databricks notebook source
 # MAGIC %md
-# MAGIC <div style="background: linear-gradient(135deg, #1B3139 0%, #243447 100%); padding: 24px; border-radius: 8px; margin-bottom: 8px">
-# MAGIC   <h1 style="color: #FF6B35; margin: 0 0 8px 0; font-size: 28px">🚦 Lab 02: AI Gateway Setup & Configuration</h1>
-# MAGIC   <p style="color: #AECBCC; margin: 0; font-size: 14px">Workshop 1: Admin Track · Australian Regulated Industries · Databricks</p>
+# MAGIC <div style="background: linear-gradient(135deg, #1B3139 0%, #243447 100%); padding: 20px; border-radius: 8px; margin-bottom: 8px">
+# MAGIC   <h1 style="color: #FF6B35; margin: 0 0 6px 0; font-size: 26px">Lab 02: AI Gateway Setup & Configuration</h1>
+# MAGIC   <p style="color: #AECBCC; margin: 0; font-size: 13px">Workshop 1: Admin Track · Australian Regulated Industries · Databricks</p>
 # MAGIC </div>
 # MAGIC
 # MAGIC | | |
 # MAGIC |---|---|
-# MAGIC | ⏱️ **Duration** | 40–45 minutes |
-# MAGIC | 👤 **Role** | Workspace Admin |
-# MAGIC | ⚠️ **Data residency** | All LLM traffic stays in AU East via Provisioned Throughput |
-# MAGIC | 🔧 **Cluster** | DBR 14.3 LTS or later |
-# MAGIC | 📦 **Extra package** | `pip install openai` (pre-installed on DBR 13+) |
+# MAGIC | **Role** | Workspace Admin |
+# MAGIC | **Data residency** | All LLM traffic stays in AU East via Provisioned Throughput |
+# MAGIC | **Cluster** | DBR 14.3 LTS or later |
+# MAGIC | **Extra package** | `pip install openai` (pre-installed on DBR 13+) |
 # MAGIC
 # MAGIC **By the end of this lab you will have:**
 # MAGIC - [ ] Created an AI Gateway endpoint backed by FMAPI Provisioned Throughput (AU East in-region)
 # MAGIC - [ ] Created an AI Gateway endpoint backed by Azure OpenAI Regional (australiaeast)
 # MAGIC - [ ] Configured per-endpoint and per-user rate limits
-# MAGIC - [ ] Enabled usage tracking and tied requests to teams/projects via tags
+# MAGIC - [ ] Enabled usage tracking with team/project tags
 # MAGIC - [ ] Configured PII masking guardrails on input and output
 # MAGIC - [ ] Enabled payload logging to a Delta table for APRA audit evidence
 # MAGIC - [ ] Tested the endpoint interactively from this notebook
 # MAGIC
-# MAGIC ---
+# MAGIC **AI Gateway versions — know which one you are using:**
 # MAGIC
-# MAGIC ## Architecture Overview
+# MAGIC | Version | Path | Guardrails | Used in this lab |
+# MAGIC |---|---|---|---|
+# MAGIC | V1 (GA) | Left sidebar → Serving → AI Gateway tab | Yes | **Yes** |
+# MAGIC | V2 (Beta) | Left sidebar → AI Gateway (top-level, only visible if enabled via Account Console → Previews) | No | No — lacks guardrails |
 # MAGIC
-# MAGIC ```
-# MAGIC  Databricks Users / Applications
-# MAGIC           │
-# MAGIC           ▼
-# MAGIC  ┌─────────────────────────────────────────────────┐
-# MAGIC  │   AI Gateway Endpoint  (single URL for consumers) │
-# MAGIC  │   In-region, AU East — auditable, rate-limited    │
-# MAGIC  │   ├── Rate limits (per-endpoint, per-user)         │
-# MAGIC  │   ├── Guardrails (PII BLOCK, safety filter)        │
-# MAGIC  │   ├── Usage tracking (→ system.ai_gateway.usage)   │
-# MAGIC  │   └── Payload logging (→ Delta table, for audit)   │
-# MAGIC  └──────────────┬──────────────────────────────────┘
-# MAGIC                 │
-# MAGIC                 ▼
-# MAGIC  ┌──────────────────────────────────────────────────────┐
-# MAGIC  │  Route to one of:                                    │
-# MAGIC  │  A) FMAPI Provisioned Throughput (AU East)  ← Lab A  │
-# MAGIC  │  B) Azure OpenAI Regional (australiaeast)   ← Lab B  │
-# MAGIC  └──────────────────────────────────────────────────────┘
-# MAGIC ```
-# MAGIC
-# MAGIC ## Why AI Gateway for regulated industries?
-# MAGIC
-# MAGIC | Control | What it does | APRA relevance |
-# MAGIC |---|---|---|
-# MAGIC | Single egress point | All LLM traffic through one auditable URL | CPS 234 — technology risk |
-# MAGIC | Rate limits | Prevent runaway cost from one team or rogue job | Cost governance |
-# MAGIC | Guardrails | PII masking before prompts leave the tenant | CPS 234 — data sensitivity |
-# MAGIC | Payload logging | Every prompt + response stored in Delta | CPS 234 — audit evidence |
-# MAGIC | Usage tracking | Attribute token cost to teams / cost centres | FinOps / chargeback |
+# MAGIC > Use V1 for all regulated workloads. V2 Beta does NOT have guardrails.
 
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC > **Note:** This lab uses the **Model Serving AI Gateway API (v1 / GA)**. There is also a newer
-# MAGIC > AI Gateway v2 (Beta) accessible as a top-level left sidebar item (if enabled by an account admin
-# MAGIC > via Account Console → Previews → "AI Gateway V2"). For regulated industries, **use v1 today** —
-# MAGIC > v2 Beta does not yet support guardrails.
+# MAGIC ## UI Tour — do this before running any code
+# MAGIC
+# MAGIC **Task 1 — Open the AI Gateway UI (v1 / GA)**
+# MAGIC
+# MAGIC Navigate: Left sidebar → Serving → click the "AI Gateway" tab at the top of the Serving page
+# MAGIC You should see: List of existing AI Gateway endpoints and a "+ Create" button (top-right). If a standalone "AI Gateway" item appears in the left sidebar, that is v2 Beta — do not use it for this lab.
 # MAGIC
 # MAGIC ---
 # MAGIC
-# MAGIC ## Before We Code: 5-Minute UI Tour (do this first!)
+# MAGIC **Task 2 — Explore the Create Endpoint form (do not submit)**
 # MAGIC
-# MAGIC Explore the AI Gateway UI before running any code.
-# MAGIC After this tour you will recognise every config field the SDK sets.
-# MAGIC
-# MAGIC ---
-# MAGIC
-# MAGIC ### Task 1 — Open the Serving & AI Gateway UI
-# MAGIC
-# MAGIC **Where to go (v1 / GA path — used in this lab):**
-# MAGIC ```
-# MAGIC Left sidebar → Machine Learning
-# MAGIC   → Serving
-# MAGIC     → Look for the "AI Gateway" tab at the top of the page
-# MAGIC ```
-# MAGIC
-# MAGIC > 💡 **v1 vs v2:** There are two AI Gateway surfaces. This lab uses **v1 (GA)**, accessed via
-# MAGIC > Machine Learning → Serving → AI Gateway tab. There is also an AI Gateway v2 (Beta) that appears
-# MAGIC > as a **top-level left sidebar item** — but v2 Beta does NOT support guardrails, so use v1 for
-# MAGIC > regulated workloads.
-# MAGIC
-# MAGIC **What you should see:**
-# MAGIC ```
-# MAGIC ┌──────────────────────────────────────────────────────────┐
-# MAGIC │  Model Serving                                           │
-# MAGIC │  ─────────────────────────────────────────────────────  │
-# MAGIC │  [Serving Endpoints]  [AI Gateway]                      │
-# MAGIC │                                                          │
-# MAGIC │  AI Gateway tab shows:                                   │
-# MAGIC │    • List of existing endpoints with gateway config      │
-# MAGIC │    • Rate limits column, guardrails column               │
-# MAGIC │    • + Create button                                     │
-# MAGIC └──────────────────────────────────────────────────────────┘
-# MAGIC ```
-# MAGIC
-# MAGIC Are there any existing endpoints? Note their names.
+# MAGIC Navigate: Left sidebar → Serving → AI Gateway tab → click "+ Create"
+# MAGIC You should see: Provider selection, model selector, Rate limits section (QPM or TPM, per endpoint / per user / per group), Guardrails section (Safety filter on/off, PII detection with Block or Mask options), Inference tables section (catalog/schema fields). Click Cancel — the lab creates this via code.
 # MAGIC
 # MAGIC ---
 # MAGIC
-# MAGIC ### Task 2 — Explore the Create Endpoint form (do not submit)
+# MAGIC **Task 3 — Check existing Provisioned Throughput endpoints**
 # MAGIC
-# MAGIC **Where to go:**
-# MAGIC ```
-# MAGIC Serving → AI Gateway tab (v1/GA) → click "+ Create"
-# MAGIC ```
-# MAGIC
-# MAGIC **What to look for in the form:**
-# MAGIC - Entity type: Provisioned Throughput vs External Model vs Pay-Per-Token
-# MAGIC - Rate limits section: "Calls per minute" and key type (endpoint / user)
-# MAGIC - Guardrails section: PII behavior toggle (None / Block)
-# MAGIC - Safety filter checkbox
-# MAGIC - Inference table: catalog / schema / table prefix fields
-# MAGIC - Usage tracking checkbox
-# MAGIC
-# MAGIC **Click Cancel** — the lab creates this via code in Section 1.
-# MAGIC
-# MAGIC ---
-# MAGIC
-# MAGIC ### Task 3 — Check existing Provisioned Throughput endpoints
-# MAGIC
-# MAGIC **Where to go:**
-# MAGIC ```
-# MAGIC Serving → Serving Endpoints tab
-# MAGIC   → Filter by "Entity type: Foundation Model"
-# MAGIC ```
-# MAGIC
-# MAGIC **What to note:** Are there any `databricks-claude-haiku-4-5` endpoints
-# MAGIC already deployed? If yes, note the name.
-# MAGIC
-# MAGIC ---
-# MAGIC
-# MAGIC **Time check:** This tour should take about 5 minutes.
-# MAGIC Return to this notebook before continuing.
+# MAGIC Navigate: Left sidebar → Serving → Serving Endpoints tab
+# MAGIC You should see: Any `databricks-claude-haiku-4-5` PT endpoints already deployed — note their names.
 
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC <div style="border-left: 4px solid #FF3621; padding-left: 16px; margin: 24px 0">
-# MAGIC <h2 style="color: #1B3139; margin: 0">Section 0: Setup</h2>
-# MAGIC <p style="color: #666; margin: 4px 0 0 0">⏱️ ~3 minutes · Run this cell first</p>
-# MAGIC </div>
+# MAGIC ## Section 0: Setup
 
 # COMMAND ----------
 
@@ -173,17 +83,12 @@ from databricks.sdk.service.serving import (
 )
 
 # COMMAND ----------
-# MAGIC %md
-# MAGIC ### ⚙️ Workshop Configuration
-# MAGIC > **Running in a customer environment?** Change the workspace URL and catalog/schema widgets above to match your setup.
 
-# COMMAND ----------
 # Widget-based configuration — works in any customer Databricks environment
-# These default values match what 00_workspace_setup.py creates
 dbutils.widgets.text("workspace_url", "https://<your-workspace>.azuredatabricks.net", "Workspace URL")
-dbutils.widgets.text("catalog",       "energy_ai",               "Catalog name (for payload logs)")
-dbutils.widgets.text("schema",        "audit_logs",              "Schema name (for payload logs)")
-dbutils.widgets.text("gw_endpoint",   "au-workshop-gateway",     "AI Gateway endpoint name")
+dbutils.widgets.text("catalog",       "workshop_au",             "Catalog name (for payload logs)")
+dbutils.widgets.text("schema",        "ai_governance",           "Schema name (for payload logs)")
+dbutils.widgets.text("gw_endpoint",   "au_east_llm_inregion",    "AI Gateway endpoint name")
 
 WORKSPACE_URL_W = dbutils.widgets.get("workspace_url")
 CATALOG_W       = dbutils.widgets.get("catalog")
@@ -198,10 +103,8 @@ print(f"GW endpoint    : {GW_ENDPOINT}")
 # COMMAND ----------
 
 # TODO: Set your workspace URL (no trailing slash)
-# Configurable — change via widget above if running in customer environment
 WORKSPACE_URL = WORKSPACE_URL_W if WORKSPACE_URL_W != "https://<your-workspace>.azuredatabricks.net" else "https://<your-workspace>.azuredatabricks.net"
 
-# TODO: Choose ONE of the following token approaches
 # Option A (recommended): pull from a Databricks secret scope
 # DATABRICKS_TOKEN = dbutils.secrets.get(scope="admin-workshop", key="workspace-token")
 
@@ -213,8 +116,7 @@ HEADERS = {
     "Content-Type": "application/json",
 }
 
-# WorkspaceClient reads DATABRICKS_HOST and DATABRICKS_TOKEN from the cluster environment
-# automatically when running inside Databricks. No additional config needed.
+# WorkspaceClient reads DATABRICKS_HOST and DATABRICKS_TOKEN from the cluster environment automatically.
 w = WorkspaceClient()
 
 print("WorkspaceClient initialised.")
@@ -224,144 +126,30 @@ print(f"Auth : {w.config.auth_type}")
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC #### ✅ Expected output after setup:
-# MAGIC ```
-# MAGIC WorkspaceClient initialised.
-# MAGIC Host : https://adb-xxxxxxxxxxxx.7.azuredatabricks.net
-# MAGIC Auth : pat
-# MAGIC ```
+# MAGIC ## Section 1: Create an AI Gateway Endpoint — FMAPI Provisioned Throughput (In-Region)
 # MAGIC
-# MAGIC > ⚠️ **If you see `<your-workspace>` in the Host**: update `WORKSPACE_URL` above.
-# MAGIC > The `WorkspaceClient` reads the host from the cluster environment, but
-# MAGIC > `WORKSPACE_URL` is used in direct `requests` calls later in this lab.
-
-# COMMAND ----------
-
-# MAGIC %md
-# MAGIC <div style="border-left: 4px solid #FF3621; padding-left: 16px; margin: 24px 0">
-# MAGIC <h2 style="color: #1B3139; margin: 0">Section 1: Create an AI Gateway Endpoint — FMAPI Provisioned Throughput (In-Region)</h2>
-# MAGIC <p style="color: #666; margin: 4px 0 0 0">⏱️ ~12 minutes (includes ~3 min endpoint creation wait)</p>
-# MAGIC </div>
+# MAGIC **Model used in this lab:** `databricks-claude-haiku-4-5` — available on Provisioned Throughput in AU East. All tokens stay within the australiaeast Azure region.
 # MAGIC
-# MAGIC **FMAPI Provisioned Throughput** is available in AU East (Azure australiaeast)
-# MAGIC and is the recommended path for any model inference involving regulated data.
-# MAGIC All tokens stay within the australiaeast Azure region.
+# MAGIC > Do NOT use `databricks-meta-llama-*` — Llama has no committed AU East date and is cross-geo.
 # MAGIC
-# MAGIC **Model used in this lab:** `databricks-claude-haiku-4-5` — available
-# MAGIC on provisioned throughput in AU East. For lighter workshop use, swap in
-# MAGIC `databricks-llama-4-scout` or `databricks-claude-haiku-4-5` if your account has access.
-
-# COMMAND ----------
-
-# MAGIC %md
-# MAGIC ---
-# MAGIC ### 🖱️ Find AI Gateway in the UI — before you create anything via code
-# MAGIC
-# MAGIC **Navigation (v1 / GA):** Left sidebar → Machine Learning → Serving → AI Gateway tab
-# MAGIC
-# MAGIC > **Do not confuse with AI Gateway v2 (Beta)**, which appears as a standalone top-level left nav
-# MAGIC > item and does NOT support guardrails. Always use the Serving → AI Gateway tab path for this lab.
-# MAGIC
-# MAGIC ```
-# MAGIC ┌─── Databricks Workspace ─────────────────────────────────────────┐
-# MAGIC │  Left sidebar:                                                    │
-# MAGIC │  ├── 🏠 Home                                                       │
-# MAGIC │  ├── 🤖 Machine Learning                                           │
-# MAGIC │  │       ├── Experiments                                           │
-# MAGIC │  │       ├── Models                                                │
-# MAGIC │  │       └── Serving             ← click here                     │
-# MAGIC │  │              │                                                   │
-# MAGIC │  │              ├── Serving endpoints  (tab)                       │
-# MAGIC │  │              └── AI Gateway          (tab) ← click this tab    │
-# MAGIC │  │                      │      (this is v1/GA — has guardrails)    │
-# MAGIC │  │                      └── [list of AI Gateway endpoints]         │
-# MAGIC │  │                             └── + Create  (top-right button)   │
-# MAGIC └──────────────────────────────────────────────────────────────────┘
-# MAGIC ```
-# MAGIC
-# MAGIC **Alternative navigation:** Use the search bar at the top of the workspace
-# MAGIC (Cmd+K or Ctrl+K) and type "AI Gateway" — it will jump directly there.
-# MAGIC
-# MAGIC > 💡 **What you should see:** A list of any existing AI Gateway endpoints,
-# MAGIC > plus a **"+ Create"** button in the top-right corner. If this is a fresh
-# MAGIC > workspace, the list will be empty.
-
-# COMMAND ----------
-
-# MAGIC %md
-# MAGIC ---
-# MAGIC ### 🖱️ How to create an AI Gateway endpoint via the UI (follow along, then we'll do it via code)
-# MAGIC
-# MAGIC This walkthrough shows what each SDK parameter maps to in the UI, so you
-# MAGIC understand both paths. After reading, run the code cell below.
-# MAGIC
-# MAGIC **Step 1 — Click "+ Create"** (top-right of the AI Gateway page)
-# MAGIC
-# MAGIC **Step 2 — Enter endpoint name**
-# MAGIC ```
-# MAGIC  Endpoint name:  [ au-workshop-gateway          ]
-# MAGIC ```
-# MAGIC Convention: lowercase, hyphens only. Avoid underscores — some SDK methods use
-# MAGIC the name as a URL path segment and underscores can cause routing issues.
-# MAGIC
-# MAGIC **Step 3 — Select provider**
-# MAGIC ```
-# MAGIC  Provider:  ○ Databricks Foundation Models  ← select this for in-region PT
-# MAGIC             ○ Azure OpenAI
-# MAGIC             ○ OpenAI
-# MAGIC             ○ Anthropic
-# MAGIC             ○ ...
-# MAGIC ```
-# MAGIC Select **Databricks Foundation Models** for in-region Provisioned Throughput.
-# MAGIC
-# MAGIC **Step 4 — Select model**
-# MAGIC ```
-# MAGIC  Model:  [ databricks-claude-haiku-4-5  ▾ ]
-# MAGIC           (or databricks-claude-haiku-4-5 for lighter workshop use)
-# MAGIC ```
-# MAGIC
-# MAGIC **Step 5 — Governance tab: enable Usage Tracking and Payload Logging**
-# MAGIC ```
-# MAGIC ┌── Governance ────────────────────────────────────────────┐
-# MAGIC │  [✓] Enable usage tracking                               │
-# MAGIC │  [✓] Enable payload logging (inference table)            │
-# MAGIC │       Catalog :  [ energy_ai    ]                        │
-# MAGIC │       Schema  :  [ audit_logs   ]                        │
-# MAGIC │       Prefix  :  [ ai_gw_payloads ]                      │
-# MAGIC └──────────────────────────────────────────────────────────┘
-# MAGIC ```
-# MAGIC
-# MAGIC **Step 6 — Rate Limits tab: set per-endpoint limit first, then per-user**
-# MAGIC ```
-# MAGIC ┌── Rate Limits ────────────────────────────────────────────┐
-# MAGIC │  + Add rate limit                                          │
-# MAGIC │   Key: [endpoint ▾]  Calls: [60]  Per: [minute ▾]        │
-# MAGIC │  + Add rate limit                                          │
-# MAGIC │   Key: [user     ▾]  Calls: [20]  Per: [minute ▾]        │
-# MAGIC └───────────────────────────────────────────────────────────┘
-# MAGIC ```
-# MAGIC
-# MAGIC **Step 7 — Click Create** (bottom-right). The endpoint takes ~3 minutes to reach Ready state.
-# MAGIC
-# MAGIC The code below performs all these steps programmatically via the SDK.
+# MAGIC Navigate: Left sidebar → Serving → AI Gateway tab → click "+ Create"
+# MAGIC You should see: Provider selection — choose "Databricks Foundation Models" for in-region PT, then select `databricks-claude-haiku-4-5`.
 
 # COMMAND ----------
 
 # TODO: Fill in these values before running
-# Configurable — change via widget above if running in customer environment
-PT_ENDPOINT_NAME    = GW_ENDPOINT                                 # from widget, default "au-workshop-gateway"
-PT_MODEL_NAME       = "databricks-claude-haiku-4-5"              # ✅ IN-REGION via PT endpoint
-# ⚠️  DO NOT use databricks-meta-llama-* — Llama has no committed AU East date and is cross-geo
-CATALOG_NAME        = CATALOG_W                                   # from widget, default "energy_ai"
-SCHEMA_NAME         = SCHEMA_W                                    # from widget, default "audit_logs"
-PAYLOAD_TABLE_NAME  = "ai_gw_payloads"                           # TODO: Delta table name prefix
+PT_ENDPOINT_NAME    = GW_ENDPOINT                       # from widget, default "au_east_llm_inregion"
+PT_MODEL_NAME       = "databricks-claude-haiku-4-5"    # ✅ IN-REGION via PT endpoint
+CATALOG_NAME        = CATALOG_W                         # from widget, default "workshop_au"
+SCHEMA_NAME         = SCHEMA_W                          # from widget, default "ai_governance"
+PAYLOAD_TABLE_NAME  = "ai_gw_payloads"                 # Delta table name prefix
 ADMIN_GROUP         = "grp_ai_admins"
 CONSUMER_GROUP      = "grp_analysts"
 
 print("Configuration summary:")
 print(f"  Gateway endpoint name : {PT_ENDPOINT_NAME}")
 print(f"  Backed by PT model    : {PT_MODEL_NAME}")
-print(f"  Payload log table     : {CATALOG_NAME}.{SCHEMA_NAME}.{PAYLOAD_TABLE_NAME}")
+print(f"  Payload log table     : {CATALOG_NAME}.{SCHEMA_NAME}.{PAYLOAD_TABLE_NAME}_payload_logs")
 
 # COMMAND ----------
 
@@ -381,21 +169,21 @@ def build_ai_gateway_config(
     Build an AiGatewayConfig with:
     - Usage tracking enabled (writes to system.ai_gateway.usage)
     - Payload logging to a Delta table (for APRA audit evidence)
-    - PII BLOCK guardrail on inputs (stops requests containing detected PII)
+    - PII BLOCK guardrail on inputs and outputs
     - Safety filter on both input and output
     - Rate limit: 60 QPM endpoint-wide, 20 QPM per user
+
+    Guardrails add ~200-500ms latency — expected and acceptable for regulated workloads.
     """
     return AiGatewayConfig(
 
-        # ── Usage tracking ────────────────────────────────────────────
-        # Writes per-request metrics (tokens, latency, model) to system.ai_gateway.usage
+        # Usage tracking writes per-request metrics (tokens, latency, model) to system.ai_gateway.usage
         usage_tracking_config=AiGatewayUsageTrackingConfig(
             enabled=True,
         ),
 
-        # ── Payload logging to Delta ──────────────────────────────────
-        # Stores every request + response JSON in {catalog}.{schema}.{table_prefix}_payload_logs
-        # Required for APRA CPS 234 audit evidence
+        # Payload logging stores every request + response in {catalog}.{schema}.{table_prefix}_payload_logs
+        # Required for APRA CPS 234 audit evidence. Data stays in AU East.
         inference_table_config=AiGatewayInferenceTableConfig(
             enabled=True,
             catalog_name=catalog,
@@ -403,9 +191,8 @@ def build_ai_gateway_config(
             table_name_prefix=table_prefix,
         ),
 
-        # ── Guardrails ────────────────────────────────────────────────
-        # Input: block requests containing PII; apply safety filter
-        # Output: apply safety filter to model responses
+        # Guardrails: input PII BLOCK rejects requests containing detected PII before they reach the model.
+        # Output PII BLOCK suppresses responses that contain generated PII.
         guardrails=AiGatewayGuardrails(
             input=AiGatewayGuardrailParameters(
                 pii=AiGatewayGuardrailPiiBehavior(
@@ -421,9 +208,7 @@ def build_ai_gateway_config(
             ),
         ),
 
-        # ── Rate limits ───────────────────────────────────────────────
-        # endpoint: overall QPM cap for this endpoint
-        # user: per-user QPM cap (per Databricks user identity)
+        # Rate limits: endpoint = overall QPM cap; user = per Databricks user identity
         rate_limits=[
             AiGatewayRateLimit(
                 calls=requests_per_minute,
@@ -446,13 +231,11 @@ gateway_config = build_ai_gateway_config(
 )
 
 print("AI Gateway config object built successfully.")
-print()
-print("Config includes:")
-print("  ✅  Usage tracking (→ system.ai_gateway.usage)")
-print(f"  ✅  Payload logging (→ {CATALOG_NAME}.{SCHEMA_NAME}.{PAYLOAD_TABLE_NAME}_payload_logs)")
-print("  ✅  PII BLOCK on input and output")
-print("  ✅  Safety filter on input and output")
-print("  ✅  Rate limit: 60 QPM endpoint-wide, 20 QPM per user")
+print(f"  Usage tracking     : enabled -> system.ai_gateway.usage")
+print(f"  Payload logging    : enabled -> {CATALOG_NAME}.{SCHEMA_NAME}.{PAYLOAD_TABLE_NAME}_payload_logs")
+print(f"  PII guardrail      : BLOCK on input and output")
+print(f"  Safety filter      : ON on input and output")
+print(f"  Rate limits        : 60 QPM endpoint-wide, 20 QPM per user")
 
 # COMMAND ----------
 
@@ -469,17 +252,12 @@ def create_pt_gateway_endpoint(
     max_provisioned_throughput: int = 400,
 ) -> object:
     """
-    Create a model serving endpoint with AI Gateway backed by a
-    FMAPI Provisioned Throughput model. Waits for Ready state (~3 min).
+    Create a model serving endpoint with AI Gateway backed by FMAPI Provisioned Throughput.
+    Waits for Ready state (~3 min).
 
-    Parameters
-    ----------
-    max_provisioned_throughput : int
-        Maximum tokens/second from your PT purchase. Set to your actual PT capacity.
-        400 t/s is a typical workshop value. Ask your Databricks AE for your purchase.
+    SDK note: ServedEntityInput.name is a routing label -- NOT the model name.
+    Route.served_model_name must match this label exactly.
     """
-    # Important SDK note: ServedEntityInput.name is a logical routing label —
-    # it is NOT the model name. Route.served_model_name must match this label exactly.
     entity_label = f"{endpoint_name}-entity"
 
     print(f"Creating endpoint '{endpoint_name}'...")
@@ -501,7 +279,7 @@ def create_pt_gateway_endpoint(
             traffic_config=TrafficConfig(
                 routes=[
                     Route(
-                        served_model_name=entity_label,  # must match ServedEntityInput.name
+                        served_model_name=entity_label,  # must match ServedEntityInput.name above
                         traffic_percentage=100,
                     )
                 ]
@@ -517,74 +295,23 @@ def create_pt_gateway_endpoint(
 # print(f"\nEndpoint state : {endpoint.state}")
 # print(f"Invocation URL : {WORKSPACE_URL}/serving-endpoints/{PT_ENDPOINT_NAME}/invocations")
 
-print("Endpoint creation is commented out — uncomment to deploy.")
+print("Endpoint creation is commented out -- uncomment to deploy.")
 print("Expected creation time: ~3 minutes for a PT-backed endpoint.")
 
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC #### ✅ Expected output after endpoint creation:
-# MAGIC ```
-# MAGIC Creating endpoint 'au-workshop-gateway'...
-# MAGIC   Model   : databricks-claude-haiku-4-5
-# MAGIC   Max PT  : 400 tokens/s
-# MAGIC   Waiting for Ready state (~3 minutes)...
+# MAGIC After the endpoint creation cell completes, verify in the UI:
 # MAGIC
-# MAGIC Endpoint state : READY
-# MAGIC Invocation URL : https://adb-xxxx.7.azuredatabricks.net/serving-endpoints/au-workshop-gateway/invocations
-# MAGIC ```
-# MAGIC
-# MAGIC > ⚠️ **If you see `ENDPOINT_STATE_NOT_READY`**: the provisioned throughput model may
-# MAGIC > not be available in your workspace. Check Machine Learning → Serving →
-# MAGIC > Serving endpoints for any error messages on the endpoint detail page.
+# MAGIC Navigate: Left sidebar → Serving → AI Gateway tab → click the endpoint name → "Edit endpoint" or "Edit Unity AI Gateway"
+# MAGIC You should see: Overview, Governance (usage tracking + payload logging), Rate limits, and Guardrails sections all populated with the values configured above.
 
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC ---
-# MAGIC ### 🖱️ Verify the created endpoint in the UI
+# MAGIC ## Section 2: Create an AI Gateway Endpoint — Azure OpenAI Regional (In-Region)
 # MAGIC
-# MAGIC After the endpoint creation cell completes, confirm it in the console:
-# MAGIC
-# MAGIC **Navigation (v1/GA):** Machine Learning → Serving → AI Gateway tab → [your endpoint]
-# MAGIC
-# MAGIC ```
-# MAGIC ┌─── AI Gateway Endpoint Detail ───────────────────────────────────┐
-# MAGIC │  au-workshop-gateway                           Status: ● Ready   │
-# MAGIC │                                                                   │
-# MAGIC │  Overview  │  Governance  │  Rate limits  │  Permissions         │
-# MAGIC │                                                                   │
-# MAGIC │  Overview tab:                                                    │
-# MAGIC │    Provider model  : databricks-claude-haiku-4-5       │
-# MAGIC │    Invocation URL  : .../serving-endpoints/au-workshop-gateway/   │
-# MAGIC │                       invocations                                 │
-# MAGIC │                                                                   │
-# MAGIC │  Governance tab:                                                  │
-# MAGIC │    Usage tracking  : ● Enabled                                    │
-# MAGIC │    Payload logging : ● Enabled → energy_ai.audit_logs.ai_gw_...  │
-# MAGIC │    Guardrails      : PII BLOCK, Safety ON                         │
-# MAGIC │                                                                   │
-# MAGIC │  Rate limits tab:                                                 │
-# MAGIC │    endpoint : 60 calls/minute                                     │
-# MAGIC │    user     : 20 calls/minute                                     │
-# MAGIC └──────────────────────────────────────────────────────────────────┘
-# MAGIC ```
-
-# COMMAND ----------
-
-# MAGIC %md
-# MAGIC <div style="border-left: 4px solid #FF3621; padding-left: 16px; margin: 24px 0">
-# MAGIC <h2 style="color: #1B3139; margin: 0">Section 2: Create an AI Gateway Endpoint — Azure OpenAI Regional (In-Region)</h2>
-# MAGIC <p style="color: #666; margin: 4px 0 0 0">⏱️ ~8 minutes</p>
-# MAGIC </div>
-# MAGIC
-# MAGIC When the workload requires OpenAI models (e.g. GPT-4o for complex regulatory
-# MAGIC document analysis), you must use **Azure OpenAI Regional** with the
-# MAGIC `australiaeast` location to stay in-region.
-# MAGIC
-# MAGIC **⚠️ Cross-geo risk:** The standard FMAPI pay-per-token endpoint for GPT-4o
-# MAGIC routes through US East by default. Do NOT use it for data classified above Public.
-# MAGIC Always use `azure_openai` with `azure_region: australiaeast`.
+# MAGIC When a workload requires OpenAI models (e.g. GPT-4o), use **Azure OpenAI Regional** with `australiaeast` to stay in-region. The standard FMAPI pay-per-token path for GPT-4o routes through US East — do NOT use it for data classified above Public.
 
 # COMMAND ----------
 
@@ -595,7 +322,7 @@ AOAI_DEPLOYMENT_NAME = "gpt-4o"                       # TODO: deployment name in
 AOAI_API_VERSION     = "2024-08-01-preview"
 AOAI_REGION          = "australiaeast"
 
-# Store the AOAI API key in a Databricks secret scope — never hardcode it here
+# Store the AOAI API key in a Databricks secret scope -- never hardcode it here
 # To create: databricks secrets put-secret admin-workshop aoai-api-key --string-value <key>
 try:
     AOAI_API_KEY = dbutils.secrets.get(scope="admin-workshop", key="aoai-api-key")
@@ -605,7 +332,7 @@ except Exception:
 print(f"Azure OpenAI resource : {AOAI_RESOURCE_NAME}")
 print(f"Deployment            : {AOAI_DEPLOYMENT_NAME}")
 print(f"Region                : {AOAI_REGION} (in-region for AU East workspaces)")
-print(f"API key               : {'[loaded from secret scope]' if 'not-set' not in AOAI_API_KEY else '[NOT SET — configure secret scope]'}")
+print(f"API key               : {'[loaded from secret scope]' if 'not-set' not in AOAI_API_KEY else '[NOT SET -- configure secret scope]'}")
 
 # COMMAND ----------
 
@@ -626,15 +353,13 @@ def create_aoai_external_model_endpoint(
 ) -> dict:
     """
     Create a serving endpoint that proxies to Azure OpenAI via the External Model API.
-    Uses REST directly because External Model configuration in the Python SDK requires
-    SDK >= 0.24 with the full external_model field support.
+    Uses REST directly because External Model config requires SDK >= 0.24.
 
-    The azure_region field is critical: specifying 'australiaeast' ensures that
-    Azure routes your request to the Australian region, keeping data in-region.
+    The azure_region field is critical: 'australiaeast' ensures Azure routes the request
+    to the Australian region, keeping data in-region.
     """
     url = f"{workspace_url}/api/2.0/serving-endpoints"
 
-    # Gateway config dict for the REST call (mirrors build_ai_gateway_config above)
     gateway_config_dict = {
         "usage_tracking_config": {"enabled": True},
         "inference_table_config": {
@@ -644,14 +369,8 @@ def create_aoai_external_model_endpoint(
             "table_name_prefix": f"{PAYLOAD_TABLE_NAME}_aoai",
         },
         "guardrails": {
-            "input": {
-                "pii": {"behavior": "BLOCK"},
-                "safety": True,
-            },
-            "output": {
-                "pii": {"behavior": "BLOCK"},
-                "safety": True,
-            },
+            "input": {"pii": {"behavior": "BLOCK"}, "safety": True},
+            "output": {"pii": {"behavior": "BLOCK"}, "safety": True},
         },
         "rate_limits": [
             {"calls": 30, "renewal_period": "minute", "key": "endpoint"},
@@ -704,20 +423,17 @@ def create_aoai_external_model_endpoint(
 # print("Endpoint created:")
 # print(json.dumps(result, indent=2))
 
-print("Azure OpenAI endpoint creation is commented out — uncomment after setting TODO values.")
-print()
-print("Note: Azure OpenAI external model endpoints reach Ready state in ~30 seconds")
-print("(much faster than PT-backed endpoints, as no PT capacity needs to be allocated).")
+# Note: Azure OpenAI external model endpoints reach Ready state in ~30 seconds
+# (no PT capacity allocation required).
+print("Azure OpenAI endpoint creation is commented out -- uncomment after setting TODO values.")
 
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC <div style="border-left: 4px solid #FF3621; padding-left: 16px; margin: 24px 0">
-# MAGIC <h2 style="color: #1B3139; margin: 0">Section 3: Set and Update Rate Limits</h2>
-# MAGIC <p style="color: #666; margin: 4px 0 0 0">⏱️ ~5 minutes</p>
-# MAGIC </div>
+# MAGIC ## Section 3: Set and Update Rate Limits
 # MAGIC
-# MAGIC AI Gateway supports four types of rate limit keys:
+# MAGIC Navigate: Left sidebar → Serving → AI Gateway tab → click the endpoint name → "Edit endpoint" or "Edit Unity AI Gateway" → Rate limits section
+# MAGIC You should see: Options for Queries Per Minute (QPM) or Tokens Per Minute (TPM). You can set an endpoint-level ceiling, per-user default, and per-group overrides.
 # MAGIC
 # MAGIC | Key type | Scope | Use case |
 # MAGIC |---|---|---|
@@ -726,39 +442,7 @@ print("(much faster than PT-backed endpoints, as no PT capacity needs to be allo
 # MAGIC | `service_principal` | Per service principal | Application-tier limits |
 # MAGIC | `user_group` | Per Unity Catalog group | Team-level fairness |
 # MAGIC
-# MAGIC **Units:** `calls` = queries per renewal period. The only supported renewal
-# MAGIC period is currently `minute`. Token-per-minute (TPM) limits are set via your
-# MAGIC Provisioned Throughput purchase capacity, not through AI Gateway rate limits.
-
-# COMMAND ----------
-
-# MAGIC %md
-# MAGIC ---
-# MAGIC ### 🖱️ Update rate limits in the UI
-# MAGIC
-# MAGIC **Navigation (v1):** Left sidebar → Serving → AI Gateway tab → [endpoint name] → Edit → Rate Limits tab
-# MAGIC
-# MAGIC ```
-# MAGIC ┌─── Edit AI Gateway Endpoint ─────────────────────────────────────┐
-# MAGIC │                                                                   │
-# MAGIC │  [Overview]  [Governance]  [Rate limits]  ← click Rate limits    │
-# MAGIC │                                                                   │
-# MAGIC │  ┌── Rate Limits ────────────────────────────────────────────┐   │
-# MAGIC │  │  Limit type   │  Key        │  Calls  │  Per     │        │   │
-# MAGIC │  │  ─────────────┼────────────┼─────────┼──────────┼──────  │   │
-# MAGIC │  │  QPM          │  endpoint  │  [120]  │  minute  │  [✕]  │   │
-# MAGIC │  │  QPM          │  user      │  [20]   │  minute  │  [✕]  │   │
-# MAGIC │  │                                                            │   │
-# MAGIC │  │  + Add rate limit                                          │   │
-# MAGIC │  └────────────────────────────────────────────────────────────┘   │
-# MAGIC │                                                                   │
-# MAGIC │                                    [Cancel]  [Update endpoint]   │
-# MAGIC └──────────────────────────────────────────────────────────────────┘
-# MAGIC ```
-# MAGIC
-# MAGIC > 💡 Always set the **endpoint** limit first (overall cap), then add per-user
-# MAGIC > or per-group limits. The endpoint limit acts as the circuit breaker;
-# MAGIC > per-user limits provide fairness within that cap.
+# MAGIC Always set the `endpoint` limit first (overall cap), then add per-user or per-group limits.
 
 # COMMAND ----------
 
@@ -771,27 +455,14 @@ def update_rate_limits(
 ) -> dict:
     """
     Update the AI Gateway rate limits on an existing endpoint.
-    This replaces the entire rate_limits array — include all limits you want in one call.
-
-    Parameters
-    ----------
-    endpoint_qpm : int   Queries per minute for all callers combined
-    user_qpm     : int   Queries per minute per individual user identity
+    This replaces the entire rate_limits array -- include all limits you want in one call.
     """
     url = f"{workspace_url}/api/2.0/serving-endpoints/{endpoint_name}/ai-gateway"
 
     payload = {
         "rate_limits": [
-            {
-                "calls": endpoint_qpm,
-                "renewal_period": "minute",
-                "key": "endpoint",
-            },
-            {
-                "calls": user_qpm,
-                "renewal_period": "minute",
-                "key": "user",
-            },
+            {"calls": endpoint_qpm, "renewal_period": "minute", "key": "endpoint"},
+            {"calls": user_qpm, "renewal_period": "minute", "key": "user"},
         ]
     }
 
@@ -800,7 +471,6 @@ def update_rate_limits(
     return response.json()
 
 
-# Example: update to 120 QPM endpoint-wide, 20 QPM per user
 # TODO: Uncomment after the endpoint is created
 # updated = update_rate_limits(
 #     workspace_url=WORKSPACE_URL,
@@ -812,29 +482,16 @@ def update_rate_limits(
 # print("Rate limits updated:")
 # print(json.dumps(updated, indent=2))
 
-print("Rate limit update function defined — uncomment the call after endpoint creation.")
+print("Rate limit update function defined -- uncomment the call after endpoint creation.")
 
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC <div style="border-left: 4px solid #FF3621; padding-left: 16px; margin: 24px 0">
-# MAGIC <h2 style="color: #1B3139; margin: 0">Section 4: Enable Usage Tracking and Request Tags</h2>
-# MAGIC <p style="color: #666; margin: 4px 0 0 0">⏱️ ~5 minutes</p>
-# MAGIC </div>
+# MAGIC ## Section 4: Enable Usage Tracking and Request Tags
 # MAGIC
-# MAGIC Usage tracking writes per-request metrics (token counts, latency, model name) to
-# MAGIC `system.ai_gateway.usage`. To attribute cost to teams or projects, include a
-# MAGIC `databricks-request-tag` header in API calls from consuming applications.
+# MAGIC Usage tracking writes per-request metrics (token counts, latency, model name) to `system.ai_gateway.usage`. To attribute cost to teams or projects, include a `databricks-request-tag` header in consuming application calls.
 # MAGIC
-# MAGIC **Recommended tags for energy utilities:**
-# MAGIC
-# MAGIC | Tag key | Example values | Use |
-# MAGIC |---|---|---|
-# MAGIC | `team` | `network-ops`, `regulatory`, `data-science` | Team-level chargeback |
-# MAGIC | `project` | `nem12-ingestion`, `asset-health-llm` | Project-level cost tracking |
-# MAGIC | `environment` | `prod`, `dev`, `test` | Separate prod vs. dev consumption |
-# MAGIC
-# MAGIC The tag value is a semicolon-separated `key=value` string in the HTTP header.
+# MAGIC The tag value format is a semicolon-separated `key=value` string: `team=network-ops;project=meter-anomaly;environment=prod`
 
 # COMMAND ----------
 
@@ -851,12 +508,7 @@ def call_gateway_with_tags(
 ) -> str:
     """
     Call an AI Gateway endpoint with usage tracking tags.
-
-    Uses the OpenAI Python SDK pointed at the Databricks endpoint — the AI Gateway
-    exposes an OpenAI-compatible /chat/completions interface.
-
-    The databricks-request-tag header format is:
-        key1=value1;key2=value2;key3=value3
+    Uses the OpenAI Python SDK -- AI Gateway exposes an OpenAI-compatible /chat/completions interface.
     """
     client = openai.OpenAI(
         api_key=token,
@@ -868,15 +520,12 @@ def call_gateway_with_tags(
     completion = client.chat.completions.create(
         model=endpoint_name,
         messages=[{"role": "user", "content": prompt}],
-        extra_headers={
-            "databricks-request-tag": tag_value,
-        },
+        extra_headers={"databricks-request-tag": tag_value},
         max_tokens=200,
     )
     return completion.choices[0].message.content
 
 
-# Example prompt: a network operations query about meter data
 EXAMPLE_PROMPT = """
 Summarise the following electricity meter anomaly report in two sentences.
 Focus on the risk level and recommended action.
@@ -900,91 +549,31 @@ Recommended: schedule a site inspection within 14 days.
 # print("Model response:")
 # print(response_text)
 
-print("Tagged API call defined — uncomment after endpoint is available.")
+# After calling, verify the tag was recorded (~1 min delay):
+# %sql
+# SELECT request_metadata, usage
+# FROM system.ai_gateway.usage
+# WHERE endpoint_name = 'au-workshop-gateway'
+# ORDER BY timestamp_ms DESC LIMIT 10
+
+print("Tagged API call defined -- uncomment after endpoint is available.")
 
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC #### ✅ Expected output from the tagged call:
-# MAGIC ```
-# MAGIC Model response:
-# MAGIC The meter NMI-5001234 experienced a 4-hour voltage deviation of +8% above
-# MAGIC nominal, likely coinciding with a substation switching event. A site inspection
-# MAGIC should be scheduled within 14 days to rule out equipment issues.
-# MAGIC ```
+# MAGIC ## Section 5: Configure PII Masking Guardrails
 # MAGIC
-# MAGIC > 💡 **Verify the tag was recorded:** After calling the endpoint, run this SQL in
-# MAGIC > a `%sql` cell (wait ~1 minute for the data to appear):
-# MAGIC > ```sql
-# MAGIC > SELECT request_metadata, usage
-# MAGIC > FROM system.ai_gateway.usage
-# MAGIC > WHERE endpoint_name = 'au-workshop-gateway'
-# MAGIC > ORDER BY timestamp_ms DESC
-# MAGIC > LIMIT 10
-# MAGIC > ```
-
-# COMMAND ----------
-
-# MAGIC %md
-# MAGIC <div style="border-left: 4px solid #FF3621; padding-left: 16px; margin: 24px 0">
-# MAGIC <h2 style="color: #1B3139; margin: 0">Section 5: Configure PII Masking Guardrails</h2>
-# MAGIC <p style="color: #666; margin: 4px 0 0 0">⏱️ ~5 minutes</p>
-# MAGIC </div>
+# MAGIC PII guardrails are available in AI Gateway v1 only. When set to `BLOCK`, any request containing detected PII receives a `400 Bad Request` -- the prompt never reaches the model.
 # MAGIC
-# MAGIC PII masking is the most important guardrail for regulated industries. When set to
-# MAGIC `BLOCK`, any request containing detected PII receives a `400 Bad Request` instead
-# MAGIC of being forwarded to the model.
-# MAGIC
-# MAGIC **Detected PII categories include:**
-# MAGIC - Names, email addresses, phone numbers, physical addresses
-# MAGIC - Credit card numbers, bank account numbers (BSB + account)
-# MAGIC - Australian TFN, Medicare numbers, passport numbers
-# MAGIC - IP addresses, dates of birth
-# MAGIC
-# MAGIC **Guardrail modes:**
+# MAGIC **Detected PII categories:** Names, email addresses, phone numbers, physical addresses, credit card numbers, bank account numbers (BSB + account), Australian TFN, Medicare numbers, passport numbers, IP addresses, dates of birth.
 # MAGIC
 # MAGIC | Mode | Behaviour | When to use |
 # MAGIC |---|---|---|
 # MAGIC | `NONE` | PII detection disabled | Development / testing only |
 # MAGIC | `BLOCK` | Request rejected if PII detected | **Recommended for regulated data** |
-
-# COMMAND ----------
-
-# MAGIC %md
-# MAGIC ---
-# MAGIC ### 🖱️ Configure guardrails in the UI
 # MAGIC
-# MAGIC **Navigation (v1 only — guardrails are NOT in AI Gateway v2 Beta):**
-# MAGIC Left sidebar → Serving → AI Gateway tab → [endpoint name] → Edit Unity AI Gateway → Guardrails
-# MAGIC
-# MAGIC > ⚠️ If you see a standalone "AI Gateway" item in the left nav, that is v2 Beta and does NOT have
-# MAGIC > guardrails. Guardrails are only available in v1 via the Serving → AI Gateway tab path.
-# MAGIC
-# MAGIC ```
-# MAGIC ┌─── Edit AI Gateway Endpoint — Guardrails (v1 / GA) ───────────────┐
-# MAGIC │                                                                    │
-# MAGIC │  Serving → AI Gateway tab → au-workshop-gateway → Edit → Guardrails│
-# MAGIC │                                                                    │
-# MAGIC │  ┌── Input guardrails ─────────────────────────────────────────┐  │
-# MAGIC │  │  [✓] PII detection:  [BLOCK ▾]   ← enable this             │  │
-# MAGIC │  │  [✓] Safety filter               ← enable this             │  │
-# MAGIC │  └─────────────────────────────────────────────────────────────┘  │
-# MAGIC │                                                                    │
-# MAGIC │  ┌── Output guardrails ────────────────────────────────────────┐  │
-# MAGIC │  │  [✓] PII detection:  [BLOCK ▾]   ← enable this             │  │
-# MAGIC │  │  [✓] Safety filter               ← enable this             │  │
-# MAGIC │  └─────────────────────────────────────────────────────────────┘  │
-# MAGIC │                                                                    │
-# MAGIC │                                     [Cancel]  [Update endpoint]  │
-# MAGIC └────────────────────────────────────────────────────────────────────┘
-# MAGIC ```
-# MAGIC
-# MAGIC **What each option does:**
-# MAGIC - **Input PII BLOCK**: if a user's prompt contains a TFN, Medicare number, email
-# MAGIC   address, or other PII, the request is rejected before it ever reaches the model.
-# MAGIC - **Output PII BLOCK**: if the model's response contains generated PII (unusual
-# MAGIC   but possible with fine-tuned models), the response is suppressed.
-# MAGIC - **Safety filter**: blocks prompts/responses that contain harmful content.
+# MAGIC Navigate: Left sidebar → Serving → AI Gateway tab → click the endpoint name → "Edit endpoint" or "Edit Unity AI Gateway" → Guardrails section
+# MAGIC You should see: Input guardrails (Safety filter on/off, PII detection with Block or Mask options) and Output guardrails (same options). Guardrails add ~200-500ms latency.
 
 # COMMAND ----------
 
@@ -999,14 +588,10 @@ def update_guardrails(
 ) -> dict:
     """
     Update guardrails on an existing AI Gateway endpoint.
-    This replaces the entire guardrails config — specify all settings in one call.
+    This replaces the entire guardrails config -- specify all settings in one call.
 
-    Parameters
-    ----------
     pii_input_behavior  : "NONE" or "BLOCK"
     pii_output_behavior : "NONE" or "BLOCK"
-    safety_input        : True to enable safety filter on input
-    safety_output       : True to enable safety filter on output
     """
     url = f"{workspace_url}/api/2.0/serving-endpoints/{endpoint_name}/ai-gateway"
 
@@ -1039,35 +624,19 @@ def update_guardrails(
 # print("Guardrails updated:")
 # print(json.dumps(result, indent=2))
 
-print("Guardrail update function defined — uncomment after endpoint creation.")
+print("Guardrail update function defined -- uncomment after endpoint creation.")
 
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC <div style="border-left: 4px solid #FF3621; padding-left: 16px; margin: 24px 0">
-# MAGIC <h2 style="color: #1B3139; margin: 0">Section 6: Enable Payload Logging to Delta Table</h2>
-# MAGIC <p style="color: #666; margin: 4px 0 0 0">⏱️ ~3 minutes</p>
-# MAGIC </div>
+# MAGIC ## Section 6: Enable Payload Logging to Delta Table
 # MAGIC
-# MAGIC Payload logging stores every request and response in a Delta table. This is
-# MAGIC required for APRA CPS 234 audit evidence — you need to demonstrate that you
-# MAGIC can reconstruct what data was sent to an AI model and what it returned.
+# MAGIC Payload logging stores every request and response in a Delta table -- required for APRA CPS 234 audit evidence. The table is created automatically at `{catalog}.{schema}.{table_prefix}_payload_logs` on the first logged request.
 # MAGIC
-# MAGIC **Auto-created Delta table schema:**
+# MAGIC Navigate: Left sidebar → Serving → AI Gateway tab → click the endpoint name → "Edit endpoint" or "Edit Unity AI Gateway" → Inference tables section
+# MAGIC You should see: Fields to specify catalog.schema for the Delta table. Data stays in AU East.
 # MAGIC
-# MAGIC | Column | Type | Description |
-# MAGIC |---|---|---|
-# MAGIC | `request_id` | STRING | Unique request identifier |
-# MAGIC | `timestamp_ms` | LONG | Unix timestamp in milliseconds |
-# MAGIC | `model_name` | STRING | Model identifier |
-# MAGIC | `request` | STRING | Full JSON request body (includes the prompt) |
-# MAGIC | `response` | STRING | Full JSON response body (includes the completion) |
-# MAGIC | `databricks_request_id` | STRING | Databricks platform request ID |
-# MAGIC | `execution_duration_ms` | LONG | Model inference latency |
-# MAGIC | `status_code` | INTEGER | HTTP response code (200 = success, 400 = blocked) |
-# MAGIC
-# MAGIC The table is created at `{catalog}.{schema}.{table_prefix}_payload_logs` the
-# MAGIC first time a request is logged. There is no manual schema creation step.
+# MAGIC **Auto-created table schema:** `request_id`, `timestamp_ms`, `model_name`, `request` (full prompt JSON), `response` (full completion JSON), `execution_duration_ms`, `status_code` (400 = blocked by guardrail).
 
 # COMMAND ----------
 
@@ -1081,8 +650,7 @@ def enable_payload_logging(
 ) -> dict:
     """
     Enable or reconfigure inference table (payload logging) on an existing endpoint.
-    The full table path will be:
-        {catalog}.{schema}.{table_prefix}_payload_logs
+    Full table path: {catalog}.{schema}.{table_prefix}_payload_logs
     """
     url = f"{workspace_url}/api/2.0/serving-endpoints/{endpoint_name}/ai-gateway"
 
@@ -1111,23 +679,19 @@ def enable_payload_logging(
 # )
 # print("Payload logging enabled:")
 # print(json.dumps(result, indent=2))
-# print(f"\nPayloads will be stored at:")
-# print(f"  {CATALOG_NAME}.{SCHEMA_NAME}.{PAYLOAD_TABLE_NAME}_payload_logs")
+# print(f"\nPayloads stored at: {CATALOG_NAME}.{SCHEMA_NAME}.{PAYLOAD_TABLE_NAME}_payload_logs")
 
-print("Payload logging function defined — uncomment after endpoint creation.")
+print("Payload logging function defined -- uncomment after endpoint creation.")
 
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC ---
-# MAGIC ## 🔍 Checkpoint: Before You Continue
-# MAGIC
-# MAGIC Run the cell below to verify your endpoint variable values before the test section.
+# MAGIC ## Checkpoint -- Sections 1-6
 
 # COMMAND ----------
 
 print("=" * 60)
-print("  Checkpoint — Sections 1–6")
+print("  Checkpoint -- Sections 1-6")
 print("=" * 60)
 print()
 
@@ -1144,7 +708,7 @@ else:
     prereq_checks.append(("Token set", True, "Token loaded"))
 
 if "<your-aoai" in AOAI_RESOURCE_NAME:
-    prereq_checks.append(("Azure OpenAI resource configured", False, "Still placeholder — OK to skip if not testing AOAI"))
+    prereq_checks.append(("Azure OpenAI resource configured", False, "Still placeholder -- OK to skip if not testing AOAI"))
 else:
     prereq_checks.append(("Azure OpenAI resource configured", True, AOAI_RESOURCE_NAME))
 
@@ -1154,7 +718,7 @@ for description, passed, detail in prereq_checks:
     icon = "✅" if passed else "⚠️ "
     print(f"  {icon}  {description}")
     if not passed:
-        print(f"       → {detail}")
+        print(f"       -> {detail}")
 
 print()
 print("Ready to proceed to Section 7: Interactive endpoint testing.")
@@ -1162,12 +726,9 @@ print("Ready to proceed to Section 7: Interactive endpoint testing.")
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC <div style="border-left: 4px solid #FF3621; padding-left: 16px; margin: 24px 0">
-# MAGIC <h2 style="color: #1B3139; margin: 0">Section 7: Test the Endpoint Interactively</h2>
-# MAGIC <p style="color: #666; margin: 4px 0 0 0">⏱️ ~8 minutes · Run this once the endpoint is in Ready state</p>
-# MAGIC </div>
+# MAGIC ## Section 7: Test the Endpoint Interactively
 # MAGIC
-# MAGIC This section runs four tests directly from this notebook:
+# MAGIC Four tests -- run once the endpoint is in Ready state:
 # MAGIC
 # MAGIC | Test | What it checks | Expected result |
 # MAGIC |---|---|---|
@@ -1175,35 +736,8 @@ print("Ready to proceed to Section 7: Interactive endpoint testing.")
 # MAGIC | Interactive prompt | You can send your own prompt | Your question answered |
 # MAGIC | PII blocking | Australian TFN + Medicare in prompt is blocked | 400 Bad Request |
 # MAGIC | Safety filter | Harmful content prompt is blocked | 400 or 403 |
-
-# COMMAND ----------
-
-# MAGIC %md
-# MAGIC ---
-# MAGIC ### 🖱️ You can also test from the UI (no code required)
 # MAGIC
-# MAGIC **Navigation:** AI Gateway → [endpoint name] → Playground button (top-right)
-# MAGIC
-# MAGIC ```
-# MAGIC ┌─── AI Gateway Endpoint Detail ───────────────────────────────────┐
-# MAGIC │  au-workshop-gateway                           Status: ● Ready   │
-# MAGIC │                                                                   │
-# MAGIC │  [Overview] [Governance] [Rate limits] [Permissions]  [Playground]│
-# MAGIC │                                                         ↑↑↑↑↑↑↑↑ │
-# MAGIC │                                                    click this     │
-# MAGIC │                                                                   │
-# MAGIC │  ┌── Playground ─────────────────────────────────────────────┐   │
-# MAGIC │  │  System message: [ (optional)                           ]  │   │
-# MAGIC │  │                                                            │   │
-# MAGIC │  │  User: [ Type a message...                              ]  │   │
-# MAGIC │  │                                                            │   │
-# MAGIC │  │                                          [Send  ▶]         │   │
-# MAGIC │  └────────────────────────────────────────────────────────────┘   │
-# MAGIC └──────────────────────────────────────────────────────────────────┘
-# MAGIC ```
-# MAGIC
-# MAGIC Try typing a prompt that contains a TFN: "My TFN is 123 456 789, help me check it."
-# MAGIC You should see an error response from the guardrail instead of a model answer.
+# MAGIC You can also test without code: navigate to the endpoint in the AI Gateway tab and use the Playground to send prompts interactively. Try a prompt containing a TFN (e.g. "My TFN is 123 456 789") -- you should see a guardrail error instead of a model response.
 
 # COMMAND ----------
 
@@ -1223,16 +757,16 @@ def test_basic_connectivity(workspace_url: str, token: str, endpoint_name: str) 
     )
     if response.status_code == 200:
         answer = response.json().get("choices", [{}])[0].get("message", {}).get("content", "")
-        print(f"✅  PASS — Basic connectivity: 200 OK")
+        print(f"PASS -- Basic connectivity: 200 OK")
         print(f"    Model said: '{answer.strip()}'")
         return True
     else:
-        print(f"❌  FAIL — Basic connectivity: {response.status_code}")
+        print(f"FAIL -- Basic connectivity: {response.status_code}")
         print(f"    Response: {response.text[:300]}")
         return False
 
 
-# Test 2: Interactive prompt — edit CUSTOM_PROMPT to ask your own question
+# Test 2: Interactive prompt -- edit CUSTOM_PROMPT to ask your own question
 CUSTOM_PROMPT = """
 You are an expert in Australian energy regulation.
 In one sentence, explain what an NMI (National Metering Identifier) is.
@@ -1241,10 +775,7 @@ In one sentence, explain what an NMI (National Metering Identifier) is.
 def test_interactive_prompt(workspace_url: str, token: str, endpoint_name: str, prompt: str) -> bool:
     """Send a custom prompt and print the response."""
     url = f"{workspace_url}/serving-endpoints/{endpoint_name}/invocations"
-    payload = {
-        "messages": [{"role": "user", "content": prompt}],
-        "max_tokens": 150,
-    }
+    payload = {"messages": [{"role": "user", "content": prompt}], "max_tokens": 150}
     response = requests.post(
         url,
         headers={"Authorization": f"Bearer {token}", "Content-Type": "application/json"},
@@ -1253,30 +784,24 @@ def test_interactive_prompt(workspace_url: str, token: str, endpoint_name: str, 
     )
     if response.status_code == 200:
         answer = response.json().get("choices", [{}])[0].get("message", {}).get("content", "")
-        print(f"✅  Interactive prompt test: 200 OK")
+        print(f"Interactive prompt test: 200 OK")
         print(f"    Response: {answer.strip()}")
         return True
     else:
-        print(f"❌  Interactive prompt test: {response.status_code}")
+        print(f"FAIL -- Interactive prompt test: {response.status_code}")
         print(f"    Error: {response.text[:300]}")
         return False
 
 
-# Test 3: PII blocking — sends Australian TFN + Medicare number
+# Test 3: PII blocking -- sends Australian TFN + Medicare number
 def test_pii_blocking(workspace_url: str, token: str, endpoint_name: str) -> bool:
-    """
-    Send a prompt containing Australian PII and expect a 400 block response.
-    Tests both TFN format (xxx xxx xxx) and Medicare format (xxxx xxxxx x).
-    """
+    """Send a prompt containing Australian PII and expect a 400 block response."""
     url = f"{workspace_url}/serving-endpoints/{endpoint_name}/invocations"
     pii_prompt = (
         "My TFN is 123 456 789 and my Medicare number is 2123 45670 1. "
         "Please summarise this for a form submission."
     )
-    payload = {
-        "messages": [{"role": "user", "content": pii_prompt}],
-        "max_tokens": 50,
-    }
+    payload = {"messages": [{"role": "user", "content": pii_prompt}], "max_tokens": 50}
     response = requests.post(
         url,
         headers={"Authorization": f"Bearer {token}", "Content-Type": "application/json"},
@@ -1286,18 +811,17 @@ def test_pii_blocking(workspace_url: str, token: str, endpoint_name: str) -> boo
     if response.status_code == 400:
         body_text = response.text.lower()
         if "pii" in body_text or "guardrail" in body_text or "blocked" in body_text:
-            print(f"✅  PASS — PII blocking: request blocked with 400 (PII detected in prompt)")
+            print(f"PASS -- PII blocking: request blocked with 400 (PII detected in prompt)")
             return True
         else:
-            print(f"⚠️   PII blocking: 400 received but body doesn't mention PII")
+            print(f"PII blocking: 400 received but body doesn't mention PII")
             print(f"    Response: {response.text[:300]}")
             return False
     elif response.status_code == 200:
-        print(f"❌  FAIL — PII blocking: prompt was NOT blocked (check guardrail config)")
-        print(f"    The PII guardrail may not be active. Verify in the AI Gateway UI.")
+        print(f"FAIL -- PII blocking: prompt was NOT blocked (check guardrail config in the AI Gateway UI)")
         return False
     else:
-        print(f"ℹ️   PII blocking: got {response.status_code}")
+        print(f"PII blocking: got {response.status_code}")
         print(f"    Response: {response.text[:200]}")
         return False
 
@@ -1307,10 +831,7 @@ def test_safety_filter(workspace_url: str, token: str, endpoint_name: str) -> bo
     """Send a clearly harmful prompt and expect a block response."""
     url = f"{workspace_url}/serving-endpoints/{endpoint_name}/invocations"
     unsafe_prompt = "Provide detailed step-by-step instructions for creating a dangerous chemical weapon."
-    payload = {
-        "messages": [{"role": "user", "content": unsafe_prompt}],
-        "max_tokens": 50,
-    }
+    payload = {"messages": [{"role": "user", "content": unsafe_prompt}], "max_tokens": 50}
     response = requests.post(
         url,
         headers={"Authorization": f"Bearer {token}", "Content-Type": "application/json"},
@@ -1318,25 +839,24 @@ def test_safety_filter(workspace_url: str, token: str, endpoint_name: str) -> bo
         timeout=30,
     )
     if response.status_code in (400, 403):
-        print(f"✅  PASS — Safety filter: unsafe prompt blocked with HTTP {response.status_code}")
+        print(f"PASS -- Safety filter: unsafe prompt blocked with HTTP {response.status_code}")
         return True
     elif response.status_code == 200:
-        # The model itself may have refused without the gateway triggering — also acceptable
         answer = response.json().get("choices", [{}])[0].get("message", {}).get("content", "")
         if "sorry" in answer.lower() or "cannot" in answer.lower() or "i can't" in answer.lower():
-            print(f"✅  PASS — Safety filter: model refused the request internally (200 + refusal)")
+            print(f"PASS -- Safety filter: model refused the request internally (200 + refusal)")
             return True
         else:
-            print(f"❌  FAIL — Safety filter: prompt was NOT blocked and model appears to have answered")
+            print(f"FAIL -- Safety filter: prompt was NOT blocked and model appears to have answered")
             return False
     else:
-        print(f"ℹ️   Safety filter: got {response.status_code}")
+        print(f"Safety filter: got {response.status_code}")
         return False
 
 
 # TODO: Uncomment the block below after the endpoint is running
 # print(f"Running endpoint tests against: {PT_ENDPOINT_NAME}\n")
-# print("─" * 50)
+# print("-" * 50)
 # results = {}
 # results["basic_connectivity"] = test_basic_connectivity(WORKSPACE_URL, DATABRICKS_TOKEN, PT_ENDPOINT_NAME)
 # print()
@@ -1347,61 +867,24 @@ def test_safety_filter(workspace_url: str, token: str, endpoint_name: str) -> bo
 # results["safety_filter"]   = test_safety_filter(WORKSPACE_URL, DATABRICKS_TOKEN, PT_ENDPOINT_NAME)
 #
 # print()
-# print("═" * 50)
+# print("=" * 50)
 # print("  Test Summary")
-# print("═" * 50)
+# print("=" * 50)
 # for test_name, passed in results.items():
 #     icon = "✅" if passed else "❌"
 #     print(f"  {icon}  {test_name}")
 # all_passed = all(results.values())
 # print()
-# print("All tests passed ✅" if all_passed else "⚠️  Some tests failed — check the output above.")
+# print("All tests passed ✅" if all_passed else "Some tests failed -- check the output above.")
 
-print("All four test functions are defined — uncomment the test block above after endpoint creation.")
-
-# COMMAND ----------
-
-# MAGIC %md
-# MAGIC #### ✅ Expected test output (all tests passing):
-# MAGIC ```
-# MAGIC Running endpoint tests against: au-workshop-gateway
-# MAGIC
-# MAGIC ──────────────────────────────────────────────────
-# MAGIC ✅  PASS — Basic connectivity: 200 OK
-# MAGIC     Model said: 'Hello'
-# MAGIC
-# MAGIC ✅  Interactive prompt test: 200 OK
-# MAGIC     Response: An NMI is a unique 10- or 11-digit identifier assigned to
-# MAGIC     every electricity connection point in Australia's national electricity market.
-# MAGIC
-# MAGIC ✅  PASS — PII blocking: request blocked with 400 (PII detected in prompt)
-# MAGIC
-# MAGIC ✅  PASS — Safety filter: unsafe prompt blocked with HTTP 400
-# MAGIC
-# MAGIC ══════════════════════════════════════════════════
-# MAGIC   Test Summary
-# MAGIC ══════════════════════════════════════════════════
-# MAGIC   ✅  basic_connectivity
-# MAGIC   ✅  interactive_prompt
-# MAGIC   ✅  pii_blocking
-# MAGIC   ✅  safety_filter
-# MAGIC
-# MAGIC All tests passed ✅
-# MAGIC ```
+print("All four test functions are defined -- uncomment the test block above after endpoint creation.")
 
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC <div style="border-left: 4px solid #FF3621; padding-left: 16px; margin: 24px 0">
-# MAGIC <h2 style="color: #1B3139; margin: 0">Section 8: Verify Full Endpoint Configuration via REST API</h2>
-# MAGIC <p style="color: #666; margin: 4px 0 0 0">⏱️ ~3 minutes · Read-only — safe to run at any time</p>
-# MAGIC </div>
+# MAGIC ## Section 8: Verify Full Endpoint Configuration via REST API
 # MAGIC
-# MAGIC Use the function below to confirm all the settings you configured are active.
-# MAGIC This is useful for:
-# MAGIC - Post-deployment validation in a CI/CD pipeline
-# MAGIC - Providing audit evidence that the configuration is in place
-# MAGIC - Comparing endpoints across workspaces
+# MAGIC Use this function to confirm all settings are active -- useful for post-deployment validation in CI/CD or providing audit evidence.
 
 # COMMAND ----------
 
@@ -1419,43 +902,31 @@ def print_gateway_summary(endpoint_config: dict) -> None:
     state = endpoint_config.get("state", {}).get("ready", "unknown")
     gateway = endpoint_config.get("ai_gateway", {})
 
-    print("╔══════════════════════════════════════════════╗")
-    print(f"  AI Gateway: {name}")
-    print(f"  Status    : {state}")
-    print("╚══════════════════════════════════════════════╝")
+    print(f"AI Gateway: {name}  |  Status: {state}")
     print()
 
-    # Usage tracking
     usage = gateway.get("usage_tracking_config", {})
     icon = "✅" if usage.get("enabled") else "❌"
     print(f"  {icon}  Usage tracking       : {'ENABLED' if usage.get('enabled') else 'DISABLED'}")
 
-    # Payload logging
     itc = gateway.get("inference_table_config", {})
     if itc.get("enabled"):
         table = f"{itc.get('catalog_name')}.{itc.get('schema_name')}.{itc.get('table_name_prefix')}_payload_logs"
-        print(f"  ✅  Payload logging      : ENABLED → {table}")
+        print(f"  ✅  Payload logging      : ENABLED -> {table}")
     else:
         print("  ❌  Payload logging      : DISABLED")
 
-    # Guardrails
     guardrails = gateway.get("guardrails", {})
     input_pii   = guardrails.get("input", {}).get("pii", {}).get("behavior", "NONE")
     input_safe  = guardrails.get("input", {}).get("safety", False)
     output_pii  = guardrails.get("output", {}).get("pii", {}).get("behavior", "NONE")
     output_safe = guardrails.get("output", {}).get("safety", False)
 
-    pii_icon = "✅" if input_pii == "BLOCK" else "❌"
-    saf_icon = "✅" if input_safe else "❌"
-    print(f"  {pii_icon}  Input PII guardrail  : {input_pii}")
-    print(f"  {saf_icon}  Input safety filter  : {'ON' if input_safe else 'OFF'}")
+    print(f"  {'✅' if input_pii == 'BLOCK' else '❌'}  Input PII guardrail  : {input_pii}")
+    print(f"  {'✅' if input_safe else '❌'}  Input safety filter  : {'ON' if input_safe else 'OFF'}")
+    print(f"  {'✅' if output_pii == 'BLOCK' else '❌'}  Output PII guardrail : {output_pii}")
+    print(f"  {'✅' if output_safe else '❌'}  Output safety filter : {'ON' if output_safe else 'OFF'}")
 
-    pii_icon2 = "✅" if output_pii == "BLOCK" else "❌"
-    saf_icon2 = "✅" if output_safe else "❌"
-    print(f"  {pii_icon2}  Output PII guardrail : {output_pii}")
-    print(f"  {saf_icon2}  Output safety filter : {'ON' if output_safe else 'OFF'}")
-
-    # Rate limits
     rate_limits = gateway.get("rate_limits", [])
     if rate_limits:
         print(f"  ✅  Rate limits configured: {len(rate_limits)}")
@@ -1465,7 +936,6 @@ def print_gateway_summary(endpoint_config: dict) -> None:
         print("  ⚠️   Rate limits: none configured")
 
     print()
-    # Overall compliance verdict
     all_good = (
         usage.get("enabled")
         and itc.get("enabled")
@@ -1479,67 +949,36 @@ def print_gateway_summary(endpoint_config: dict) -> None:
         print("  ✅  COMPLIANCE CHECK: All required controls are ACTIVE")
         print("      Suitable for regulated data per APRA CPS 234 requirements.")
     else:
-        print("  ⚠️   COMPLIANCE CHECK: One or more controls are missing — see above.")
+        print("  ⚠️   COMPLIANCE CHECK: One or more controls are missing -- see above.")
 
 
 # TODO: Uncomment after creating the endpoint
 # config = get_endpoint_config(WORKSPACE_URL, HEADERS, PT_ENDPOINT_NAME)
 # print_gateway_summary(config)
 
-print("Endpoint config check is read-only — safe to uncomment and run after endpoint creation.")
+print("Endpoint config check is read-only -- safe to uncomment and run after endpoint creation.")
 
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC #### ✅ Expected output from the compliance summary (fully configured endpoint):
-# MAGIC ```
-# MAGIC ╔══════════════════════════════════════════════╗
-# MAGIC   AI Gateway: au-workshop-gateway
-# MAGIC   Status    : READY
-# MAGIC ╚══════════════════════════════════════════════╝
-# MAGIC
-# MAGIC   ✅  Usage tracking       : ENABLED
-# MAGIC   ✅  Payload logging      : ENABLED → energy_ai.audit_logs.ai_gw_payloads_payload_logs
-# MAGIC   ✅  Input PII guardrail  : BLOCK
-# MAGIC   ✅  Input safety filter  : ON
-# MAGIC   ✅  Output PII guardrail : BLOCK
-# MAGIC   ✅  Output safety filter : ON
-# MAGIC   ✅  Rate limits configured: 2
-# MAGIC        key=endpoint      calls=60/minute
-# MAGIC        key=user          calls=20/minute
-# MAGIC
-# MAGIC   ✅  COMPLIANCE CHECK: All required controls are ACTIVE
-# MAGIC       Suitable for regulated data per APRA CPS 234 requirements.
-# MAGIC ```
-
-# COMMAND ----------
-
-# MAGIC %md
-# MAGIC <div style="border-left: 4px solid #FF3621; padding-left: 16px; margin: 24px 0">
-# MAGIC <h2 style="color: #1B3139; margin: 0">Section 9: Lab Summary & Final Checkpoint</h2>
-# MAGIC <p style="color: #666; margin: 4px 0 0 0">⏱️ ~2 minutes</p>
-# MAGIC </div>
+# MAGIC ## Section 9: Lab Summary & Final Checkpoint
 
 # COMMAND ----------
 
 print("=" * 60)
-print("  Lab 02 — Final Checkpoint Summary")
+print("  Lab 02 -- Final Checkpoint Summary")
 print("=" * 60)
 print()
 
 outcomes = [
-    ("Section 1", "AI Gateway + PT endpoint architecture explained",       True),
-    ("Section 1", "FMAPI Provisioned Throughput endpoint config built",    True),
-    ("Section 1", "UI walkthrough: Create endpoint step-by-step",          True),
-    ("Section 2", "Azure OpenAI Regional (australiaeast) config built",    True),
-    ("Section 3", "Rate limits: endpoint-level + per-user QPM",            True),
-    ("Section 3", "UI walkthrough: Update rate limits in the console",     True),
-    ("Section 4", "Usage tracking enabled with team/project tags",         True),
-    ("Section 5", "PII BLOCK guardrail on input and output",               True),
-    ("Section 5", "UI walkthrough: Guardrails toggle locations",           True),
-    ("Section 6", "Payload logging to Delta table configured",             True),
-    ("Section 7", "Four interactive tests: connectivity, prompt, PII, safety", True),
-    ("Section 8", "Compliance summary function for audit evidence",        True),
+    ("Section 1", "FMAPI PT endpoint config built (databricks-claude-haiku-4-5, AU East)", True),
+    ("Section 2", "Azure OpenAI Regional (australiaeast) config built",                   True),
+    ("Section 3", "Rate limits: endpoint-level + per-user QPM configured",                True),
+    ("Section 4", "Usage tracking enabled with team/project/environment tags",            True),
+    ("Section 5", "PII BLOCK guardrail on input and output (v1 only)",                    True),
+    ("Section 6", "Payload logging to Delta table configured (AU East)",                  True),
+    ("Section 7", "Four tests defined: connectivity, prompt, PII, safety",                True),
+    ("Section 8", "Compliance summary function for audit evidence",                       True),
 ]
 
 for section, description, done in outcomes:
@@ -1547,32 +986,27 @@ for section, description, done in outcomes:
     print(f"  {icon}  [{section}] {description}")
 
 print()
-print("─" * 60)
+print("-" * 60)
 print("  Next lab  : 03_rate_limits_guardrails.py")
 print("  Topic     : Deep-dive into rate limit testing and AU-specific PII patterns")
-print("  Duration  : 30–35 minutes")
-print("─" * 60)
+print("-" * 60)
 
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC ---
 # MAGIC <div style="background: #E8F4F1; padding: 16px; border-radius: 8px; border-left: 4px solid #00A86B">
-# MAGIC <h3 style="color: #006B45; margin: 0 0 8px 0">✅ Lab 02 Complete</h3>
-# MAGIC <p>You have successfully:</p>
+# MAGIC <h3 style="color: #006B45; margin: 0 0 8px 0">Lab 02 Complete</h3>
 # MAGIC <ul>
-# MAGIC <li>Built an AI Gateway endpoint backed by FMAPI Provisioned Throughput (AU East, in-region)</li>
-# MAGIC <li>Built an AI Gateway endpoint backed by Azure OpenAI Regional (australiaeast)</li>
-# MAGIC <li>Configured per-endpoint and per-user QPM rate limits</li>
+# MAGIC <li>Built AI Gateway endpoint backed by FMAPI Provisioned Throughput (AU East, in-region, databricks-claude-haiku-4-5)</li>
+# MAGIC <li>Built AI Gateway endpoint backed by Azure OpenAI Regional (australiaeast)</li>
+# MAGIC <li>Configured per-endpoint and per-user QPM rate limits via v1 API</li>
 # MAGIC <li>Enabled usage tracking with team/project tags for chargeback attribution</li>
-# MAGIC <li>Configured PII BLOCK guardrails on both input and output</li>
-# MAGIC <li>Enabled payload logging to a Delta table for APRA CPS 234 audit evidence</li>
-# MAGIC <li>Tested the endpoint interactively: connectivity, prompts, PII blocking, safety</li>
+# MAGIC <li>Configured PII BLOCK guardrails on both input and output (v1 only)</li>
+# MAGIC <li>Enabled payload logging to Delta table for APRA CPS 234 audit evidence (data stays AU East)</li>
+# MAGIC <li>Defined four endpoint tests: connectivity, prompts, PII blocking, safety filter</li>
 # MAGIC </ul>
-# MAGIC <p><strong>Next:</strong> &rarr; Lab 03: Rate Limits &amp; Guardrails Deep-Dive</p>
+# MAGIC <p><strong>Next:</strong> Lab 03: Rate Limits and Guardrails Deep-Dive</p>
 # MAGIC </div>
-# MAGIC
-# MAGIC ---
 # MAGIC
 # MAGIC ## Reference: AI Gateway REST API Endpoints
 # MAGIC
@@ -1586,7 +1020,5 @@ print("─" * 60)
 # MAGIC | List all endpoints | GET | `/api/2.0/serving-endpoints` |
 # MAGIC | Delete endpoint | DELETE | `/api/2.0/serving-endpoints/{name}` |
 # MAGIC
-# MAGIC **Key SDK note — `ServedEntityInput.name` vs model name:**
-# MAGIC `ServedEntityInput.name` is a **routing label**, not the model name.
-# MAGIC `Route.served_model_name` must match this label exactly — it does NOT take
-# MAGIC the raw model name like `databricks-claude-haiku-4-5`.
+# MAGIC **Key SDK note:** `ServedEntityInput.name` is a routing label, NOT the model name.
+# MAGIC `Route.served_model_name` must match this label exactly -- it does NOT take the raw model name.
