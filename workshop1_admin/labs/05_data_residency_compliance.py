@@ -819,6 +819,10 @@ for check in checks:
     print(f"  [DONE]  {check}")
 
 print()
+print("-" * 60)
+print("  This is the final lab in the Workshop 1 Admin Track.")
+print("-" * 60)
+print()
 print("=" * 60)
 print("WORKSHOP COMPLETE — All 5 labs finished")
 print("=" * 60)

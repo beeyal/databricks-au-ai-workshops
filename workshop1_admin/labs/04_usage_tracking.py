@@ -782,8 +782,10 @@ for check in checks:
     print(f"  [DONE]  {check}")
 
 print()
-print("Next lab: 05_data_residency_compliance.py")
-print("Topic   : Generating a compliance evidence package for APRA audit")
+print("-" * 60)
+print("  Next lab  : 05_data_residency_compliance.py")
+print("  Topic     : Generating a compliance evidence package for APRA audit")
+print("-" * 60)
 
 # COMMAND ----------
 

@@ -8,7 +8,7 @@
 # MAGIC <table style="width:100%; border-collapse:collapse; margin-top:16px; font-family:'DM Sans',sans-serif;">
 # MAGIC   <tr><td style="padding:8px 16px; background:#f5f5f5; border-radius:6px; width:25%"><b>Workshop</b></td><td style="padding:8px 16px;">Genie Spaces &amp; AI Features — Australian Regulated Industries</td></tr>
 # MAGIC   <tr><td style="padding:8px 16px; background:#f5f5f5; border-radius:6px;"><b>Role</b></td><td style="padding:8px 16px;">Data Engineer / Platform Admin</td></tr>
-# MAGIC   <tr><td style="padding:8px 16px; background:#f5f5f5; border-radius:6px;"><b>Prerequisites</b></td><td style="padding:8px 16px;">Lab 01 complete — <code>workshop.energy_nem</code> tables exist and you have a <code>SPACE_ID</code></td></tr>
+# MAGIC   <tr><td style="padding:8px 16px; background:#f5f5f5; border-radius:6px;"><b>Prerequisites</b></td><td style="padding:8px 16px;">Lab 01 complete — <code>workshop_au.energy</code> tables exist and you have a <code>SPACE_ID</code></td></tr>
 # MAGIC   <tr><td style="padding:8px 16px; background:#f5f5f5; border-radius:6px;"><b>Objectives</b></td><td style="padding:8px 16px;">Enrich UC comments → add time-series instructions → add advanced golden queries → enable Agent mode → configure SharePoint/Drive connector → run health check</td></tr>
 # MAGIC </table>
 

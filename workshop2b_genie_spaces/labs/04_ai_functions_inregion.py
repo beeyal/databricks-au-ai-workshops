@@ -20,7 +20,7 @@
 # MAGIC   </tr>
 # MAGIC   <tr>
 # MAGIC     <td style="padding: 8px 16px; background: #F4F4F4; border-radius: 4px"><strong>Prerequisite</strong></td>
-# MAGIC     <td style="padding: 8px 16px">Labs 01-02 complete -- <code>workshop.energy_nem</code> tables exist</td>
+# MAGIC     <td style="padding: 8px 16px">Labs 01-02 complete -- <code>workshop_au.energy</code> tables exist</td>
 # MAGIC   </tr>
 # MAGIC </table>
 # MAGIC
@@ -104,6 +104,11 @@ print(f"Connected: {HOST}")
 # MAGIC ---
 # MAGIC ## Step 1 -- Deploy a Provisioned Throughput Endpoint (AU East)
 # MAGIC
+# MAGIC > **START THIS STEP FIRST — deployment takes 5–15 minutes.**
+# MAGIC > Run the SDK cell below (Option B) immediately, then proceed with reading the UI orientation
+# MAGIC > and Step 2 while the endpoint provisions in the background.
+# MAGIC > Do not skip ahead to Step 3 until the endpoint reaches **Ready** state.
+# MAGIC
 # MAGIC ### Option A -- Deploy via the UI
 # MAGIC
 # MAGIC **Navigate:** Left sidebar → Serving → **[+ Create serving endpoint]** (top right)
@@ -122,7 +127,7 @@ print(f"Connected: {HOST}")
 # MAGIC {"messages": [{"role": "user", "content": "Classify: transformer overheated during heatwave. WEATHER or EQUIPMENT?"}]}
 # MAGIC ```
 # MAGIC
-# MAGIC ### Option B -- Deploy via SDK (cell below)
+# MAGIC ### Option B -- Deploy via SDK (cell below — run this NOW, then continue reading)
 
 # COMMAND ----------
 

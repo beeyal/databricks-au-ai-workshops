@@ -365,8 +365,8 @@ except Exception as e:
 # MAGIC | `event_time` | When the call happened |
 # MAGIC | `user_identity.email` | Who made the call (user or SP) |
 # MAGIC | `service_name` | `mcpServer` for all MCP calls |
-# MAGIC | `request_params.action_name` | The specific tool called |
-# MAGIC | `response.status_code` | 200 = success, 4xx/5xx = error |
+# MAGIC | `action_name` | The specific tool called (top-level column) |
+# MAGIC | `response.statusCode` | 200 = success, 4xx/5xx = error |
 
 # COMMAND ----------
 
@@ -380,10 +380,9 @@ except Exception as e:
 # MAGIC SELECT
 # MAGIC   event_time,
 # MAGIC   user_identity.email                              AS user,
-# MAGIC   request_params.action_name                      AS mcp_tool_called,
-# MAGIC   request_params.request_id                       AS request_id,
-# MAGIC   response.status_code                            AS http_status,
-# MAGIC   DATEDIFF(ms, event_time, response_time)         AS latency_ms
+# MAGIC   action_name                                     AS mcp_action,
+# MAGIC   request_params                                  AS request_params,
+# MAGIC   response.statusCode                             AS http_status
 # MAGIC FROM system.access.audit
 # MAGIC WHERE service_name = 'mcpServer'
 # MAGIC   AND action_name  = 'mcpToolsCall'
@@ -401,11 +400,11 @@ except Exception as e:
 sql_asset_access = """
 -- Data asset access frequency via MCP — last 7 days
 SELECT
-  request_params.action_name                         AS mcp_tool_called,
+  action_name                                        AS mcp_action,
   user_identity.email                                AS accessed_by,
   COUNT(*)                                           AS call_count,
-  SUM(CASE WHEN response.status_code = 200 THEN 1 ELSE 0 END) AS success_count,
-  SUM(CASE WHEN response.status_code != 200 THEN 1 ELSE 0 END) AS error_count,
+  SUM(CASE WHEN response.statusCode = 200 THEN 1 ELSE 0 END) AS success_count,
+  SUM(CASE WHEN response.statusCode != 200 THEN 1 ELSE 0 END) AS error_count,
   MIN(event_time)                                    AS first_seen,
   MAX(event_time)                                    AS last_seen
 FROM system.access.audit
@@ -427,7 +426,7 @@ print(sql_asset_access)
 # MAGIC
 # MAGIC | CPS 234 requirement | Control | Evidence location |
 # MAGIC |--------------------|---------|-------------------|
-# MAGIC | Asset access is logged | Every MCP call → `system.access.audit` | `WHERE service_name='mcpServer'` |
+# MAGIC | Asset access is logged | Every MCP call → `system.access.audit` | `WHERE service_name='mcpServer' AND action_name='mcpToolsCall'` |
 # MAGIC | Access attributed to an identity | App runs as named SP; notebook calls use user email | `user_identity.email` column |
 # MAGIC | Access controls are enforced | UC function permissions control which tools the agent can call | UC audit + function GRANT history |
 # MAGIC | Rate limits prevent abuse | AI Gateway per-SP rate limits | AI Gateway metrics |
@@ -444,7 +443,7 @@ print(sql_asset_access)
 try:
     df = spark.sql("""
         SELECT
-            request_params.action_name                         AS tool_name,
+            action_name                                        AS tool_name,
             COUNT(DISTINCT user_identity.email)                AS distinct_callers,
             COUNT(*)                                           AS total_calls,
             MIN(event_time)                                    AS first_call,
@@ -481,7 +480,7 @@ sql_after_hours = """
 SELECT
   event_time,
   user_identity.email                          AS caller,
-  request_params.action_name                   AS tool_called,
+  action_name                                  AS tool_called,
   HOUR(CONVERT_TIMEZONE('UTC', 'Australia/Sydney', event_time)) AS hour_aest
 FROM system.access.audit
 WHERE service_name = 'mcpServer'

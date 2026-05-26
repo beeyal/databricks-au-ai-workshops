@@ -698,8 +698,10 @@ for check in checks:
     print(f"  [DONE]  {check}")
 
 print()
-print("Next lab: 04_usage_tracking.py")
-print("Topic   : System tables, cost attribution, and budget alerts")
+print("-" * 60)
+print("  Next lab  : 04_usage_tracking.py")
+print("  Topic     : System tables, cost attribution, and budget alerts")
+print("-" * 60)
 
 # COMMAND ----------
 

@@ -31,8 +31,8 @@
 # ── EDIT THESE BEFORE RUNNING ──────────────────────────────────────────────────
 
 # The catalog and schema where AEMO tables live
-AEMO_CATALOG = "aemo"
-AEMO_SCHEMA   = "default"           # change if tables are in a different schema
+AEMO_CATALOG = "workshop_au"
+AEMO_SCHEMA   = "aemo"              # change if tables are in a different schema
 
 # Genie Space name that participants will see
 SPACE_TITLE       = "AEMO NEM Operations"
@@ -89,6 +89,14 @@ print()
 if failed:
     print(f"⛔  {len(failed)} table(s) failed the check. Resolve before continuing.")
     print("   Failing tables:", failed)
+    print()
+    print("   Common cause: the AEMO data setup notebook has not been run yet.")
+    print(f"   Expected location: {AEMO_CATALOG}.{AEMO_SCHEMA}.*")
+    print("   Run the setup notebook first, then re-run this notebook from Step 1.")
+    raise RuntimeError(
+        f"Pre-flight failed: {len(failed)} table(s) missing or empty. "
+        "Run the AEMO data setup notebook before creating the Genie Space."
+    )
 else:
     print("✅  All tables passed. Ready to create the Genie Space.")
 
@@ -116,19 +124,21 @@ Key columns:
   - region_id        : STRING    — NEM region: NSW1, VIC1, QLD1, SA1, TAS1
   - duid             : STRING    — Dispatchable Unit Identifier (unique per generator unit)
   - dispatch_mw      : DOUBLE    — Actual MW dispatched in that interval (0 if unavailable)
-  - fuel_type        : STRING    — e.g. 'COAL', 'GAS', 'WIND', 'SOLAR', 'HYDRO', 'BATTERY', 'BIOMASS'
-  - scheduled_mw     : DOUBLE    — MW the market requested (may differ from dispatch_mw)
-  - availability_mw  : DOUBLE    — Maximum the unit declared it could produce
+  - fuel_type        : STRING    — e.g. 'coal', 'gas', 'wind', 'solar', 'hydro', 'battery', 'biomass'
+  - station_name     : STRING    — Human-readable station name (e.g. 'Loy Yang A')
+  - initial_mw       : DOUBLE    — MW at the start of the dispatch interval
+  - available_mw     : DOUBLE    — Maximum MW the unit declared it could produce
+  - ramp_rate        : DOUBLE    — MW per minute ramp capability
 
 ### spot_prices
 30-minute trading interval Regional Reference Prices for all NEM regions.
 Key columns:
-  - settlement_date  : TIMESTAMP — trading interval end time (AEST)
-  - region_id        : STRING    — NEM region: NSW1, VIC1, QLD1, SA1, TAS1
-  - rrp              : DOUBLE    — Regional Reference Price in $/MWh
-  - rop              : DOUBLE    — Regional Override Price (same as rrp unless intervention)
-  - apc_flag         : BOOLEAN   — TRUE if Administered Price Cap was active
-  - total_demand_mw  : DOUBLE    — Total regional demand for that interval
+  - settlement_date       : TIMESTAMP — trading interval end time (AEST)
+  - region_id             : STRING    — NEM region: NSW1, VIC1, QLD1, SA1, TAS1
+  - rrp                   : DOUBLE    — Regional Reference Price in $/MWh
+  - total_demand_mw       : DOUBLE    — Total regional demand for that interval
+  - net_interchange       : DOUBLE    — Net MW import (positive) or export (negative) via interconnectors
+  - scheduled_generation  : DOUBLE    — Total scheduled generation dispatched in the region
 
 ### market_notices
 AEMO market and system notices as published on NEMWEB.
@@ -137,30 +147,34 @@ Key columns:
   - notice_type      : STRING    — Category: e.g. 'LOR1', 'LOR2', 'LOR3', 'MARKET NOTICE', 'SYSTEM NOTICE', 'RERT'
   - reason           : STRING    — Full text of the notice
   - effective_date   : TIMESTAMP — When the notice takes effect (AEST)
-  - issue_date       : TIMESTAMP — When AEMO published the notice (AEST)
+  - issue_time       : TIMESTAMP — When AEMO published the notice (AEST)
   - region_id        : STRING    — Region affected (NULL if NEM-wide)
-  - external_body    : STRING    — Issuing body (usually 'AEMO')
+  - intervention     : BOOLEAN   — TRUE if this notice is part of a market intervention
 
 ### generator_registration
 NEM registered generator details from the AEMO Registration and Exemption List.
 Key columns:
-  - duid             : STRING    — Dispatchable Unit Identifier (primary key)
-  - station_name     : STRING    — Human-readable station name (e.g. 'Loy Yang A')
-  - participant_id   : STRING    — Market participant code
-  - region_id        : STRING    — NEM region the unit is registered in
-  - registered_capacity_mw : DOUBLE — Nameplate capacity in MW
-  - fuel_type        : STRING    — Primary fuel type
-  - technology_type  : STRING    — e.g. 'Steam Sub-Critical', 'Combined Cycle', 'Wind', 'Battery'
-  - dispatch_type    : STRING    — 'GENERATOR' or 'LOAD'
+  - duid                    : STRING — Dispatchable Unit Identifier (primary key)
+  - station_name            : STRING — Human-readable station name (e.g. 'Loy Yang A')
+  - participant_id          : STRING — Market participant code
+  - region_id               : STRING — NEM region the unit is registered in
+  - registered_capacity_mw  : DOUBLE — Nameplate capacity in MW
+  - fuel_type               : STRING — Primary fuel type
+  - dispatch_type           : STRING — 'GENERATOR' or 'LOAD'
+  - max_ramp_rate           : DOUBLE — Maximum ramp rate in MW/min
+  - min_load                : DOUBLE — Minimum stable generation level in MW
 
 ### settlement_amounts
 Weekly NEM settlement data. One row per participant per settlement run.
 Key columns:
-  - settlement_date  : DATE      — Settlement week end date
-  - participant_id   : STRING    — Market participant code
-  - total_aud        : DOUBLE    — Net settlement amount in AUD (positive = receivable, negative = payable)
-  - settlement_status: STRING    — 'FINAL', 'REVISED', 'PRELIMINARY', 'DISPUTED', 'PENDING'
-  - run_number       : INTEGER   — Settlement run iteration (higher = more recent revision)
+  - settlement_date         : DATE   — Settlement week end date
+  - participant_id          : STRING — Market participant code
+  - run_type                : STRING — Settlement run type: 'FINAL', 'REVISED', 'PRELIMINARY'
+  - energy_amount_aud       : DOUBLE — Energy component of settlement in AUD
+  - fcas_amount_aud         : DOUBLE — FCAS component of settlement in AUD
+  - interconnector_residue_aud : DOUBLE — Interconnector residue component in AUD
+  - total_aud               : DOUBLE — Net settlement amount in AUD (positive = receivable, negative = payable)
+  - settlement_status       : STRING — 'FINAL', 'REVISED', 'PRELIMINARY', 'DISPUTED', 'PENDING'
 
 ## Formatting rules
 - Express prices in $/MWh with 2 decimal places (e.g. $87.45/MWh)
@@ -255,7 +269,7 @@ SELECT
     region_id,
     LEFT(reason, 200)   AS reason_summary,
     effective_date,
-    issue_date
+    issue_time
 FROM aemo.market_notices
 WHERE notice_type IN ('LOR1', 'LOR2', 'LOR3')
   AND effective_date >= CURRENT_DATE - INTERVAL 7 DAYS
@@ -270,8 +284,7 @@ SELECT
     region_id,
     DATE(settlement_date)         AS spike_date,
     settlement_date               AS interval_time,
-    ROUND(rrp, 2)                 AS rrp_mwh,
-    CASE WHEN apc_flag THEN 'YES' ELSE 'NO' END AS apc_active
+    ROUND(rrp, 2)                 AS rrp_mwh
 FROM aemo.spot_prices
 WHERE rrp > 1000
 ORDER BY settlement_date DESC
@@ -339,10 +352,10 @@ SELECT
     region_id,
     LEFT(reason, 300)  AS reason_summary,
     effective_date,
-    issue_date
+    issue_time
 FROM aemo.market_notices
-WHERE issue_date >= CURRENT_DATE - INTERVAL 30 DAYS
-ORDER BY issue_date DESC
+WHERE issue_time >= CURRENT_DATE - INTERVAL 30 DAYS
+ORDER BY issue_time DESC
 """.strip()
     },
     {
@@ -420,7 +433,7 @@ SELECT
     settlement_date,
     ROUND(total_aud, 2)    AS settlement_amount_aud,
     settlement_status,
-    run_number
+    run_type
 FROM aemo.settlement_amounts
 WHERE settlement_status IN ('DISPUTED', 'PENDING')
   AND settlement_date >= CURRENT_DATE - INTERVAL 28 DAYS
@@ -476,14 +489,21 @@ ORDER BY total_mwh DESC;
 -- Tile 3: Active notices today
 SELECT notice_type, region_id, LEFT(reason, 150) AS reason_summary, effective_date
 FROM aemo.market_notices
-WHERE DATE(issue_date) = CURRENT_DATE
-ORDER BY issue_date DESC
+WHERE DATE(issue_time) = CURRENT_DATE
+ORDER BY issue_time DESC
 LIMIT 10;
 """.strip()
     },
 ]
 
-print(f"Defined {len(GOLDEN_QUERIES)} golden queries.")
+# Qualify all table references in the golden queries with the configured catalog and schema.
+# The SQL strings use the short alias "aemo." — replace with the full three-part name so
+# the queries run regardless of the session's default catalog.
+_TABLE_PREFIX = f"{AEMO_CATALOG}.{AEMO_SCHEMA}."
+for _q in GOLDEN_QUERIES:
+    _q["sql"] = _q["sql"].replace("aemo.", _TABLE_PREFIX)
+
+print(f"Defined {len(GOLDEN_QUERIES)} golden queries (table prefix: {_TABLE_PREFIX}).")
 for i, q in enumerate(GOLDEN_QUERIES, 1):
     print(f"  {i:02d}. {q['name']}")
 
@@ -577,7 +597,7 @@ else:
             "description": q["description"],
             "query":       q["sql"],
         }
-        url  = f"{host}/api/2.0/genie/spaces/{SPACE_ID}/queries"
+        url  = f"{host}/api/2.0/genie/spaces/{SPACE_ID}/sql-queries"
         resp = requests.post(url, headers=headers, json=payload, timeout=30)
 
         if resp.status_code in (200, 201):

@@ -619,8 +619,10 @@ else:
 
 # COMMAND ----------
 
+spark.sql(f"CREATE SCHEMA IF NOT EXISTS {CATALOG}.ai_governance")
+
 spark.sql(f"""
-CREATE TABLE IF NOT EXISTS {CATALOG}.{SCHEMA}.genie_space_registry (
+CREATE TABLE IF NOT EXISTS {CATALOG}.ai_governance.genie_space_registry (
     space_id              STRING    COMMENT 'Genie Space ID (UUID from the Genie REST API)',
     space_title           STRING    COMMENT 'Display title of the Genie Space',
     space_url             STRING    COMMENT 'Full URL to access the space in the Databricks UI',
@@ -665,7 +667,7 @@ registry_row = Row(
     created_at           = datetime.utcnow()
 )
 
-spark.createDataFrame([registry_row]).write.mode("append").saveAsTable(f"{CATALOG}.{SCHEMA}.genie_space_registry")
+spark.createDataFrame([registry_row]).write.mode("append").saveAsTable(f"{CATALOG}.ai_governance.genie_space_registry")
 
 print("Registry record written.")
 print()
@@ -686,7 +688,7 @@ SELECT
     certified_by,
     certified_at,
     notes
-FROM {CATALOG}.{SCHEMA}.genie_space_registry
+FROM {CATALOG}.ai_governance.genie_space_registry
 ORDER BY created_at DESC
 """).display()
 
@@ -696,7 +698,7 @@ ORDER BY created_at DESC
 # MAGIC ### 2b -- Promoting to Certified (reference SQL -- run when ready)
 # MAGIC
 # MAGIC ```sql
-# MAGIC UPDATE workshop_au.energy.genie_space_registry
+# MAGIC UPDATE workshop_au.ai_governance.genie_space_registry
 # MAGIC SET
 # MAGIC     certification_status = 'certified',
 # MAGIC     certified_by         = 'your.name@aemo.com.au',
@@ -924,7 +926,7 @@ def run_s3_readiness_checklist(space_id: str, pt_endpoint_name: str, catalog: st
     try:
         reg = spark.sql(f"""
             SELECT certification_status, golden_query_count
-            FROM {catalog}.{schema}.genie_space_registry
+            FROM {catalog}.ai_governance.genie_space_registry
             WHERE space_id = '{space_id}'
         """).collect()
         if reg:

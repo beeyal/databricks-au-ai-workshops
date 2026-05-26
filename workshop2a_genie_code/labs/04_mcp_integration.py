@@ -50,7 +50,7 @@
 # MAGIC | Databricks SQL | `.../mcp/sql` | Direct SQL execution |
 # MAGIC
 # MAGIC **Tool naming convention:** UC function dots become double underscores in MCP tool names:
-# MAGIC `workshop_au.energy.calculate_peak_demand` → `workshop_au__energy__calculate_peak_demand`
+# MAGIC `workshop_au.workshop_lab.calculate_peak_demand` → `workshop_au__workshop_lab__calculate_peak_demand`
 # MAGIC
 # MAGIC **Three packages — do not mix them:**
 # MAGIC
@@ -67,16 +67,16 @@
 
 # COMMAND ----------
 
-%pip install databricks-mcp databricks-langchain databricks-openai mlflow --quiet
+%pip install databricks-mcp databricks-langchain databricks-openai mlflow langgraph --quiet
 dbutils.library.restartPython()
 
 # COMMAND ----------
 
 dbutils.widgets.text("catalog",        "workshop_au",          "Catalog name")
-dbutils.widgets.text("schema",         "energy",               "Schema name")
+dbutils.widgets.text("schema",         "workshop_lab",         "Schema name")
 dbutils.widgets.text("pt_endpoint",    "au_east_llm_inregion", "PT endpoint name")
 dbutils.widgets.text("genie_space_id", "",                     "Genie Space ID")
-dbutils.widgets.text("vs_index",       "workshop_au.energy.policy_docs_index", "VS index (3-part name)")
+dbutils.widgets.text("vs_index",       "workshop_au.workshop_lab.policy_docs_index", "VS index (3-part name)")
 
 CATALOG        = dbutils.widgets.get("catalog")
 SCHEMA         = dbutils.widgets.get("schema")
@@ -112,8 +112,8 @@ if GENIE_SPACE_ID == "":
 # MAGIC
 # MAGIC **How to find your Vector Search index:**
 # MAGIC
-# MAGIC Navigate: Left sidebar → Catalog icon → workshop_au → energy → Vector Search Indexes
-# MAGIC You should see: `policy_docs_index` with full 3-part name `workshop_au.energy.policy_docs_index`.
+# MAGIC Navigate: Left sidebar → Catalog icon → workshop_au → workshop_lab → Vector Search Indexes
+# MAGIC You should see: `policy_docs_index` with full 3-part name `workshop_au.workshop_lab.policy_docs_index`.
 
 # COMMAND ----------
 
@@ -895,8 +895,8 @@ print("Exercise: uncomment the block above and run to register check_regulatory_
 # MAGIC
 # MAGIC | Check | What to verify |
 # MAGIC |-------|---------------|
-# MAGIC | SQL test | `SELECT workshop_au.energy.check_regulatory_compliance('NSW', 'SAIDI', 278)` returns `breach: true, penalty_estimate_aud: 420000.0` |
-# MAGIC | MLflow trace | Tool call appears as `workshop_au__energy__check_regulatory_compliance` in the Traces tab |
+# MAGIC | SQL test | `SELECT workshop_au.workshop_lab.check_regulatory_compliance('NSW', 'SAIDI', 278)` returns `breach: true, penalty_estimate_aud: 420000.0` |
+# MAGIC | MLflow trace | Tool call appears as `workshop_au__workshop_lab__check_regulatory_compliance` in the Traces tab |
 # MAGIC | Tool routing | LLM routes to `check_regulatory_compliance`, not `search_policy_docs_index` |
 
 # COMMAND ----------
