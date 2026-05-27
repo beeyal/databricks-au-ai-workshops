@@ -18,7 +18,7 @@
 # MAGIC - [ ] Configured per-endpoint and per-user rate limits
 # MAGIC - [ ] Enabled usage tracking with team/project tags
 # MAGIC - [ ] Configured PII masking guardrails on input and output
-# MAGIC - [ ] Enabled payload logging to a Delta table for APRA audit evidence
+# MAGIC - [ ] Enabled payload logging to a Delta table for SOCI Act compliance audit evidence
 # MAGIC - [ ] Tested the endpoint interactively from this notebook
 # MAGIC
 # MAGIC **AI Gateway versions — know which one you are using:**
@@ -168,7 +168,7 @@ def build_ai_gateway_config(
     """
     Build an AiGatewayConfig with:
     - Usage tracking enabled (writes to system.ai_gateway.usage)
-    - Payload logging to a Delta table (for APRA audit evidence)
+    - Payload logging to a Delta table (for SOCI Act compliance audit evidence)
     - PII BLOCK guardrail on inputs and outputs
     - Safety filter on both input and output
     - Rate limit: 60 QPM endpoint-wide, 20 QPM per user
@@ -183,7 +183,7 @@ def build_ai_gateway_config(
         ),
 
         # Payload logging stores every request + response in {catalog}.{schema}.{table_prefix}_payload_logs
-        # Required for APRA CPS 234 audit evidence. Data stays in AU East.
+        # Required for SOCI Act CPS 234 audit evidence. Data stays in AU East.
         inference_table_config=AiGatewayInferenceTableConfig(
             enabled=True,
             catalog_name=catalog,
@@ -631,7 +631,7 @@ print("Guardrail update function defined -- uncomment after endpoint creation.")
 # MAGIC %md
 # MAGIC ## Section 6: Enable Payload Logging to Delta Table
 # MAGIC
-# MAGIC Payload logging stores every request and response in a Delta table -- required for APRA CPS 234 audit evidence. The table is created automatically at `{catalog}.{schema}.{table_prefix}_payload_logs` on the first logged request.
+# MAGIC Payload logging stores every request and response in a Delta table -- required for SOCI Act CPS 234 audit evidence. The table is created automatically at `{catalog}.{schema}.{table_prefix}_payload_logs` on the first logged request.
 # MAGIC
 # MAGIC Navigate: Left sidebar → Serving → AI Gateway tab → click the endpoint name → "Edit endpoint" or "Edit Unity AI Gateway" → Inference tables section
 # MAGIC You should see: Fields to specify catalog.schema for the Delta table. Data stays in AU East.
@@ -947,7 +947,7 @@ def print_gateway_summary(endpoint_config: dict) -> None:
     )
     if all_good:
         print("  ✅  COMPLIANCE CHECK: All required controls are ACTIVE")
-        print("      Suitable for regulated data per APRA CPS 234 requirements.")
+        print("      Suitable for regulated data per SOCI Act 2018 + Privacy Act requirements.")
     else:
         print("  ⚠️   COMPLIANCE CHECK: One or more controls are missing -- see above.")
 
@@ -1002,7 +1002,7 @@ print("-" * 60)
 # MAGIC <li>Configured per-endpoint and per-user QPM rate limits via v1 API</li>
 # MAGIC <li>Enabled usage tracking with team/project tags for chargeback attribution</li>
 # MAGIC <li>Configured PII BLOCK guardrails on both input and output (v1 only)</li>
-# MAGIC <li>Enabled payload logging to Delta table for APRA CPS 234 audit evidence (data stays AU East)</li>
+# MAGIC <li>Enabled payload logging to Delta table for SOCI Act CPS 234 audit evidence (data stays AU East)</li>
 # MAGIC <li>Defined four endpoint tests: connectivity, prompts, PII blocking, safety filter</li>
 # MAGIC </ul>
 # MAGIC <p><strong>Next:</strong> Lab 03: Rate Limits and Guardrails Deep-Dive</p>

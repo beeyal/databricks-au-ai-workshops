@@ -356,7 +356,7 @@ def check_data_geography():
             remediation=(
                 "In Account Console, go to Workspaces > [this workspace] > Compliance & Security. "
                 "Enable 'Enforce data processing within Geography'. "
-                "This is required for APRA CPS 234 and AEMO/AER data sovereignty obligations."
+                "This is required for SOCI Act 2018 critical infrastructure obligations and AER data sovereignty requirements."
             ),
         )
     else:

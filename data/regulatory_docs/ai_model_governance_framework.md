@@ -13,7 +13,7 @@
 
 This framework defines the governance requirements for the full lifecycle of AI and machine learning models developed, procured, or deployed by the company. It supplements the AI Usage Policy (POL-AI-001) with specific requirements for model development, validation, production deployment, ongoing monitoring, and retirement.
 
-The framework responds to the increasing use of AI in regulated activities—including asset condition assessment, load forecasting for AEMO market participation, and customer interaction—and the expectation from the AER and APRA CPS 230 that regulated entities demonstrate control over technology risks, including algorithmic risk.
+The framework responds to the increasing use of AI in regulated activities—including asset condition assessment, load forecasting for AEMO market participation, and customer interaction—and the expectation from the AER that regulated entities demonstrate control over technology risks, including algorithmic risk, consistent with Security of Critical Infrastructure Act 2018 (SOCI Act) obligations.
 
 ---
 
@@ -165,4 +165,4 @@ Models that are replaced by a newer version or no longer serve a business purpos
 
 ---
 
-*This framework is reviewed annually and upon any material change to AI regulatory guidance in Australia, including guidance from APRA, the AER, or the Office of the Australian Information Commissioner.*
+*This framework is reviewed annually and upon any material change to AI regulatory guidance in Australia, including guidance from the AER, ASD/ACSC, or the Office of the Australian Information Commissioner.*

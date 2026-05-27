@@ -485,7 +485,7 @@ print("  IN-REGION  (use this):  databricks-qwen3-embedding-0-6b")
 print("  CROSS-GEO  (avoid):     databricks-gte-large-en")
 print()
 print("Selecting the wrong model sends document embeddings outside AU East.")
-print("For regulated industries (APRA, AER, AUSTRAC) this may breach data residency requirements.")
+print("For regulated industries (SOCI Act, AER, Privacy Act) this may breach data residency requirements.")
 
 # COMMAND ----------
 

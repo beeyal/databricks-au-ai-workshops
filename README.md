@@ -1,12 +1,12 @@
 # Databricks AI Workshops — Australian Regulated Industries
 
-Hands-on workshop series for enabling AI features on Databricks in APRA-regulated and critical-infrastructure environments — designed and tested for the **Australia East** region.
+Hands-on workshop series for enabling AI features on Databricks in critical infrastructure and privacy-regulated environments — designed and tested for the **Australia East** region.
 
 ---
 
 ## Overview
 
-This repository contains three complementary workshops covering the full spectrum of Databricks AI adoption, from platform governance to daily developer and analyst productivity. All content is designed for organisations operating under Australian regulatory frameworks including APRA CPS 234, CPS 230, the Australian Privacy Act, and Critical Infrastructure obligations.
+This repository contains three complementary workshops covering the full spectrum of Databricks AI adoption, from platform governance to daily developer and analyst productivity. All content is designed for organisations operating under Australian regulatory frameworks including SOCI Act 2018 (critical infrastructure), Privacy Act 1988, AESCSF, and AER regulatory obligations.
 
 | # | Workshop | Track | Duration |
 |---|----------|-------|----------|

@@ -47,7 +47,7 @@ The AU East AI availability deck covers all Databricks AI features and their AU 
 | Section | What it covers |
 |---------|---------------|
 | What's in-region today | Genie Spaces, AI Gateway, FMAPI PT, Genie Code, Model Serving — all safe for regulated data |
-| What's cross-geo | FMAPI Pay-Per-Token, Knowledge Assistant — not suitable for APRA-regulated data without mitigations |
+| What's cross-geo | FMAPI Pay-Per-Token, Knowledge Assistant — not suitable for critical infrastructure regulated data without mitigations |
 | What's not available | Foundation Model Fine-tuning not available in AU East as of May 2026 |
 | Roadmap | Known planned availability dates; framed as direction, not commitment |
 | Recommended path | Sessions 2 and 3 as the enablement vehicle |
@@ -83,7 +83,7 @@ The core track is mandatory for all Session 2 participants. It follows the `sess
 | 03 | Rate Limits & Guardrails | `workshop1_admin/labs/03_rate_limits_guardrails.py` | 40 min | Per-user rate limits; AU PII guardrail active |
 | 04 | Genie Space — Admin Setup | `session2_technical/labs/04_genie_space_admin_setup.py` | 45 min | Production Genie Space created; golden queries loaded |
 | 05 | Usage Tracking & Cost Attribution | `workshop1_admin/labs/04_usage_tracking.py` | 35 min | Cost attribution view built; budget alert configured |
-| 06 | Data Residency & Compliance Evidence | `workshop1_admin/labs/05_data_residency_compliance.py` | 35 min | APRA compliance evidence package exported |
+| 06 | Data Residency & Compliance Evidence | `workshop1_admin/labs/05_data_residency_compliance.py` | 35 min | SOCI Act + Privacy Act compliance evidence package exported |
 
 **Go/no-go gate for Session 3:** The checklist at the end of Lab 04 must pass before Session 3 can be run. See `session2_technical/README.md` for the full checklist.
 

@@ -46,7 +46,7 @@ Work through the following in order. Most steps have dependencies on earlier one
 - [ ] Locate **"Enforce data processing within workspace Geography"** and confirm it is **enabled**.
 - [ ] If it is not enabled, enable it now. This setting may take up to 30 minutes to propagate.
 
-> This is the single most important compliance control for APRA-regulated participants. If you cannot enable it (e.g., the customer's Account Admin has not approved it), Workshop 1 Lab 3 will still walk through the API call to check it — but you should communicate clearly to participants that their production workspace should have this enabled before they run any regulated workloads.
+> This is the single most important compliance control for SOCI Act / critical infrastructure regulated participants. If you cannot enable it (e.g., the customer's Account Admin has not approved it), Workshop 1 Lab 3 will still walk through the API call to check it — but you should communicate clearly to participants that their production workspace should have this enabled before they run any regulated workloads.
 
 ### 1.5 AI features
 
@@ -155,7 +155,7 @@ Run through this list in the 60 minutes before participants arrive.
 
 ### Lab 1 facilitation notes
 
-**Before participants start:** Walk through the AU East residency table in the lab header (the green/red matrix). Spend 2 minutes on it. This sets up the entire governance narrative for the day. Participants from APRA-regulated entities will have questions about Pay-Per-Token — acknowledge the concern, tell them Workshop 1 Lab 2 covers how to block it at the AI Gateway.
+**Before participants start:** Walk through the AU East residency table in the lab header (the green/red matrix). Spend 2 minutes on it. This sets up the entire governance narrative for the day. Participants from teams from SOCI Act / critical infrastructure regulated organisations will have questions about Pay-Per-Token — acknowledge the concern, tell them Workshop 1 Lab 2 covers how to block it at the AI Gateway.
 
 **Section 3 (Geography enforcement):** This is the most important section. Most participants will get a 403 Forbidden because they are not Account Admins on the workshop workspace. That is intentional — show the correct response from a machine where you have Account Admin, or show a screenshot. The point is to know *where* to check, not necessarily to change the setting live.
 
@@ -174,7 +174,7 @@ AI Gateway is the control plane for routing, rate limiting, and guardrailing LLM
 
 ### Lab 3 facilitation notes
 
-`system.access.audit` is where every AI action (Genie query, model serving call, AI Gateway request) is logged. This section resonates strongly with APRA audiences because CPS 234 requires audit trails for all access to sensitive data and systems.
+`system.access.audit` is where every AI action (Genie query, model serving call, AI Gateway request) is logged. This section resonates strongly with regulated organisations because the SOCI Act and Privacy Act both require audit trails for all access to sensitive data and systems.
 
 **Key moment:** Run the live audit query that shows Genie Space queries in the audit log. If the Genie Space was tested in the pre-workshop checklist, those queries will appear. This is a powerful demo — participants can see their own test query in the log.
 
@@ -184,7 +184,7 @@ AI Gateway is the control plane for routing, rate limiting, and guardrailing LLM
 
 Unity Catalog governance for AI assets follows the same pattern as data governance — catalogs, schemas, grants. The novelty is the asset types: registered models, serving endpoints, AI Gateway routes, Genie Spaces.
 
-**Pause for discussion:** After the GRANT examples, ask the room: "In your current environment, who approves access to a new AI model endpoint? Is that a manual process or automated?" This surfaced well in APRA-regulated workshop runs — most teams have no defined process yet, which creates a compelling reason to build one using UC.
+**Pause for discussion:** After the GRANT examples, ask the room: "In your current environment, who approves access to a new AI model endpoint? Is that a manual process or automated?" This surfaced well in SOCI Act / critical infrastructure regulated workshop runs — most teams have no defined process yet, which creates a compelling reason to build one using UC.
 
 ---
 
@@ -368,7 +368,7 @@ Participants need only a modern web browser. No local software installation is r
 
 ### Network (corporate/office delivery)
 
-If running the workshop in a corporate office environment (common for APRA-regulated entities), confirm the following with the customer's network team at least 3 days before:
+If running the workshop in a corporate office environment (common for regulated organisations), confirm the following with the customer's network team at least 3 days before:
 
 | Traffic | Destination | Port |
 |---------|-------------|------|

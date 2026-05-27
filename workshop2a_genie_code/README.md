@@ -87,7 +87,7 @@ Key exercises:
 - Design a NEM12 data quality pipeline end-to-end using only chat prompts
 - Debug a 4-cell pipeline where the error surfaces 3 cells after the root cause
 - Ask cross-cell questions: "Why does the result in cell 7 differ from what I computed in cell 4?"
-- Regulatory extension: ask Genie Code to add APRA-style audit trail fields to a pipeline
+- Regulatory extension: ask Genie Code to add regulatory audit trail fields to a pipeline
 
 ---
 

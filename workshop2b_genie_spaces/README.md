@@ -123,7 +123,7 @@ By the end of this workshop, you will have:
 - A practical framework for deciding when to trust a Genie answer vs. when to verify it — directly applicable to regulatory reporting workflows
 - A set of column descriptions and Genie Space instructions you can take back to your data team
 - An understanding of the data residency posture of every Genie feature you used today
-- Familiarity with AI SQL functions and their safe usage pattern in APRA-regulated environments
+- Familiarity with AI SQL functions and their safe usage pattern in critical infrastructure regulated environments
 
 ---
 

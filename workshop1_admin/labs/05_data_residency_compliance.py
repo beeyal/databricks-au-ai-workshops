@@ -8,15 +8,15 @@
 # MAGIC | | |
 # MAGIC |---|---|
 # MAGIC | **Prerequisites** | Labs 01–04 complete |
-# MAGIC | **By the end** | Compliance evidence package generated, pre-flight checklist run, APRA audit log exported |
+# MAGIC | **By the end** | Compliance evidence package generated, pre-flight checklist run, SOCI Act audit log exported |
 # MAGIC
 # MAGIC ---
 # MAGIC
 # MAGIC | Regulation | Requirement | How this lab addresses it |
 # MAGIC |---|---|---|
-# MAGIC | APRA CPS 234 | Data processed in permitted jurisdictions | Geography enforcement API check |
-# MAGIC | APRA CPS 234 | Access logs maintained for all information assets | Audit log query + evidence package |
-# MAGIC | APRA CPS 230 | Operational risk controls documented and tested | Pre-flight checklist script |
+# MAGIC | SOCI Act 2018 | Data processed in permitted jurisdictions | Geography enforcement API check |
+# MAGIC | SOCI Act 2018 | Access logs maintained for all information assets | Audit log query + evidence package |
+# MAGIC | Privacy Act 1988 | Operational risk controls documented and tested | Pre-flight checklist script |
 # MAGIC | Privacy Act 1988 | Personal information must not leave Australia | PII guardrail + geography enforcement |
 # MAGIC
 # MAGIC ---
@@ -171,7 +171,7 @@ display(spark.sql("""
 # MAGIC <h2 style="color: #1B3139; margin: 0">Section 2: Verify "Enforce Data Processing Within Geography"</h2>
 # MAGIC </div>
 # MAGIC
-# MAGIC This is the **most critical APRA control** in this lab. When disabled (the default), some AI features may route data outside Australia. The API check below confirms the setting programmatically for your evidence package.
+# MAGIC This is the **most critical SOCI Act control** in this lab. When disabled (the default), some AI features may route data outside Australia. The API check below confirms the setting programmatically for your evidence package.
 
 # COMMAND ----------
 
@@ -397,7 +397,7 @@ compliance_package = {
     "account_id":      ACCOUNT_ID,
     "assessment_date": REPORT_TIMESTAMP,
     "assessed_by":     "TODO: Name/Role",
-    "regulatory_frameworks": ["APRA CPS 234", "APRA CPS 230", "Privacy Act 1988 (Cth)", "NER"],
+    "regulatory_frameworks": ["SOCI Act 2018", "Privacy Act 1988", "Privacy Act 1988 (Cth)", "NER"],
     "section_1_infrastructure": {
         "workspace_region":              region_check.get("location", "unknown"),
         "cloud_provider":                "Microsoft Azure",
@@ -455,16 +455,16 @@ print("Compliance evidence save is commented out — uncomment after configuring
 
 # MAGIC %md
 # MAGIC <div style="border-left: 4px solid #FF3621; padding-left: 16px; margin: 24px 0">
-# MAGIC <h2 style="color: #1B3139; margin: 0">Section 5: APRA Audit Evidence — AI Model Access Logs</h2>
+# MAGIC <h2 style="color: #1B3139; margin: 0">Section 5: SOCI Act Audit Evidence — AI Model Access Logs</h2>
 # MAGIC </div>
 # MAGIC
-# MAGIC APRA CPS 234 requires logs of access to AI models. Confirm the retention period with your legal team (typically 7 years for financial records).
+# MAGIC SOCI Act 2018 requires logs of access to AI models. Confirm the retention period with your legal team (typically 7 years for financial records).
 
 # COMMAND ----------
 
 def generate_ai_access_log(start_date: str, end_date: str, include_endpoints: list = None):
     """
-    Generate an AI model access log for APRA audit purposes.
+    Generate an AI model access log for SOCI Act + Privacy Act compliance audit purposes.
 
     Parameters
     ----------
@@ -806,7 +806,7 @@ checks = [
     "AI feature inventory: 11 features reviewed with residency status",
     "Compliance evidence package generated (structured JSON)",
     "Evidence package save-to-Delta pattern documented",
-    "APRA audit log query: all AI access events with user/IP",
+    "SOCI Act compliance audit log query: all AI access events with user/IP",
     "Access log export to Unity Catalog volume",
     "UC tag schema defined for AI asset classification",
     "Tag SQL examples for models, endpoints, and UC objects",
@@ -841,7 +841,7 @@ print("  7. Schedule the compliance evidence package as a quarterly job")
 # MAGIC %md
 # MAGIC ---
 # MAGIC <div style="background: #F0F4F8; padding: 16px; border-radius: 6px; margin-top: 16px">
-# MAGIC <h3 style="color: #1B3139; margin: 0 0 12px 0">APRA CPS 234 Evidence Artefact Checklist</h3>
+# MAGIC <h3 style="color: #1B3139; margin: 0 0 12px 0">SOCI Act 2018 Evidence Artefact Checklist</h3>
 # MAGIC
 # MAGIC | Artefact | Source | How to produce |
 # MAGIC |---|---|---|

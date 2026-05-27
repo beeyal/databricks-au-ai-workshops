@@ -261,7 +261,7 @@ display(playground_usage)
 
 # COMMAND ----------
 
-# AI Gateway configuration changes — change management audit evidence (APRA CPS 230)
+# AI Gateway configuration changes — change management audit evidence (SOCI Act CPS 230)
 gateway_changes = spark.sql("""
   SELECT
     event_time,
@@ -784,7 +784,7 @@ for check in checks:
 print()
 print("-" * 60)
 print("  Next lab  : 05_data_residency_compliance.py")
-print("  Topic     : Generating a compliance evidence package for APRA audit")
+print("  Topic     : Generating a compliance evidence package for SOCI Act + Privacy Act audit")
 print("-" * 60)
 
 # COMMAND ----------

@@ -112,7 +112,7 @@ demo = gr.ChatInterface(
     description=(
         "Ask questions about NEM dispatch intervals, spot prices, market notices, "
         "settlements, and generation unit status. "
-        "All data is processed in **Australia East** — APRA data residency maintained."
+        "All data is processed in **Australia East** — SOCI Act / critical infrastructure data residency maintained."
     ),
     examples=[
         "What was the average spot price in VIC yesterday?",

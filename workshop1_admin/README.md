@@ -8,13 +8,13 @@
 
 ## Overview
 
-This workshop equips platform and security teams with the knowledge and hands-on experience to safely enable, govern, and audit Databricks AI features in environments subject to Australian regulatory obligations including APRA CPS 234, APRA CPS 230, the Australian Privacy Act, and critical infrastructure obligations under the SOCI Act.
+This workshop equips platform and security teams with the knowledge and hands-on experience to safely enable, govern, and audit Databricks AI features in environments subject to Australian regulatory obligations including SOCI Act 2018 (critical infrastructure), Privacy Act 1988 + APPs, AESCSF (energy sector cybersecurity), and AER regulatory obligations.
 
 The workshop takes a controls-first approach: every AI feature introduced is accompanied by the corresponding governance control, Unity Catalog permission, and audit mechanism. By the end of the day, participants will have a documented controls framework they can adapt for their organisation.
 
 ### Why this matters for regulated industries
 
-Australian regulators — particularly APRA — expect organisations to maintain active oversight of AI systems that access or process regulated data. That means:
+Australian regulators — Australian regulators expect organisations to maintain active oversight of AI systems that access or process regulated data. That means:
 
 - Knowing exactly which AI features are enabled in each workspace
 - Being able to prove that regulated data does not leave the Australian jurisdiction
@@ -133,5 +133,5 @@ The table below is your quick reference for labs and discussions. It reflects th
 
 - Run the same preflight and settings checks on your production workspace
 - Review your organisation's AI feature request process against the controls covered today
-- Schedule a follow-up session with your Databricks SA to review your specific APRA obligations and the Databricks shared responsibility model
+- Schedule a follow-up session with your Databricks SA to review your specific SOCI Act and Privacy Act obligations and the Databricks shared responsibility model
 - Consider whether Workshop 2a (Genie Code) or Workshop 2b (Genie Spaces) is the right next step for your technical teams

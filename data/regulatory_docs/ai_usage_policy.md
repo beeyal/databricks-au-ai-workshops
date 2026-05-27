@@ -11,7 +11,7 @@
 
 ## 1. Purpose
 
-This policy establishes the governance framework for the use of artificial intelligence (AI) and machine learning (ML) technologies across all business functions. It ensures that AI adoption aligns with the company's obligations under the Australian Energy Regulator (AER) Cyber Security Guidelines, APRA Prudential Standard CPS 230 Operational Risk Management, and the Privacy Act 1988 (Cth).
+This policy establishes the governance framework for the use of artificial intelligence (AI) and machine learning (ML) technologies across all business functions. It ensures that AI adoption aligns with the company's obligations under the Security of Critical Infrastructure Act 2018 (SOCI Act), AER Cyber Security Guidelines, Australian Energy Sector Cyber Security Framework (AESCSF), and the Privacy Act 1988 (Cth).
 
 The company recognises AI as a strategic enabler but acknowledges the material operational risks that poorly governed AI introduces to critical electricity infrastructure.
 
@@ -84,9 +84,9 @@ AI-related incidents—including model errors resulting in incorrect operational
 
 ---
 
-## 7. APRA CPS 230 Alignment
+## 7. SOCI Act and AER Cyber Security Alignment
 
-In accordance with APRA CPS 230, AI services provided by third-party vendors that support material business activities must be subject to the Vendor Risk Management Policy (POL-VRM-005). Material service providers delivering AI platforms must demonstrate adequate operational resilience, including documented business continuity and disaster recovery capabilities.
+In accordance with the Security of Critical Infrastructure Act 2018 (SOCI Act) and AER Cyber Security Guidelines, AI services provided by third-party vendors that support material business activities must be subject to the Vendor Risk Management Policy (POL-VRM-005). Critical infrastructure service providers (SOCI Act) delivering AI platforms must demonstrate adequate operational resilience, including documented business continuity and disaster recovery capabilities.
 
 ---
 

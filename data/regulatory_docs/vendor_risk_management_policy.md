@@ -11,9 +11,9 @@
 
 ## 1. Purpose
 
-This policy establishes the framework for identifying, assessing, and managing risks arising from third-party vendors and service providers, with specific provisions for AI/ML service providers and cloud platforms. The policy implements the requirements of APRA Prudential Standard CPS 230 Operational Risk Management (effective 1 July 2025) and the Security of Critical Infrastructure Act 2018 (Cth).
+This policy establishes the framework for identifying, assessing, and managing risks arising from third-party vendors and service providers, with specific provisions for AI/ML service providers and cloud platforms. The policy implements the requirements of the Security of Critical Infrastructure Act 2018 (Cth) and AER Cyber Security Guidelines.
 
-CPS 230 requires regulated entities and their associated service providers to maintain operational resilience. As the company operates critical electricity infrastructure supporting the NEM, third-party failures can have consequences for market participants and energy consumers beyond the company's direct customer base.
+The SOCI Act requires responsible entities for critical infrastructure assets to manage risks to the reliable operation of those assets, including risks arising from third-party service providers. As the company operates critical electricity infrastructure supporting the NEM, third-party failures can have consequences for market participants and energy consumers beyond the company's direct customer base.
 
 ---
 
@@ -41,13 +41,13 @@ All active vendors are assigned a tier based on operational criticality and data
 
 ---
 
-## 4. Material Service Providers — APRA CPS 230
+## 4. Critical Infrastructure Service Providers — SOCI Act
 
 ### 4.1 Identification
 
-Under CPS 230 paragraph 55, the company must identify material service providers (MSPs) — those providers whose failure would have a material adverse impact on the company's operational continuity. The Risk team maintains the MSP Register, reviewed quarterly by the Risk and Audit Committee.
+Under the SOCI Act, the company must identify critical infrastructure service providers (CISPs) — those providers whose failure would have a material adverse impact on the company's ability to maintain safe and reliable electricity supply. The Risk team maintains the CISP Register, reviewed quarterly by the Risk and Audit Committee.
 
-Current MSP categories include:
+Current CISP categories include:
 
 - EMS/SCADA platform vendors
 - Network Management System (NMS) software providers
@@ -55,9 +55,9 @@ Current MSP categories include:
 - Cloud infrastructure providers hosting operational data
 - AI/ML platforms processing metering or operational data
 
-### 4.2 MSP Requirements
+### 4.2 CISP Requirements
 
-Tier 1 and designated MSPs must contractually commit to:
+Tier 1 and designated CISPs must contractually commit to:
 
 - Providing the company with audited business continuity plans (BCPs) and disaster recovery (DR) test results annually
 - Notifying the company of any material operational incident within 24 hours
@@ -135,4 +135,4 @@ All vendor contracts must include exit provisions ensuring that:
 
 ---
 
-*Queries regarding this policy should be directed to the Procurement team or the Chief Risk Officer. This policy is reviewed annually or when APRA CPS 230 guidance is updated.*
+*Queries regarding this policy should be directed to the Procurement team or the Chief Risk Officer. This policy is reviewed annually or when SOCI Act guidance or AER requirements are updated.*

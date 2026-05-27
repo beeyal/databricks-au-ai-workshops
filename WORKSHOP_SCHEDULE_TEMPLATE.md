@@ -47,7 +47,7 @@ The following must be confirmed at least **3 business days before the first work
 
 | Time | Duration | Session | Notes |
 |---|---|---|---|
-| 8:30 AM | 30 min | Welcome, context-setting, and environment check | Introduce the regulatory framing (APRA CPS 234/230, SOCI Act, Privacy Act). Confirm all participants can access the workspace. Start cluster now if not already running. |
+| 8:30 AM | 30 min | Welcome, context-setting, and environment check | Introduce the regulatory framing (SOCI Act 2018, Privacy Act 1988, AESCSF). Confirm all participants can access the workspace. Start cluster now if not already running. |
 | 9:00 AM | 45 min | **Lab 01** — Workspace AI Settings & Access Control | Inspect AI feature flags, verify geography enforcement setting, configure UC grants for AI assets, create a service principal. Hardest lab logistically — allocate extra time for participants without full admin rights. |
 | 9:45 AM | 15 min | Break | Keep to 15 minutes. Use this time to start the cluster for Lab 02 if it recycled. |
 | 10:00 AM | 45 min | **Lab 02** — AI Gateway Setup | Configure AI Gateway endpoint, routing rules, rate limits, guardrails. Demo the block on cross-geo Pay-Per-Token models. |
@@ -127,7 +127,7 @@ Same as Option A but with an extended afternoon for deeper content and cross-fun
 | Time | Duration | Session | Notes |
 |---|---|---|---|
 | 8:15 AM | — | Room opens | |
-| 8:30 AM | 40 min | Welcome, objectives, and regulatory landscape | Expanded opening: APRA CPS 230/234, SOCI Act, Privacy Act, NER Chapter 7. Draw the connection between each to a specific lab. |
+| 8:30 AM | 40 min | Welcome, objectives, and regulatory landscape | Expanded opening: SOCI Act 2018, Privacy Act 1988, AESCSF, AER, NER Chapter 7. Draw the connection between each to a specific lab. |
 | 9:10 AM | 50 min | **Lab 01** — Workspace AI Settings & Access Control | Extra time for mixed-experience groups. |
 | 10:00 AM | 15 min | Break | |
 | 10:15 AM | 50 min | **Lab 02** — AI Gateway Setup | |

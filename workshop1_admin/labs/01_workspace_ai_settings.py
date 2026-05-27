@@ -295,7 +295,7 @@ def compliance_check_geography(setting_response: dict) -> None:
     print("─" * 60)
     if csp_value == "COMPLIANCE_SECURITY_PROFILE":
         print("PASS — Enforce data processing within Geography: ENABLED")
-        print("    APRA CPS 234 data residency requirement: MET")
+        print("    SOCI Act critical infrastructure data residency: MET")
     else:
         print("FAIL — Enforce data processing within Geography: NOT ENABLED")
         print(f"    Current value : '{csp_value or '(not set)'}'")
