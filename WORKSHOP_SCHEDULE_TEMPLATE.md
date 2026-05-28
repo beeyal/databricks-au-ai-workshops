@@ -23,9 +23,9 @@ The following must be confirmed at least **3 business days before the first work
 
 ### Participant Access
 
-- [ ] All Workshop 1 participants have **Workspace Admin** role, or have an admin buddy they can pair with for settings labs
-- [ ] All Workshop 2a participants have **Data Engineer** role + SELECT on `workshop_au.*`
-- [ ] All Workshop 2b participants have at minimum **Viewer** role + `CAN_USE` on the `Workshop — Energy Analytics` Genie Space
+- [ ] All Session 1 participants have **Workspace Admin** role, or have an admin buddy they can pair with for settings labs
+- [ ] All Session 5 (Genie Code) participants have **Data Engineer** role + SELECT on `workshop_au.*`
+- [ ] All Session 2 (Genie Space) participants have at minimum **Viewer** role + `CAN_USE` on the `Workshop — Energy Analytics` Genie Space
 - [ ] Each participant has logged into the workspace successfully from the venue network before day 1
 
 ### Venue and Environment
@@ -41,7 +41,7 @@ The following must be confirmed at least **3 business days before the first work
 ## Option A: Half-Day (4 Hours) — Admin Track Only
 
 **Audience:** Workspace admins, security architects, platform engineers, cloud infrastructure leads  
-**Workshop:** Workshop 1 — Governing Databricks AI Features in Australian Regulated Industries  
+**Workshop:** Session 1 — Governing Databricks AI Features in Australian Regulated Industries  
 **Room opens:** 8:15 AM (participants arrive, facilitator assists stragglers with workspace login)  
 **Start:** 8:30 AM  
 
@@ -65,12 +65,12 @@ The following must be confirmed at least **3 business days before the first work
 
 ## Option B: Full Day (7 Hours) — Admin Track + One End-User Workshop
 
-**Audience (Day 1 morning):** Workshop 1 audience — admins and security architects  
-**Audience (Day 1 afternoon):** Workshop 2a OR Workshop 2b audience — choose based on your attendee split  
-**Workshop 2a** suits data engineers and ML engineers  
-**Workshop 2b** suits business analysts and operational managers
+**Audience (Day 1 morning):** Session 1 audience — admins and security architects  
+**Audience (Day 1 afternoon):** Session 5 (Genie Code) OR Session 2 (Genie Space) audience — choose based on your attendee split  
+**Session 5 (Genie Code)** suits data engineers and ML engineers  
+**Session 2 (Genie Space)** suits business analysts and operational managers
 
-**Note on audience mixing:** Workshop 1 and Workshop 2x audiences often differ. If running both in the same room, expect some attendees to be present for both tracks and others only for one half. Design the seating and logistics accordingly. Participants who are not attending Workshop 1 should be scheduled to arrive for the 1:00 PM start.
+**Note on audience mixing:** Session 1 and Workshop 2x audiences often differ. If running both in the same room, expect some attendees to be present for both tracks and others only for one half. Design the seating and logistics accordingly. Participants who are not attending Session 1 should be scheduled to arrive for the 1:00 PM start.
 
 | Time | Duration | Session | Track | Notes |
 |---|---|---|---|---|
@@ -81,11 +81,11 @@ The following must be confirmed at least **3 business days before the first work
 | 10:00 AM | 45 min | **Lab 02** — AI Gateway Setup | Admin | |
 | 10:45 AM | 40 min | **Lab 03** — Audit Logging for AI Actions | Admin | |
 | 11:25 AM | 35 min | **Lab 04** — Unity Catalog Governance for AI Assets | Admin | |
-| 12:00 PM | 30 min | Workshop 1 Debrief and Q&A | Admin | Collect feedback. Admin attendees not staying for the afternoon may leave. |
+| 12:00 PM | 30 min | Session 1 Debrief and Q&A | Admin | Collect feedback. Admin attendees not staying for the afternoon may leave. |
 | 12:30 PM | 60 min | Lunch | — | Use this time to verify the Genie Space and Lab 2x environment are ready. Do a quick run-through of the first lab cell. |
 | 1:30 PM | 15 min | Afternoon welcome and environment check | 2a or 2b | Fresh audience introduction. Confirm Genie Space access or notebook access for all. |
 
-**Afternoon — Workshop 2a (Data Engineers):**
+**Afternoon — Session 5 (Genie Code) (Data Engineers):**
 
 | Time | Duration | Session | Notes |
 |---|---|---|---|
@@ -96,7 +96,7 @@ The following must be confirmed at least **3 business days before the first work
 | 4:00 PM | 30 min | Debrief, Q&A, next steps | Prompt cheat sheet distribution. Discuss production environment considerations. Collect feedback. |
 | 4:30 PM | — | Close | |
 
-**Afternoon — Workshop 2b (Business Analysts):**
+**Afternoon — Session 2 (Genie Space) (Business Analysts):**
 
 | Time | Duration | Session | Notes |
 |---|---|---|---|
@@ -110,15 +110,15 @@ The following must be confirmed at least **3 business days before the first work
 
 **Facilitator notes for Option B:**
 - Lunch is a hard boundary. The afternoon audience arrives at 1:30 PM — if the morning overruns into lunch, you lose setup time. Enforce the 12:00 PM debrief start.
-- For Workshop 2b: Lab 02 (Curating Data for Genie) is the lab most likely to confuse non-technical audiences. If you sense the group struggling, convert it to a facilitator-led demo rather than hands-on and use the recovered time to extend the Lab 03 trust discussion, which has higher business value for this audience.
-- For Workshop 2a: Lab 03 (Autocomplete) can be shortened if Labs 01 and 02 generated strong Q&A. The productivity patterns are quick to cover as a walkthrough.
+- For Session 2 (Genie Space): Lab 02 (Curating Data for Genie) is the lab most likely to confuse non-technical audiences. If you sense the group struggling, convert it to a facilitator-led demo rather than hands-on and use the recovered time to extend the Lab 03 trust discussion, which has higher business value for this audience.
+- For Session 5 (Genie Code): Lab 03 (Autocomplete) can be shortened if Labs 01 and 02 generated strong Q&A. The productivity patterns are quick to cover as a walkthrough.
 
 ---
 
 ## Option C: Two-Day Immersive — All Three Workshops
 
 **Audience:** Mix of admins, engineers, and business analysts  
-**Structure:** Day 1 = Workshop 1 (full day + extension). Day 2 = Workshop 2a (morning) + Workshop 2b (afternoon)
+**Structure:** Day 1 = Session 1 (full day + extension). Day 2 = Session 5 (Genie Code) (morning) + Session 2 (Genie Space) (afternoon)
 
 ### Day 1 — Admin and Governance Track
 
@@ -148,7 +148,7 @@ Same as Option A but with an extended afternoon for deeper content and cross-fun
 
 ### Day 2 — End User Tracks (Parallel or Sequential)
 
-For groups where engineers and business analysts attend together: run Workshop 2a and 2b in sequence, with business analysts joining at 1:30 PM. For large groups where the tracks benefit from separation: run in parallel rooms if available.
+For groups where engineers and business analysts attend together: run Session 5 (Genie Code) and 2b in sequence, with business analysts joining at 1:30 PM. For large groups where the tracks benefit from separation: run in parallel rooms if available.
 
 | Time | Duration | Session | Track | Notes |
 |---|---|---|---|---|
@@ -160,7 +160,7 @@ For groups where engineers and business analysts attend together: run Workshop 2
 | 10:45 AM | 35 min | **Lab 03** — Autocomplete Patterns & Productivity Tips | 2a | |
 | 11:20 AM | 40 min | Debrief, Q&A, and prompt pattern sharing | 2a | Group shares the most useful prompts they discovered. Facilitator captures on whiteboard. |
 | 12:00 PM | 60 min | Lunch | — | Business analyst group arrives at 1:00 PM. |
-| 1:00 PM | 15 min | Workshop 2b welcome and environment check | 2b | Confirm Genie Space access for all new arrivals. |
+| 1:00 PM | 15 min | Session 2 (Genie Space) welcome and environment check | 2b | Confirm Genie Space access for all new arrivals. |
 | 1:15 PM | 35 min | **Lab 01** — Genie Spaces Fundamentals | 2b | |
 | 1:50 PM | 30 min | **Lab 02** — Curating Data for Genie | 2b | Facilitator-led if audience is non-technical. |
 | 2:20 PM | 25 min | **Lab 03** — Genie Quality and Trust | 2b | |

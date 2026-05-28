@@ -24,7 +24,7 @@
 # MAGIC     <strong>Data residency</strong><br>All audit data in AU East
 # MAGIC   </div>
 # MAGIC   <div style="background: #fffbf0; border-left: 4px solid #f9a825; padding: 12px 18px; border-radius: 6px; flex: 1; min-width: 160px;">
-# MAGIC     <strong>APRA relevance</strong><br>CPS 234 evidence trail
+# MAGIC     <strong>SOCI Act relevance</strong><br>Critical infrastructure compliance evidence
 # MAGIC   </div>
 # MAGIC </div>
 
@@ -37,7 +37,7 @@
 # MAGIC |---|---------|-------|------|
 # MAGIC | 1 | AI Gateway | Usage dashboard, inference table, rate limits per SP | 10 min |
 # MAGIC | 2 | MLflow Traces | Trace UI, slow/failed MCP call detection | 10 min |
-# MAGIC | 3 | Audit Logging | `system.access.audit` for MCP, APRA evidence, anomaly alerts | 10 min |
+# MAGIC | 3 | Audit Logging | `system.access.audit` for MCP, SOCI Act + Privacy Act evidence, anomaly alerts | 10 min |
 # MAGIC
 # MAGIC **Why agents need more governance than notebooks:** a single user message can trigger ten tool calls across three systems. The governance surface is proportionally larger.
 # MAGIC
@@ -46,7 +46,7 @@
 # MAGIC | Cost overrun | Unbounded PT endpoint calls | AI Gateway rate limits per SP |
 # MAGIC | Data exfiltration | No record of which tables the agent queried | `system.access.audit` logs every MCP call |
 # MAGIC | Incident investigation | "Something went wrong" — no detail | MLflow traces: every tool call and LLM step |
-# MAGIC | APRA CPS 234 | Cannot demonstrate AI access controls | Full chain: user → agent → tool → data asset |
+# MAGIC | SOCI Act 2018 | Cannot demonstrate AI access controls | Full chain: user → agent → tool → data asset |
 
 # COMMAND ----------
 
@@ -420,9 +420,9 @@ print(sql_asset_access)
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC ### 3.4 — MCP audit and APRA CPS 234
+# MAGIC ### 3.4 — MCP Audit and SOCI Act Compliance
 # MAGIC
-# MAGIC APRA CPS 234 requires audit trails for information asset access, including access by automated systems. The controls in this workshop map directly to CPS 234 evidence:
+# MAGIC The SOCI Act 2018 and Privacy Act 1988 require audit trails for critical infrastructure data access, including access by automated systems. The controls in this workshop provide the following compliance evidence:
 # MAGIC
 # MAGIC | CPS 234 requirement | Control | Evidence location |
 # MAGIC |--------------------|---------|-------------------|
@@ -530,7 +530,7 @@ print(sql_after_hours)
 # MAGIC | `system.access.audit` | Every MCP call attributed to an identity | Catalog → system → access → audit |
 # MAGIC | DBSQL Alert | Automated anomaly detection and notification | SQL Editor → Save → Create Alert |
 # MAGIC
-# MAGIC **APRA CPS 234 checklist after Labs 01–05:**
+# MAGIC **SOCI Act 2018 + Privacy Act compliance checklist after Labs 01–05:**
 # MAGIC - All LLM inference stays in AU East (PT endpoint + workspace-local MCP)
 # MAGIC - Every agent call attributed to a named identity in `system.access.audit`
 # MAGIC - UC function permissions control which tools the agent can call

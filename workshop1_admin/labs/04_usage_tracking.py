@@ -200,7 +200,7 @@ serving_calls = spark.sql("""
     action_name,
     user_identity.email             AS user_email,
     request_params['endpointName']  AS endpoint_name,
-    response.status_code            AS response_code,
+    response.statusCode            AS response_code,
     COUNT(*)                        AS call_count
   FROM system.access.audit
   WHERE
@@ -261,14 +261,14 @@ display(playground_usage)
 
 # COMMAND ----------
 
-# AI Gateway configuration changes — change management audit evidence (SOCI Act CPS 230)
+# AI Gateway configuration changes — change management audit evidence (SOCI Act 2018)
 gateway_changes = spark.sql("""
   SELECT
     event_time,
     user_identity.email             AS changed_by,
     action_name,
     request_params['endpointName']  AS endpoint_name,
-    response.status_code            AS result_code,
+    response.statusCode            AS result_code,
     request_params                  AS change_details
   FROM system.access.audit
   WHERE
@@ -732,7 +732,7 @@ SELECT
   user_identity.email                AS changed_by,
   action_name,
   request_params['endpointName']     AS endpoint_name,
-  response.status_code               AS result_code
+  response.statusCode               AS result_code
 FROM system.access.audit
 WHERE event_time >= CURRENT_TIMESTAMP - INTERVAL 90 DAYS
   AND service_name = 'modelServing'

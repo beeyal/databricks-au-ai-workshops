@@ -676,7 +676,7 @@ if qr.status_code == 200:
 # MAGIC 1. You have a column `quality_flag` with values A, E, S, N. A business analyst is getting inflated consumption totals. Write the column comment you would add to help Genie automatically exclude bad-quality data.
 # MAGIC 2. A user asks Genie "show me peak demand for summer" but the result is wrong because the model multiplied 30-min intervals by 2. What **two specific changes** would you make — one to a column comment, one to the instructions block?
 # MAGIC 3. Agent mode vs Chat mode: for "Which substations had the most outages in zones with high consumption growth?" — which mode is better and why?
-# MAGIC 4. For the SharePoint connector (GA April 2026), which embedding model should you use for AU East data residency, and what is the risk of using the wrong model for an APRA-regulated institution?
+# MAGIC 4. For the SharePoint connector (GA April 2026), which embedding model should you use for AU East data residency, and what is the risk of using the wrong model for an SOCI Act / critical infrastructure regulated organisation?
 # MAGIC 5. The health checker reports "Only 2 trusted assets" but your schema has 10 tables. Walk through three steps to diagnose why the missing tables are not appearing.
 # MAGIC
 # MAGIC **Proceed to Lab 03 when ready.**

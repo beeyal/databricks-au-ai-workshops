@@ -28,7 +28,7 @@
 # MAGIC | V1 (GA) | Left sidebar → Serving → AI Gateway tab | Yes | **Yes** |
 # MAGIC | V2 (Beta) | Left sidebar → AI Gateway (top-level, only visible if enabled via Account Console → Previews) | No | No — lacks guardrails |
 # MAGIC
-# MAGIC > Use V1 for all regulated workloads. V2 Beta does NOT have guardrails.
+# MAGIC > Use V1 for all regulated workloads. V2 has LLM Guardrails (Beta, launched May 19 2026). For regulated production workloads use V1 (GA) while V2 reaches GA.
 
 # COMMAND ----------
 

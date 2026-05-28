@@ -32,7 +32,7 @@ The session takes a left-to-right controls flow: access before gateway, gateway 
 | 03 | Rate Limits & Guardrails | `workshop1_admin/labs/03_rate_limits_guardrails.py` | 40 min | Per-user rate limits set; AU PII guardrail active; guardrail evidence generated |
 | 04 | Genie Space — Admin Setup & Operating Model | `session2_technical/labs/04_genie_space_admin_setup.py` | 45 min | Production Genie Space live; operating model understood; certification checklist run |
 | 05 | Usage Tracking & Cost Attribution | `workshop1_admin/labs/04_usage_tracking.py` | 35 min | Cost attribution view built; AI Gateway usage queried; budget alert configured |
-| 06 | Data Residency & Compliance Evidence | `workshop1_admin/labs/05_data_residency_compliance.py` | 35 min | Compliance evidence package generated; APRA audit artefact exported |
+| 06 | Data Residency & Compliance Evidence | `workshop1_admin/labs/05_data_residency_compliance.py` | 35 min | Compliance evidence package generated; SOCI Act + Privacy Act compliance artefact exported |
 
 **Total: ~230 minutes of lab time.** Allow ~30 minutes for discussion, troubleshooting, and break.
 
@@ -48,7 +48,7 @@ By the end of this session, the workshop workspace will have:
 
 3. **Rate limits configured** — Per-user QPM cap set on the AI Gateway endpoint so no single user can exhaust capacity. Rate limit events appear in `system.ai_gateway.usage`.
 
-4. **AU PII guardrail active** — Input guardrail blocking TFN patterns, Medicare numbers, and common AU PII patterns. Guardrail configuration saved as APRA evidence artefact.
+4. **AU PII guardrail active** — Input guardrail blocking TFN patterns, Medicare numbers, and common AU PII patterns. Guardrail configuration saved as SOCI Act compliance artefact.
 
 5. **Production Genie Space** — `Workshop — Energy Operations` Genie Space created with:
    - `workshop_au.energy` tables as trusted assets (principle of least privilege)
@@ -59,7 +59,7 @@ By the end of this session, the workshop workspace will have:
 
 6. **Usage dashboard** — `v_ai_cost_attribution` view built over `system.ai_gateway.usage` and `system.billing.usage`. Budget alert SQL ready to deploy.
 
-7. **Compliance evidence package** — JSON artefact covering geography enforcement, AI Gateway config, guardrail config, and AI asset UC grants. Ready for APRA CPS 234 review.
+7. **Compliance evidence package** — JSON artefact covering geography enforcement, AI Gateway config, guardrail config, and AI asset UC grants. Ready for SOCI Act 2018 + Privacy Act review.
 
 ---
 
@@ -90,7 +90,7 @@ Session 3 opens Genie to business users. The following must be true before that 
 - [ ] Participant list confirmed — all business users have Databricks workspace access at Viewer level or above.
 - [ ] Genie Space URL copied and ready to share — format: `https://{workspace}/genie/spaces/{SPACE_ID}`.
 - [ ] Sample questions list prepared — 10–15 business questions participants can ask in Session 3 (provided in Lab 04 output).
-- [ ] Compliance evidence package from Lab 06 saved and accessible — needed if APRA review question arises.
+- [ ] Compliance evidence package from Lab 06 saved and accessible — needed if regulatory compliance review arises.
 
 ### What Happens if Prerequisites Are Not Met
 

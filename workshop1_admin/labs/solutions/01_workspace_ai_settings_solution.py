@@ -173,7 +173,7 @@ def compliance_check_geography(setting_response: dict) -> bool:
     print("─" * 60)
     if csp == "COMPLIANCE_SECURITY_PROFILE":
         print("PASS — Enforce data processing within Geography: ENABLED")
-        print("    APRA CPS 234 data residency requirement: MET")
+        print("    SOCI Act data residency requirement: MET")
         return True
     else:
         print("FAIL — Enforce data processing within Geography: NOT ENABLED")
@@ -244,7 +244,7 @@ print("Genie Space permission helper defined — set GENIE_SPACE_ID and uncommen
 # COMMAND ----------
 
 # SOLUTION: Grant serving endpoint permissions via SDK
-w.serving_endpoints.set_permissions(
+w.serving_endpoints.update_permissions(
     serving_endpoint_id=ENDPOINT_NAME,
     access_control_list=[
         ServingEndpointAccessControlRequest(

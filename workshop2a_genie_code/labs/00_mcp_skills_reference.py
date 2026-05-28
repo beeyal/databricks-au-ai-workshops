@@ -86,7 +86,7 @@
 # MAGIC | `author` | No | Shown in skill browser |
 # MAGIC | `version` | No | Useful for change tracking |
 # MAGIC
-# MAGIC > **Tip:** The `description` field is the selector. Write it to match the phrasing participants will actually use. "NEM12 data", "SAIDI calculations", "APRA audit" will match; vague descriptions like "energy stuff" won't.
+# MAGIC > **Tip:** The `description` field is the selector. Write it to match the phrasing participants will actually use. "NEM12 data", "SAIDI calculations", "compliance audit" will match; vague descriptions like "energy stuff" won't.
 
 # COMMAND ----------
 
@@ -336,7 +336,7 @@
 # MAGIC   <code>03_adding_skills_tools.py</code> →
 # MAGIC   <code>04_mcp_integration.py</code>
 # MAGIC   <br/><br/>
-# MAGIC   <strong>Skills deployed to workspace:</strong> <code>@energy-operations</code> &nbsp;|&nbsp; <code>@apra-compliance</code>
+# MAGIC   <strong>Skills deployed to workspace:</strong> <code>@energy-operations</code> &nbsp;|&nbsp; <code>@nem12-format</code>
 # MAGIC   <br/>
 # MAGIC   <strong>UC functions:</strong> <code>workshop_au.energy.*</code> (see Lab 3)
 # MAGIC </div>

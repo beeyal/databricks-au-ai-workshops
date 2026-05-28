@@ -201,7 +201,7 @@ def generate_compliance_evidence_package(workspace_url, account_id, feature_inve
         "account_id":      account_id,
         "assessment_date": report_timestamp,
         "assessed_by":     spark.sql("SELECT current_user()").collect()[0][0],
-        "regulatory_frameworks": ["APRA CPS 234", "APRA CPS 230", "Privacy Act 1988", "National Electricity Rules"],
+        "regulatory_frameworks": ["SOCI Act 2018", "Privacy Act 1988", "AESCSF", "National Electricity Rules"],
         "section_1_infrastructure": {
             "workspace_region":               region_check.get("location"),
             "cloud_provider":                 "Microsoft Azure",
@@ -276,11 +276,11 @@ save_compliance_evidence(spark, CATALOG_NAME, SCHEMA_NAME, package)
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC ## 5. APRA Audit Log — SOLUTION
+# MAGIC ## 5. SOCI Act + Privacy Act Audit Log — SOLUTION
 
 # COMMAND ----------
 
-# SOLUTION: AI model access log for APRA audit
+# SOLUTION: AI model access log for SOCI Act + Privacy Act compliance audit
 AUDIT_START = "2024-05-01"
 AUDIT_END   = "2024-05-31"
 
@@ -293,7 +293,7 @@ access_log_df = spark.sql(f"""
     action_name                                      AS action,
     service_name                                     AS service,
     request_params['endpointName']                   AS endpoint_name,
-    response.status_code                             AS response_code,
+    response.statusCode                             AS response_code,
     response.error_message                           AS error_message,
     request_id                                       AS audit_request_id
   FROM system.access.audit
@@ -368,13 +368,15 @@ for stmt in tag_statements:
 # COMMAND ----------
 
 # SOLUTION: Query tagged objects
+# system.information_schema.object_tags does not exist — use per-object-type tag tables
+# and UNION ALL to get a unified view across tables and registered models.
 tagged_objects = spark.sql("""
-  SELECT
-    object_name,
-    object_type,
-    tag_name,
-    tag_value
-  FROM system.information_schema.object_tags
+  SELECT 'TABLE' AS object_type, catalog_name, schema_name, table_name AS object_name, tag_name, tag_value
+  FROM system.information_schema.table_tags
+  WHERE tag_name IN ('data_classification', 'ai_approved', 'regulatory_scope', 'data_residency')
+  UNION ALL
+  SELECT 'MODEL' AS object_type, catalog_name, schema_name, model_name AS object_name, tag_name, tag_value
+  FROM system.information_schema.model_tags
   WHERE tag_name IN ('data_classification', 'ai_approved', 'regulatory_scope', 'data_residency')
   ORDER BY object_name, tag_name
 """)
@@ -560,7 +562,7 @@ print("  [DONE] Workspace region verified (IMDS + Spark conf)")
 print("  [DONE] Geography enforcement checked via Account API")
 print("  [DONE] Feature inventory: 11 features with live flag status")
 print("  [DONE] Compliance evidence package generated and saved to Delta")
-print("  [DONE] APRA audit log generated and exported to UC Volume")
+print("  [DONE] SOCI Act + Privacy Act audit log generated and exported to UC Volume")
 print("  [DONE] UC tags applied to AI models and endpoints")
 print("  [DONE] Pre-flight checklist: all checks executed")
 print("  [DONE] Pre-flight report saved to Delta")

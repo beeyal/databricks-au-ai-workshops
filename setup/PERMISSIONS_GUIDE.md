@@ -21,9 +21,9 @@ This guide covers the full permission model for the AU AI Workshops programme. I
 |---|---|---|---|---|
 | Business user | Session 3 | `USE CATALOG` on `workshop_au`; `USE SCHEMA`, `SELECT` on `workshop_au.aemo` | `CAN_VIEW` on Genie Space; `CAN_USE` on SQL warehouse | Invite to workspace; add to Genie Space |
 | Data Engineer / Data Scientist | Session 2 (core) | `USE CATALOG` on `workshop_au`; `USE SCHEMA`, `SELECT`, `EXECUTE` on `workshop_au.energy`, `workshop_au.aemo`, `workshop_au.ai_governance` | `CAN_USE` on SQL warehouse; `CAN_QUERY` on PT endpoint | Invite to workspace |
-| Genie Code Developer | Session 2a | Same as Data Engineer above | Same as Data Engineer; plus `CAN_VIEW` on Genie Space | Invite to workspace; add to Genie Space |
-| MCP Agent Builder | Session 2c | `USE CATALOG` on `workshop_au`; `USE SCHEMA`, `SELECT`, `EXECUTE` on `workshop_au.energy` and `workshop_au.aemo` | `CAN_QUERY` on PT endpoint | Invite to workspace |
-| Admin (W1 Admin) | Session 2 (admin labs) | Full catalog admin on `workshop_au`; metastore admin rights to run `GRANT` statements | Workspace admin | Account Console → Workspaces → [workspace] → Admins |
+| Genie Code Developer | Session 5 (Genie Code) | Same as Data Engineer above | Same as Data Engineer; plus `CAN_VIEW` on Genie Space | Invite to workspace; add to Genie Space |
+| MCP Agent Builder | Session 4 (Agents/MCP) | `USE CATALOG` on `workshop_au`; `USE SCHEMA`, `SELECT`, `EXECUTE` on `workshop_au.energy` and `workshop_au.aemo` | `CAN_QUERY` on PT endpoint | Invite to workspace |
+| Admin (W1 Admin) | Session 1 | Full catalog admin on `workshop_au`; metastore admin rights to run `GRANT` statements | Workspace admin | Account Console → Workspaces → [workspace] → Admins |
 
 **How permissions are delivered:** The grant script (`setup/grant_workshop_access.py`) creates a UC group for each session type and applies the above grants to the group. Adding a user to the group gives them all the permissions automatically. This means permissions can be adjusted for a cohort simply by adding or removing users from the group — no individual `GRANT` statements needed.
 
@@ -68,7 +68,7 @@ Confirm this is on before running the preflight check. The preflight notebook (`
 
 ### System table access
 
-System tables (`system.billing.usage`, `system.access.audit`) must be enabled at the metastore level. This is required for Session 2 Labs 05 and 06.
+System tables (`system.billing.usage`, `system.access.audit`) must be enabled at the metastore level. This is required for Session 1 Lab 04.
 
 1. Go to **Account Console** → **Data** → **Metastores**.
 2. Select the metastore assigned to the workshop workspace.

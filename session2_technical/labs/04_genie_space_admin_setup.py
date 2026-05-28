@@ -214,7 +214,7 @@ payload = {
         "network asset health, and AER/AEMO regulatory reporting. "
         "Covers NEM12 interval meter data, network assets, outage events, "
         "and compliance document metadata. "
-        "In-region for AU East -- safe for APRA-regulated data."
+        "In-region for AU East -- safe for SOCI Act / critical infrastructure regulated data."
     ),
     "warehouse_id": serverless_id,
 }

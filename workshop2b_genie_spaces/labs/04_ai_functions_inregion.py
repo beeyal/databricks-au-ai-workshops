@@ -30,7 +30,7 @@
 # MAGIC
 # MAGIC | # | Objective |
 # MAGIC |---|-----------|
-# MAGIC | 1 | Understand why default AI Functions are cross-geo and why that matters for APRA-regulated workloads |
+# MAGIC | 1 | Understand why default AI Functions are cross-geo and why that matters for SOCI Act / critical infrastructure regulated workloads |
 # MAGIC | 2 | Deploy a **Provisioned Throughput (PT) endpoint** in AU East as the in-region AI router |
 # MAGIC | 3 | Create **Unity Catalog wrapper functions** that route all AI calls through the PT endpoint |
 # MAGIC | 4 | Implement classification, summarisation, and extraction using the in-region pattern |
@@ -43,7 +43,7 @@
 # MAGIC ---
 # MAGIC ## Why This Lab Exists: The Data Residency Problem
 # MAGIC
-# MAGIC The built-in AI Functions (`ai_classify`, `ai_summarize`, `ai_extract`, `ai_generate`) call Databricks' shared Foundation Model API. For AU East workspaces, model inference **may route outside Australia** (typically US East 1), which is incompatible with APRA-regulated data handling.
+# MAGIC The built-in AI Functions (`ai_classify`, `ai_summarize`, `ai_extract`, `ai_generate`) call Databricks' shared Foundation Model API. For AU East workspaces, model inference **may route outside Australia** (typically US East 1), which is incompatible with SOCI Act / critical infrastructure data handling requirements.
 # MAGIC
 # MAGIC ```
 # MAGIC CROSS-GEO (avoid for regulated AU data)        IN-REGION (use this)
@@ -757,7 +757,7 @@ IN-REGION EMBEDDING (for Vector Search / Genie RAG):
 # MAGIC ---
 # MAGIC ## Lab 04 -- Review Questions
 # MAGIC
-# MAGIC **Q1.** A colleague says "I'll just use `ai_classify()` -- it's faster." What are the two reasons this is a problem for your APRA-regulated energy company customer?
+# MAGIC **Q1.** A colleague says "I'll just use `ai_classify()` -- it's faster." What are the two reasons this is a problem for your SOCI Act / critical infrastructure regulated energy company?
 # MAGIC
 # MAGIC **Q2.** The PT endpoint is deployed and working. The model vendor releases a newer model. How do you update all AI function calls without changing every notebook or query?
 # MAGIC

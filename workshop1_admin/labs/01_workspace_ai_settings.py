@@ -29,7 +29,7 @@
 # MAGIC **Task 1 — Geography Enforcement toggle (Account Console only)**
 # MAGIC
 # MAGIC Navigate: accounts.cloud.databricks.com → Workspaces → [your workspace name] → Security and compliance tab
-# MAGIC You should see: Toggle labelled "Enforce data processing within workspace Geography for Designated Services" — it must be ON for APRA-regulated workloads.
+# MAGIC You should see: Toggle labelled "Enforce data processing within workspace Geography for Designated Services" — it must be ON for SOCI Act / critical infrastructure regulated workloads.
 # MAGIC
 # MAGIC > This setting is NOT in the workspace admin console. It lives on the workspace detail page inside the Account Console.
 # MAGIC
@@ -175,7 +175,7 @@ for key in WORKSPACE_CONF_KEYS:
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC **For an APRA-regulated workspace, the recommended hardened values are:**
+# MAGIC **For a SOCI Act / critical infrastructure regulated workspace, the recommended hardened values are:**
 # MAGIC
 # MAGIC | Key | Recommended | Why |
 # MAGIC |---|---|---|
@@ -235,7 +235,7 @@ print("Genie Space toggle: commented out for safety. Uncomment to make a change.
 # MAGIC %md
 # MAGIC ## Section 3: Verify "Enforce Data Processing Within Geography"
 # MAGIC
-# MAGIC This is the single most important compliance setting for APRA-regulated entities. When enabled, it prevents Databricks features from routing data outside the workspace region (AU East).
+# MAGIC This is the single most important compliance setting for SOCI Act / critical infrastructure regulated entities. When enabled, it prevents Databricks features from routing data outside the workspace region (AU East).
 # MAGIC
 # MAGIC **Who can change it:** Account Admins only. Workspace-only Admins will receive a 403 — expected.
 # MAGIC
@@ -459,7 +459,7 @@ from databricks.sdk.service.serving import (
 w = WorkspaceClient()  # Reads DATABRICKS_HOST and DATABRICKS_TOKEN from environment
 
 # TODO: Uncomment and run after setting ENDPOINT_NAME and group variables
-# w.serving_endpoints.set_permissions(
+# w.serving_endpoints.update_permissions(
 #     serving_endpoint_id=ENDPOINT_NAME,
 #     access_control_list=[
 #         ServingEndpointAccessControlRequest(
@@ -472,7 +472,7 @@ w = WorkspaceClient()  # Reads DATABRICKS_HOST and DATABRICKS_TOKEN from environ
 #         ),
 #     ],
 # )
-# print(f"SDK permissions set on endpoint: {ENDPOINT_NAME}")
+# print(f"SDK permissions updated on endpoint: {ENDPOINT_NAME}")
 
 print("SDK permission call is commented out — uncomment after setting variable values.")
 
@@ -586,11 +586,13 @@ print("Service principal creation is commented out — safe to run in a non-prod
 
 # COMMAND ----------
 
-from databricks.sdk.service.iam import Group
+from databricks.sdk.service.iam import Group, Patch, PatchOp, PatchSchema
 
 def assign_sp_to_group(w: WorkspaceClient, sp_id: int, group_display_name: str) -> None:
     """
     Add a service principal to an existing workspace group using SCIM PATCH.
+    Uses typed SDK objects (Patch/PatchOp/PatchSchema) rather than raw dicts —
+    PatchOp.ADD issues a PATCH (additive), so existing members are preserved.
     Idempotent — safe to call multiple times.
     """
     groups = list(w.groups.list(filter=f"displayName eq \"{group_display_name}\""))
@@ -601,11 +603,8 @@ def assign_sp_to_group(w: WorkspaceClient, sp_id: int, group_display_name: str) 
     group = groups[0]
     w.groups.patch(
         id=group.id,
-        operations=[{
-            "op": "add",
-            "path": "members",
-            "value": [{"value": str(sp_id)}]
-        }]
+        schemas=[PatchSchema.URN_IETF_PARAMS_SCIM_API_MESSAGES_2_0_PATCH_OP],
+        operations=[Patch(op=PatchOp.ADD, path="members", value=[{"value": str(sp_id)}])]
     )
     print(f"Added SP {sp_id} to group '{group_display_name}' (group ID: {group.id})")
 

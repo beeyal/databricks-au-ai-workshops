@@ -928,7 +928,7 @@ SELECT
 FROM system.access.audit
 WHERE user_identity.email = '{ws.current_user.me().user_name}'
   AND event_time > '{(datetime.utcnow() - timedelta(hours=2)).strftime("%Y-%m-%dT%H:%M:%S")}'
-  AND service_name IN ('databricksSQL','vectorSearch','genie','unityCatalog')
+  AND service_name = 'mcpServer' AND action_name = 'mcpToolsCall'
 ORDER BY event_time DESC
 LIMIT 50
 """

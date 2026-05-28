@@ -169,7 +169,7 @@ print(f"Workspace    : {w.config.host}")
 # MAGIC     action_name,
 # MAGIC     request_params.space_id          AS space_id,
 # MAGIC     request_params.conversation_id   AS conversation_id,
-# MAGIC     response.status_code             AS status
+# MAGIC     response.statusCode              AS status
 # MAGIC FROM system.access.audit
 # MAGIC WHERE
 # MAGIC     event_time >= DATE_SUB(CURRENT_TIMESTAMP(), ${lookback_days})

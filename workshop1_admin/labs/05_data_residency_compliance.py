@@ -189,7 +189,7 @@ def check_geography_enforcement(account_id: str, headers: dict) -> dict:
     try:
         response = requests.get(url, headers=headers, timeout=30)
 
-        if response.status_code == 403:
+        if response.statusCode == 403:
             return {
                 "status":         "CANNOT_VERIFY",
                 "reason":         "403 Forbidden — account admin role required",
@@ -197,7 +197,7 @@ def check_geography_enforcement(account_id: str, headers: dict) -> dict:
                 "compliant":      None,
             }
 
-        if response.status_code == 404:
+        if response.statusCode == 404:
             return {
                 "status":         "FAIL",
                 "reason":         "Setting not found — Geography enforcement is NOT enabled",
@@ -353,7 +353,7 @@ def check_feature_flag_status(workspace_url: str, headers: dict, flag_type: str)
     url = f"{workspace_url}/api/2.0/settings/types/{flag_type}/names/default"
     try:
         response = requests.get(url, headers=headers, timeout=15)
-        if response.status_code == 404:
+        if response.statusCode == 404:
             return "NOT_SET (default)"
         response.raise_for_status()
         body   = response.json()
@@ -397,7 +397,7 @@ compliance_package = {
     "account_id":      ACCOUNT_ID,
     "assessment_date": REPORT_TIMESTAMP,
     "assessed_by":     "TODO: Name/Role",
-    "regulatory_frameworks": ["SOCI Act 2018", "Privacy Act 1988", "Privacy Act 1988 (Cth)", "NER"],
+    "regulatory_frameworks": ["SOCI Act 2018", "Privacy Act 1988", "AESCSF", "NER"],
     "section_1_infrastructure": {
         "workspace_region":              region_check.get("location", "unknown"),
         "cloud_provider":                "Microsoft Azure",
@@ -486,7 +486,7 @@ def generate_ai_access_log(start_date: str, end_date: str, include_endpoints: li
       action_name                                      AS action,
       service_name                                     AS service,
       request_params['endpointName']                   AS endpoint_name,
-      response.status_code                             AS response_code,
+      response.statusCode                             AS response_code,
       request_id                                       AS audit_request_id
     FROM system.access.audit
     WHERE
@@ -538,7 +538,7 @@ AI_TAG_SCHEMA = {
     "data_classification": (["public", "internal", "confidential", "restricted", "secret"], "internal"),
     "data_residency":      (["au-east", "any-au", "global"],                                "au-east"),
     "pii_processes":       (["yes", "no", "conditional"],                                   "no"),
-    "regulatory_scope":    (["apra-cps234", "apra-cps230", "privacy-act", "ner", "none"],   "none"),
+    "regulatory_scope":    (["soci-act-2018", "privacy-act-1988", "aescsf", "ner", "none"],   "none"),
     "ai_approved":         (["approved", "pending-review", "not-approved", "conditional"],  "pending-review"),
     "owner_team":          (None,                                                            None),
 }
