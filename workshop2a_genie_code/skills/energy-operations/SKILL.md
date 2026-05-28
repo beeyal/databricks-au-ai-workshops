@@ -165,7 +165,7 @@ SELECT
     COUNT(*)                                AS outage_count
 FROM outage_events
 WHERE event_type = 'unplanned'
-  AND major_event_day = FALSE               -- exclude MEDs from STPIS reporting
+  -- Note: outage_events has no major_event_day column; filter MEDs by duration or cause if needed
 GROUP BY region, YEAR(start_time)
 ORDER BY region, year
 ```
@@ -175,11 +175,10 @@ ORDER BY region, year
 SELECT
     region,
     YEAR(start_time)                        AS year,
-    SUM(customers_affected)                 / MAX(total_customers) AS saifi,
+    SUM(saifi_count)                        AS total_saifi,
     COUNT(*)                                AS interruption_events
 FROM outage_events
 WHERE event_type = 'unplanned'
-  AND major_event_day = FALSE
 GROUP BY region, YEAR(start_time)
 ORDER BY region, year
 ```
@@ -189,18 +188,18 @@ ORDER BY region, year
 SELECT
     a.asset_id,
     a.asset_type,
-    a.substation_name,
+    a.asset_name,
     a.region,
-    a.install_year,
-    YEAR(CURRENT_DATE) - a.install_year          AS age_years,
-    COUNT(wo.work_order_id)                       AS work_orders_last_2yr,
+    a.installation_date,
+    YEAR(CURRENT_DATE) - YEAR(a.installation_date)   AS age_years,
+    COUNT(wo.work_order_id)                           AS work_orders_last_2yr,
     SUM(CASE WHEN wo.priority = 'critical' THEN 1 ELSE 0 END) AS critical_wos
 FROM energy_assets a
 LEFT JOIN maintenance_work_orders wo
     ON a.asset_id = wo.asset_id
     AND wo.created_date >= ADD_MONTHS(CURRENT_DATE, -24)
-WHERE a.asset_type IN ('transformer', 'distribution_transformer')
-GROUP BY a.asset_id, a.asset_type, a.substation_name, a.region, a.install_year
+WHERE a.asset_type = 'transformer'
+GROUP BY a.asset_id, a.asset_type, a.asset_name, a.region, a.installation_date
 HAVING age_years > 40 OR critical_wos >= 2
 ORDER BY critical_wos DESC, age_years DESC
 ```

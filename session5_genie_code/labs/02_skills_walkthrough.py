@@ -176,15 +176,16 @@ ORDER BY total_mw DESC
 ### LOR event summary
 ```sql
 SELECT
-    event_type,    -- LOR1 / LOR2 / LOR3
+    notice_type,    -- LOR1 / LOR2 / LOR3
     region_id,
     COUNT(*)       AS event_count,
-    AVG(TIMESTAMPDIFF(MINUTE, start_time, end_time)) AS avg_duration_min
+    MIN(issue_time)  AS earliest_notice,
+    MAX(issue_time)  AS latest_notice
 FROM workshop_au.aemo.market_notices
 WHERE notice_type LIKE 'LOR%'
-  AND start_time >= CURRENT_DATE - INTERVAL 30 DAYS
-GROUP BY event_type, region_id
-ORDER BY event_type, region_id
+  AND issue_time >= CURRENT_DATE - INTERVAL 30 DAYS
+GROUP BY notice_type, region_id
+ORDER BY notice_type, region_id
 ```
 
 ## 5-Minute Dispatch vs 30-Minute Settlement
@@ -428,7 +429,7 @@ space = w.api_client.do(
         "title": "AEMO NEM Operations",
         "warehouse_id": "<your-sql-warehouse-id>",
         "description": "NL-to-SQL access to NEM spot prices, dispatch, and market notices",
-        "instructions": """This Genie Space provides access to AEMO NEM operational data.
+        "instructions": '''This Genie Space provides access to AEMO NEM operational data.
 
 REGION CODES: Always use NSW1, VIC1, QLD1, SA1, TAS1 (never NSW, VIC, etc.)
 PRICES: Express in $/MWh. Market price cap is $15,300/MWh. Floor is -$1,000/MWh.
@@ -441,7 +442,7 @@ Available tables:
 - workshop_au.aemo.spot_prices (30-min interval, column rrp = $/MWh)
 - workshop_au.aemo.dispatch_intervals (5-min generator dispatch by DUID)
 - workshop_au.aemo.market_notices (LOR and intervention events)
-- workshop_au.aemo.generator_registration (DUID metadata, fuel_type, capacity)"""
+- workshop_au.aemo.generator_registration (DUID metadata, fuel_type, capacity)'''
     }
 )
 space_id = space["space_id"]
@@ -459,7 +460,7 @@ tables = [
 for table in tables:
     w.api_client.do(
         "POST",
-        f"/api/2.0/genie/spaces/{space_id}/tables",
+        f"/api/2.0/genie/spaces/{space_id}/datasets",
         body={"table_name": table}
     )
     print(f"  Added: {table}")
@@ -471,46 +472,46 @@ golden_queries = [
     {
         "name": "Average spot price by region last 7 days",
         "question": "What was the average spot price by region over the last 7 days?",
-        "sql": """SELECT region_id, ROUND(AVG(rrp), 2) AS avg_price_mwh
+        "sql": '''SELECT region_id, ROUND(AVG(rrp), 2) AS avg_price_mwh
 FROM workshop_au.aemo.spot_prices
 WHERE settlement_date >= CURRENT_DATE - INTERVAL 7 DAYS
-GROUP BY region_id ORDER BY avg_price_mwh DESC"""
+GROUP BY region_id ORDER BY avg_price_mwh DESC'''
     },
     {
         "name": "Top generators by dispatch last week",
         "question": "Which generators dispatched the most electricity last week?",
-        "sql": """SELECT di.duid, gr.station_name, gr.fuel_type,
+        "sql": '''SELECT di.duid, gr.station_name, gr.fuel_type,
     ROUND(SUM(di.dispatch_mw) / 1000, 1) AS total_gwh
 FROM workshop_au.aemo.dispatch_intervals di
 JOIN workshop_au.aemo.generator_registration gr USING (duid)
 WHERE di.settlement_date >= CURRENT_DATE - INTERVAL 7 DAYS
 GROUP BY di.duid, gr.station_name, gr.fuel_type
-ORDER BY total_gwh DESC LIMIT 10"""
+ORDER BY total_gwh DESC LIMIT 10'''
     },
     {
         "name": "High price events this month",
         "question": "How many high price events above $300/MWh occurred this month?",
-        "sql": """SELECT region_id, COUNT(*) AS high_price_intervals,
+        "sql": '''SELECT region_id, COUNT(*) AS high_price_intervals,
     ROUND(MAX(rrp), 2) AS peak_price_mwh
 FROM workshop_au.aemo.spot_prices
 WHERE rrp > 300
   AND DATE_TRUNC('month', settlement_date) = DATE_TRUNC('month', CURRENT_DATE)
-GROUP BY region_id ORDER BY high_price_intervals DESC"""
+GROUP BY region_id ORDER BY high_price_intervals DESC'''
     },
     {
         "name": "LOR events last 30 days",
         "question": "Show me all LOR events in the last 30 days",
-        "sql": """SELECT notice_type, region_id, start_time, end_time,
-    TIMESTAMPDIFF(MINUTE, start_time, end_time) AS duration_min, description
+        "sql": '''SELECT notice_id, notice_type, region_id, issue_time, effective_date,
+    LEFT(reason, 250) AS reason_preview
 FROM workshop_au.aemo.market_notices
 WHERE notice_type LIKE 'LOR%'
-  AND start_time >= CURRENT_DATE - INTERVAL 30 DAYS
-ORDER BY start_time DESC"""
+  AND issue_time >= CURRENT_DATE - INTERVAL 30 DAYS
+ORDER BY issue_time DESC'''
     },
     {
         "name": "Renewable vs fossil fuel dispatch mix",
         "question": "What is the renewable vs fossil fuel dispatch mix this week?",
-        "sql": """SELECT
+        "sql": '''SELECT
     CASE WHEN gr.fuel_type IN ('WIND','SOLAR','HYDRO','BIOMASS') THEN 'Renewable'
          ELSE 'Fossil / Other' END AS generation_type,
     gr.fuel_type,
@@ -519,15 +520,19 @@ FROM workshop_au.aemo.dispatch_intervals di
 JOIN workshop_au.aemo.generator_registration gr USING (duid)
 WHERE di.settlement_date >= CURRENT_DATE - INTERVAL 7 DAYS
 GROUP BY generation_type, gr.fuel_type
-ORDER BY total_gwh DESC"""
+ORDER BY total_gwh DESC'''
     },
 ]
 
 for gq in golden_queries:
     w.api_client.do(
         "POST",
-        f"/api/2.0/genie/spaces/{space_id}/golden-queries",
-        body=gq
+        f"/api/2.0/genie/spaces/{space_id}/sql-queries",
+        body={
+            "name":        gq["name"],
+            "description": gq["question"],
+            "query":       gq["sql"],
+        }
     )
     print(f"  Added golden query: {gq['name']}")
 ```

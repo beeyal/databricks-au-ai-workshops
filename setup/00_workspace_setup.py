@@ -714,7 +714,7 @@ def fmapi_test():
     host  = ctx.apiUrl().get()
     token = ctx.apiToken().get()
 
-    # Try LLaMA first, fall back to any available endpoint
+    # Try configured in-region Claude model first, fall back to any available endpoint
     endpoints = {ep.name: ep for ep in w.serving_endpoints.list()}
     test_ep   = GENIE_LLM_MODEL if GENIE_LLM_MODEL in endpoints else (list(endpoints.keys())[0] if endpoints else None)
     if not test_ep:
@@ -949,7 +949,7 @@ aemo_smoke(
 )
 aemo_smoke(
     "LOR events in market_notices",
-    lambda: f"{spark.sql(f\"SELECT COUNT(*) FROM {CATALOG}.{SCHEMA_AEMO}.market_notices WHERE notice_type LIKE 'LOR%'\").collect()[0][0]} LOR notices",
+    lambda: str(spark.sql(f"SELECT COUNT(*) FROM {CATALOG}.{SCHEMA_AEMO}.market_notices WHERE notice_type LIKE 'LOR%'").collect()[0][0]) + " LOR notices",
 )
 aemo_smoke(
     "Top region by avg spot price",

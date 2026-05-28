@@ -139,13 +139,13 @@ KEY TERMINOLOGY
 
 QUERY PREFERENCES
 - Always aggregate spot prices using ROUND(AVG(rrp), 2) and label the column clearly
-- When showing time series, order by SETTLEMENTDATE ASC
-- For regional comparisons, use REGIONID as the grouping key and show all five regions
-- Filter to Australia/Sydney timezone when displaying dates to users: CONVERT_TZ(SETTLEMENTDATE, 'UTC', 'Australia/Sydney')
-- For "yesterday" queries: WHERE DATE(SETTLEMENTDATE) = DATE_SUB(CURRENT_DATE(), 1)
-- For "last week" queries: WHERE SETTLEMENTDATE >= DATE_SUB(CURRENT_DATE(), 7)
+- When showing time series, order by settlement_date ASC
+- For regional comparisons, use region_id as the grouping key and show all five regions
+- Display timestamps as AEST or AEDT — do not convert to UTC in output
+- For "yesterday" queries: WHERE DATE(settlement_date) = CURRENT_DATE - INTERVAL 1 DAY
+- For "last week" queries: WHERE settlement_date >= CURRENT_DATE - INTERVAL 7 DAYS
 - Round monetary values to 2 decimal places; round MW values to 0 decimal places
-- When asked about generators, join generator_registration on DUID to show STATIONNAME and FUEL_TYPE
+- When asked about generators, join generator_registration on duid to show station_name and fuel_type
 
 IMPORTANT LIMITATIONS
 - Do not interpret regulatory or compliance questions — direct those to AEMO's compliance team
@@ -255,14 +255,14 @@ GOLDEN_QUERIES = [
         "description": "Shows the mean RRP ($/MWh) for each NEM region for the previous calendar day, ordered by price descending.",
         "sql": f"""
 SELECT
-    REGIONID,
-    ROUND(AVG(RRP), 2)   AS avg_price_dollarMWh,
-    ROUND(MIN(RRP), 2)   AS min_price_dollarMWh,
-    ROUND(MAX(RRP), 2)   AS max_price_dollarMWh,
-    COUNT(*)              AS dispatch_intervals
+    region_id,
+    ROUND(AVG(rrp), 2)   AS avg_price_dollarMWh,
+    ROUND(MIN(rrp), 2)   AS min_price_dollarMWh,
+    ROUND(MAX(rrp), 2)   AS max_price_dollarMWh,
+    COUNT(*)              AS trading_intervals
 FROM {CATALOG}.{SCHEMA}.spot_prices
-WHERE DATE(SETTLEMENTDATE) = DATE_SUB(CURRENT_DATE(), 1)
-GROUP BY REGIONID
+WHERE DATE(settlement_date) = CURRENT_DATE - INTERVAL 1 DAY
+GROUP BY region_id
 ORDER BY avg_price_dollarMWh DESC
 """.strip(),
     },
@@ -271,28 +271,28 @@ ORDER BY avg_price_dollarMWh DESC
         "description": "Daily average spot price for each of the five NEM regions over the past 7 days, suitable for trend comparison.",
         "sql": f"""
 SELECT
-    DATE(SETTLEMENTDATE)  AS trading_date,
-    REGIONID,
-    ROUND(AVG(RRP), 2)   AS avg_price_dollarMWh
+    DATE(settlement_date)  AS trading_date,
+    region_id,
+    ROUND(AVG(rrp), 2)   AS avg_price_dollarMWh
 FROM {CATALOG}.{SCHEMA}.spot_prices
-WHERE SETTLEMENTDATE >= DATE_SUB(CURRENT_DATE(), 7)
-GROUP BY DATE(SETTLEMENTDATE), REGIONID
-ORDER BY trading_date ASC, REGIONID ASC
+WHERE settlement_date >= CURRENT_DATE - INTERVAL 7 DAYS
+GROUP BY DATE(settlement_date), region_id
+ORDER BY trading_date ASC, region_id ASC
 """.strip(),
     },
     {
         "name": "Price spikes above $500/MWh — last 30 days",
-        "description": "All 5-minute dispatch intervals where the regional spot price exceeded $500/MWh in the past month. Shows region, timestamp, and price.",
+        "description": "All trading intervals where the regional spot price exceeded $500/MWh in the past month. Shows region, timestamp, and price.",
         "sql": f"""
 SELECT
-    SETTLEMENTDATE,
-    REGIONID,
-    ROUND(RRP, 2)  AS spike_price_dollarMWh
+    settlement_date,
+    region_id,
+    ROUND(rrp, 2)  AS spike_price_dollarMWh
 FROM {CATALOG}.{SCHEMA}.spot_prices
 WHERE
-    SETTLEMENTDATE >= DATE_SUB(CURRENT_DATE(), 30)
-    AND RRP > 500
-ORDER BY RRP DESC
+    settlement_date >= CURRENT_DATE - INTERVAL 30 DAYS
+    AND rrp > 500
+ORDER BY rrp DESC
 LIMIT 200
 """.strip(),
     },
@@ -301,13 +301,13 @@ LIMIT 200
         "description": "Total megawatt-hours dispatched grouped by fuel type for the past 7 days. Shows the generation mix across coal, gas, wind, solar, hydro, and battery.",
         "sql": f"""
 SELECT
-    g.FUEL_TYPE,
-    ROUND(SUM(d.TOTALCLEARED * 5 / 60), 0) AS total_MWh_dispatched
+    g.fuel_type,
+    ROUND(SUM(d.dispatch_mw) / 12, 0) AS total_MWh_dispatched
 FROM {CATALOG}.{SCHEMA}.dispatch_intervals d
 JOIN {CATALOG}.{SCHEMA}.generator_registration g
-    ON d.DUID = g.DUID
-WHERE d.SETTLEMENTDATE >= DATE_SUB(CURRENT_DATE(), 7)
-GROUP BY g.FUEL_TYPE
+    ON d.duid = g.duid
+WHERE d.settlement_date >= CURRENT_DATE - INTERVAL 7 DAYS
+GROUP BY g.fuel_type
 ORDER BY total_MWh_dispatched DESC
 """.strip(),
     },
@@ -316,17 +316,17 @@ ORDER BY total_MWh_dispatched DESC
         "description": "All Lack of Reserve (LOR1, LOR2, LOR3) notices issued by AEMO in the past 14 days with severity, affected region, and notice text.",
         "sql": f"""
 SELECT
-    NOTICEID,
-    NOTICE_TYPE,
-    REGIONID,
-    ISSUE_DATETIME,
-    EXTERNAL_REFERENCE,
-    NOTICE_TEXT
+    notice_id,
+    notice_type,
+    region_id,
+    issue_time,
+    effective_date,
+    LEFT(reason, 250) AS reason_preview
 FROM {CATALOG}.{SCHEMA}.market_notices
 WHERE
-    ISSUE_DATETIME >= DATE_SUB(CURRENT_DATE(), 14)
-    AND NOTICE_TYPE LIKE 'LOR%'
-ORDER BY ISSUE_DATETIME DESC
+    issue_time >= CURRENT_DATE - INTERVAL 14 DAYS
+    AND notice_type LIKE 'LOR%'
+ORDER BY issue_time DESC
 """.strip(),
     },
     {
@@ -334,17 +334,17 @@ ORDER BY ISSUE_DATETIME DESC
         "description": "Ranks the top 20 individual generating units by total energy dispatched over the past 30 days, with station name and fuel type.",
         "sql": f"""
 SELECT
-    d.DUID,
-    g.STATIONNAME,
-    g.FUEL_TYPE,
-    g.REGIONID,
-    ROUND(SUM(d.TOTALCLEARED * 5 / 60), 0)  AS total_MWh,
-    ROUND(AVG(d.TOTALCLEARED), 1)            AS avg_MW_dispatch
+    d.duid,
+    g.station_name,
+    g.fuel_type,
+    g.region_id,
+    ROUND(SUM(d.dispatch_mw) / 12, 0)  AS total_MWh,
+    ROUND(AVG(d.dispatch_mw), 1)        AS avg_MW_dispatch
 FROM {CATALOG}.{SCHEMA}.dispatch_intervals d
 JOIN {CATALOG}.{SCHEMA}.generator_registration g
-    ON d.DUID = g.DUID
-WHERE d.SETTLEMENTDATE >= DATE_SUB(CURRENT_DATE(), 30)
-GROUP BY d.DUID, g.STATIONNAME, g.FUEL_TYPE, g.REGIONID
+    ON d.duid = g.duid
+WHERE d.settlement_date >= CURRENT_DATE - INTERVAL 30 DAYS
+GROUP BY d.duid, g.station_name, g.fuel_type, g.region_id
 ORDER BY total_MWh DESC
 LIMIT 20
 """.strip(),
@@ -354,15 +354,17 @@ LIMIT 20
         "description": "Total net settlement amount per market participant for the most recently completed calendar month. Settlement amounts are in AUD.",
         "sql": f"""
 SELECT
-    PARTICIPANTID,
-    ROUND(SUM(AMOUNT), 2)   AS net_settlement_aud,
-    COUNT(DISTINCT TRADINGDATE) AS trading_days
+    participant_id,
+    ROUND(SUM(total_aud), 2)              AS net_settlement_aud,
+    ROUND(SUM(energy_amount_aud), 2)      AS energy_aud,
+    ROUND(SUM(fcas_amount_aud), 2)        AS fcas_aud,
+    COUNT(DISTINCT settlement_date)       AS settlement_weeks
 FROM {CATALOG}.{SCHEMA}.settlement_amounts
 WHERE
-    MONTH(TRADINGDATE)  = MONTH(DATE_SUB(CURRENT_DATE(), 32))
-    AND YEAR(TRADINGDATE)   = YEAR(DATE_SUB(CURRENT_DATE(), 32))
-GROUP BY PARTICIPANTID
-ORDER BY ABS(net_settlement_aud) DESC
+    MONTH(settlement_date)  = MONTH(CURRENT_DATE - INTERVAL 32 DAYS)
+    AND YEAR(settlement_date)   = YEAR(CURRENT_DATE - INTERVAL 32 DAYS)
+GROUP BY participant_id
+ORDER BY ABS(SUM(total_aud)) DESC
 LIMIT 50
 """.strip(),
     },
@@ -371,20 +373,20 @@ LIMIT 50
         "description": "Monthly comparison of coal (BLACK COAL, BROWN COAL) vs renewables (WIND, SOLAR) dispatch in Queensland (QLD1) over the past 3 months.",
         "sql": f"""
 SELECT
-    DATE_FORMAT(d.SETTLEMENTDATE, 'yyyy-MM')   AS month,
+    DATE_FORMAT(d.settlement_date, 'yyyy-MM')  AS month,
     CASE
-        WHEN g.FUEL_TYPE IN ('BLACK COAL', 'BROWN COAL') THEN 'Coal'
-        WHEN g.FUEL_TYPE IN ('WIND', 'SOLAR')            THEN 'Renewable'
+        WHEN g.fuel_type IN ('BLACK COAL', 'BROWN COAL') THEN 'Coal'
+        WHEN g.fuel_type IN ('WIND', 'SOLAR')            THEN 'Renewable'
         ELSE 'Other'
     END                                         AS generation_category,
-    ROUND(SUM(d.TOTALCLEARED * 5 / 60), 0)     AS total_MWh
+    ROUND(SUM(d.dispatch_mw) / 12, 0)          AS total_MWh
 FROM {CATALOG}.{SCHEMA}.dispatch_intervals d
 JOIN {CATALOG}.{SCHEMA}.generator_registration g
-    ON d.DUID = g.DUID
+    ON d.duid = g.duid
 WHERE
-    g.REGIONID = 'QLD1'
-    AND d.SETTLEMENTDATE >= ADD_MONTHS(CURRENT_DATE(), -3)
-GROUP BY DATE_FORMAT(d.SETTLEMENTDATE, 'yyyy-MM'), generation_category
+    g.region_id = 'QLD1'
+    AND d.settlement_date >= ADD_MONTHS(CURRENT_DATE(), -3)
+GROUP BY DATE_FORMAT(d.settlement_date, 'yyyy-MM'), generation_category
 ORDER BY month ASC, generation_category ASC
 """.strip(),
     },
@@ -393,45 +395,45 @@ ORDER BY month ASC, generation_category ASC
         "description": "Count of each market notice type issued in the past 30 days. Useful for understanding recent market conditions and AEMO operational activity.",
         "sql": f"""
 SELECT
-    NOTICE_TYPE,
+    notice_type,
     COUNT(*)                     AS notice_count,
-    MIN(ISSUE_DATETIME)          AS first_issued,
-    MAX(ISSUE_DATETIME)          AS last_issued
+    MIN(issue_time)              AS first_issued,
+    MAX(issue_time)              AS last_issued
 FROM {CATALOG}.{SCHEMA}.market_notices
-WHERE ISSUE_DATETIME >= DATE_SUB(CURRENT_DATE(), 30)
-GROUP BY NOTICE_TYPE
+WHERE issue_time >= CURRENT_DATE - INTERVAL 30 DAYS
+GROUP BY notice_type
 ORDER BY notice_count DESC
 """.strip(),
     },
     {
         "name": "Highest price intervals — with dispatched generators",
-        "description": "The 10 most expensive 5-minute dispatch intervals in the past 30 days, showing which generators were dispatched during each event and at what output.",
+        "description": "The 10 most expensive trading intervals in the past 30 days, showing which generators were dispatched during each event and at what output.",
         "sql": f"""
 WITH top_intervals AS (
     SELECT
-        SETTLEMENTDATE,
-        REGIONID,
-        ROUND(RRP, 2) AS spike_price_dollarMWh
+        settlement_date,
+        region_id,
+        ROUND(rrp, 2) AS spike_price_dollarMWh
     FROM {CATALOG}.{SCHEMA}.spot_prices
-    WHERE SETTLEMENTDATE >= DATE_SUB(CURRENT_DATE(), 30)
-    ORDER BY RRP DESC
+    WHERE settlement_date >= CURRENT_DATE - INTERVAL 30 DAYS
+    ORDER BY rrp DESC
     LIMIT 10
 )
 SELECT
-    ti.SETTLEMENTDATE,
-    ti.REGIONID,
+    ti.settlement_date,
+    ti.region_id,
     ti.spike_price_dollarMWh,
-    d.DUID,
-    g.STATIONNAME,
-    g.FUEL_TYPE,
-    ROUND(d.TOTALCLEARED, 1) AS dispatched_MW
+    d.duid,
+    g.station_name,
+    g.fuel_type,
+    ROUND(d.dispatch_mw, 1) AS dispatched_MW
 FROM top_intervals ti
 JOIN {CATALOG}.{SCHEMA}.dispatch_intervals d
-    ON ti.SETTLEMENTDATE = d.SETTLEMENTDATE
+    ON ti.settlement_date = d.settlement_date
 JOIN {CATALOG}.{SCHEMA}.generator_registration g
-    ON d.DUID = g.DUID
-WHERE g.REGIONID = ti.REGIONID
-ORDER BY ti.spike_price_dollarMWh DESC, d.TOTALCLEARED DESC
+    ON d.duid = g.duid
+WHERE g.region_id = ti.region_id
+ORDER BY ti.spike_price_dollarMWh DESC, d.dispatch_mw DESC
 """.strip(),
     },
 ]
@@ -442,11 +444,11 @@ for i, qry in enumerate(GOLDEN_QUERIES, start=1):
     try:
         w.api_client.do(
             "POST",
-            f"/api/2.0/genie/spaces/{space_id}/queries",
+            f"/api/2.0/genie/spaces/{space_id}/sql-queries",
             body={
-                "title":       qry["name"],
+                "name":        qry["name"],
                 "description": qry["description"],
-                "content":     qry["sql"],
+                "query":       qry["sql"],
             },
         )
         print(f"  [{i:02d}] {qry['name']}  ✓")
@@ -470,7 +472,7 @@ print("\nAll golden queries registered in the Knowledge Store.")
 # MAGIC | Domain acronyms | NMI, DUID, FCAS, LOR1/2/3, RRP, TI, DI |
 # MAGIC | Region codes | NSW1, VIC1, QLD1, SA1, TAS1 |
 # MAGIC | Units and scales | $/MWh, MW, MWh, 5-min dispatch, 30-min trading |
-# MAGIC | Preferred aggregations | `ROUND(AVG(RRP), 2)`, order by SETTLEMENTDATE ASC |
+# MAGIC | Preferred aggregations | `ROUND(AVG(rrp), 2)`, order by settlement_date ASC |
 # MAGIC | Time zone | Queries display in Australia/Sydney time |
 # MAGIC | Thresholds | Price spike > $300/MWh; extreme spike > $5,000/MWh |
 # MAGIC | What NOT to do | No compliance interpretation; no forecast language |

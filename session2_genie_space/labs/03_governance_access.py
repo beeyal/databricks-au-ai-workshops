@@ -421,7 +421,7 @@ print("""
 # MAGIC </tr>
 # MAGIC <tr style="background: #f0f7ff;">
 # MAGIC <td style="padding: 10px 14px; border-bottom: 1px solid #ddd;">Column names and data types</td>
-# MAGIC <td style="padding: 10px 14px; border-bottom: 1px solid #ddd;">SETTLEMENTDATE TIMESTAMP, REGIONID STRING, RRP DOUBLE</td>
+# MAGIC <td style="padding: 10px 14px; border-bottom: 1px solid #ddd;">settlement_date TIMESTAMP, region_id STRING, rrp DOUBLE</td>
 # MAGIC </tr>
 # MAGIC <tr>
 # MAGIC <td style="padding: 10px 14px; border-bottom: 1px solid #ddd;">Column comments (from Unity Catalog)</td>
@@ -488,7 +488,7 @@ print("""
 # MAGIC FOUNDATION MODEL (Databricks-hosted, AU region)
 # MAGIC     │
 # MAGIC     │  Returns: SQL query text
-# MAGIC     │  SELECT ROUND(AVG(RRP), 2) AS avg_price ...
+# MAGIC     │  SELECT ROUND(AVG(rrp), 2) AS avg_price ...
 # MAGIC     ▼
 # MAGIC GENIE SERVICE
 # MAGIC     │
@@ -525,10 +525,10 @@ for row in cols:
 # MAGIC >
 # MAGIC > ```sql
 # MAGIC > ALTER TABLE workshop_au.aemo.spot_prices
-# MAGIC > ALTER COLUMN RRP COMMENT 'Regional Reference Price in $/MWh. The spot price for this 5-minute dispatch interval in this NEM region.';
+# MAGIC > ALTER COLUMN rrp COMMENT 'Regional Reference Price in $/MWh. The spot price for this 30-minute trading interval in this NEM region.';
 # MAGIC >
 # MAGIC > ALTER TABLE workshop_au.aemo.spot_prices
-# MAGIC > ALTER COLUMN REGIONID COMMENT 'NEM region code: NSW1, VIC1, QLD1, SA1, or TAS1';
+# MAGIC > ALTER COLUMN region_id COMMENT 'NEM region code: NSW1, VIC1, QLD1, SA1, or TAS1';
 # MAGIC > ```
 
 # COMMAND ----------
@@ -617,14 +617,14 @@ print("Check 3: Golden queries in Knowledge Store\n")
 try:
     queries = w.api_client.do(
         "GET",
-        f"/api/2.0/genie/spaces/{SPACE_ID}/queries",
+        f"/api/2.0/genie/spaces/{SPACE_ID}/sql-queries",
     )
-    query_list = queries.get("queries", [])
+    query_list = queries.get("sql_queries", [])
     count = len(query_list)
     if count >= 5:
         print(f"  Golden queries: PASS ✓ ({count} queries found)")
         for q in query_list:
-            print(f"    - {q.get('title', 'Untitled')}")
+            print(f"    - {q.get('name', 'Untitled')}")
     else:
         print(f"  Golden queries: WARN — only {count} found, recommend at least 5")
 except Exception as e:

@@ -126,10 +126,11 @@ Do NOT use: NSW, VIC, QLD, SA, TAS, New South Wales, etc.
 - Timestamps: AEST or AEDT — always state the timezone
 
 ## Available tables (catalog: workshop_au)
-- workshop_au.aemo.spot_prices — 30-min trading interval prices; column rrp = RRP in $/MWh
-- workshop_au.aemo.dispatch_intervals — 5-min generator dispatch by DUID
-- workshop_au.aemo.market_notices — LOR1/LOR2/LOR3 events and market interventions
-- workshop_au.aemo.generator_registration — NEM generator details: fuel_type, registered_capacity_mw
+- workshop_au.aemo.spot_prices — 30-min trading interval prices; key columns: settlement_date, region_id, rrp ($/MWh), total_demand_mw, net_interchange, scheduled_generation
+- workshop_au.aemo.dispatch_intervals — 5-min generator dispatch; key columns: settlement_date, region_id, duid, dispatch_mw, initial_mw, available_mw, ramp_rate, fuel_type, station_name
+- workshop_au.aemo.market_notices — LOR1/LOR2/LOR3 events and market interventions; key columns: notice_id, notice_type, issue_time, reason, effective_date, region_id, intervention
+- workshop_au.aemo.generator_registration — NEM generator details; key columns: duid, station_name, participant_id, region_id, fuel_type, registered_capacity_mw, dispatch_type, max_ramp_rate, min_load
+- workshop_au.aemo.settlement_amounts — weekly settlement by participant; key columns: settlement_date, participant_id, run_type, energy_amount_aud, fcas_amount_aud, interconnector_residue_aud, total_aud, settlement_status
 
 ## Coding conventions
 - Always use catalog.schema.table three-part format: workshop_au.aemo.spot_prices

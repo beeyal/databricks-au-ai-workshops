@@ -320,7 +320,7 @@ def check_data_geography():
 
     # Check the 'Enforce data processing within Geography' workspace setting
     # This maps to the workspace conf key 'enforceUserIsolation' / data residency controls
-    # The public setting in Account Console is under Compliance & Security
+    # The public setting in Account Console is under Security and compliance
     try:
         conf = w.workspace_conf.get_status(keys=["enableDataProcessingWithinGeography"])
         val = conf.get("enableDataProcessingWithinGeography", "unknown")
@@ -354,7 +354,7 @@ def check_data_geography():
             WARN,
             "Could not confirm geography enforcement setting — verify manually.",
             remediation=(
-                "In Account Console, go to Workspaces > [this workspace] > Compliance & Security. "
+                "In Account Console, go to Workspaces > [this workspace] > Security and compliance. "
                 "Enable 'Enforce data processing within Geography'. "
                 "This is required for SOCI Act 2018 critical infrastructure obligations and AER data sovereignty requirements."
             ),
@@ -366,7 +366,7 @@ def check_data_geography():
             f"Setting value: {val} — geography enforcement is NOT enabled.",
             remediation=(
                 "Enable 'Enforce data processing within Geography' in Account Console > "
-                "Workspaces > [this workspace] > Compliance & Security. "
+                "Workspaces > [this workspace] > Security and compliance. "
                 "Restart all clusters after enabling. Required for regulated industry workshops."
             ),
         )
@@ -375,7 +375,7 @@ def check_data_geography():
 safe_run(
     check_data_geography,
     "Data processing within geography",
-    "Enable in Account Console > Workspaces > Compliance & Security.",
+    "Enable in Account Console > Workspaces > Security and compliance.",
 )
 
 # COMMAND ----------

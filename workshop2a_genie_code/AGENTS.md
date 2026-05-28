@@ -15,7 +15,7 @@ Auto-discovered by Genie Code when working in any notebook within this directory
 
 | Table | Row count | Description |
 |-------|-----------|-------------|
-| `workshop_au.energy.energy_assets` | 500 | Network assets: transformers, substations, feeders, poles |
+| `workshop_au.energy.energy_assets` | 500 | Network assets: transformers, substations, poles, cables, meters |
 | `workshop_au.energy.meter_readings` | 50,000 | NEM12-style 30-minute interval readings with quality flags |
 | `workshop_au.energy.outage_events` | 2,000 | Network outage events with SAIDI/SAIFI fields |
 | `workshop_au.energy.maintenance_work_orders` | 3,000 | Work orders with priority, status, and unstructured description text |
@@ -23,11 +23,11 @@ Auto-discovered by Genie Code when working in any notebook within this directory
 
 ### Key Column Notes
 
-**meter_readings:** `nmi` (10-char), `reading_datetime` (timestamp), `interval_kwh` (DECIMAL), `quality_flag` (A/E/S/N/F)
+**meter_readings:** `nmi` (10-char), `reading_datetime` (timestamp), `interval_kwh` (DECIMAL), `quality_flag` (A/E/S/N)
 
-**outage_events:** `event_type` ('planned'/'unplanned'), `major_event_day` (BOOLEAN), `saidi_minutes` (DECIMAL), `customers_affected` (INT), `region` (VIC/NSW/QLD/SA/TAS)
+**outage_events:** `event_type` ('planned'/'unplanned'/'emergency'), `saidi_minutes` (DECIMAL), `saifi_count` (DECIMAL), `affected_customers` (INT), `duration_minutes` (INT), `region` (VIC/NSW/QLD/SA/WA)
 
-**energy_assets:** `asset_type` ('transformer'/'substation'/'feeder'/'pole'), `install_year` (INT), `region`, `substation_name`, `rated_kva` (INT)
+**energy_assets:** `asset_type` ('transformer'/'substation'/'pole'/'cable'/'meter'), `installation_date` (DATE), `region`, `asset_name`, `rated_capacity_kva` (DECIMAL)
 
 **maintenance_work_orders:** `priority` ('critical'/'high'/'medium'/'low'), `status` ('open'/'in_progress'/'closed'), `description` (STRING — unstructured text, suitable for AI extraction)
 

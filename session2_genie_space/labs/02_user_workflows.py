@@ -79,14 +79,14 @@ displayHTML(f'<a href="{space_url}" target="_blank" style="font-size:1.2em; colo
 # MAGIC
 # MAGIC ### What you should see
 # MAGIC - A single number in $/MWh (e.g. `$87.42/MWh`)
-# MAGIC - A table showing 1 row: REGIONID = VIC1, avg_price = [number]
-# MAGIC - The SQL Genie generated should filter to `REGIONID = 'VIC1'` and `DATE(SETTLEMENTDATE) = DATE_SUB(CURRENT_DATE(), 1)`
+# MAGIC - A table showing 1 row: region_id = VIC1, avg_price = [number]
+# MAGIC - The SQL Genie generated should filter to `region_id = 'VIC1'` and `DATE(settlement_date) = CURRENT_DATE - INTERVAL 1 DAY`
 # MAGIC
 # MAGIC ### Show SQL reminder
 # MAGIC After Genie responds, click **Show SQL** in the bottom-left of the result. Confirm:
-# MAGIC - The filter is `REGIONID = 'VIC1'` (not `'VIC'` or `'Victoria'`)
+# MAGIC - The filter is `region_id = 'VIC1'` (not `'VIC'` or `'Victoria'`)
 # MAGIC - The date filter uses yesterday, not a hardcoded date
-# MAGIC - The aggregation is `AVG(RRP)` or similar
+# MAGIC - The aggregation is `AVG(rrp)` or similar
 
 # COMMAND ----------
 
@@ -98,16 +98,16 @@ print("Validation SQL for Task 1: Average spot price in VIC1 yesterday\n")
 
 # MAGIC %sql
 # MAGIC SELECT
-# MAGIC     REGIONID,
-# MAGIC     ROUND(AVG(RRP), 2)  AS avg_price_dollarMWh,
-# MAGIC     ROUND(MIN(RRP), 2)  AS min_price_dollarMWh,
-# MAGIC     ROUND(MAX(RRP), 2)  AS max_price_dollarMWh,
-# MAGIC     COUNT(*)             AS dispatch_intervals
+# MAGIC     region_id,
+# MAGIC     ROUND(AVG(rrp), 2)  AS avg_price_dollarMWh,
+# MAGIC     ROUND(MIN(rrp), 2)  AS min_price_dollarMWh,
+# MAGIC     ROUND(MAX(rrp), 2)  AS max_price_dollarMWh,
+# MAGIC     COUNT(*)             AS trading_intervals
 # MAGIC FROM ${catalog}.${schema_aemo}.spot_prices
 # MAGIC WHERE
-# MAGIC     DATE(SETTLEMENTDATE) = DATE_SUB(CURRENT_DATE(), 1)
-# MAGIC     AND REGIONID = 'VIC1'
-# MAGIC GROUP BY REGIONID
+# MAGIC     DATE(settlement_date) = CURRENT_DATE - INTERVAL 1 DAY
+# MAGIC     AND region_id = 'VIC1'
+# MAGIC GROUP BY region_id
 
 # COMMAND ----------
 
@@ -143,13 +143,13 @@ print("Validation SQL for Task 1: Average spot price in VIC1 yesterday\n")
 # Validation SQL — Task 2
 # MAGIC %sql
 # MAGIC SELECT
-# MAGIC     REGIONID,
-# MAGIC     ROUND(AVG(RRP), 2)   AS avg_price_dollarMWh,
-# MAGIC     ROUND(MIN(RRP), 2)   AS min_price_dollarMWh,
-# MAGIC     ROUND(MAX(RRP), 2)   AS max_price_dollarMWh
+# MAGIC     region_id,
+# MAGIC     ROUND(AVG(rrp), 2)   AS avg_price_dollarMWh,
+# MAGIC     ROUND(MIN(rrp), 2)   AS min_price_dollarMWh,
+# MAGIC     ROUND(MAX(rrp), 2)   AS max_price_dollarMWh
 # MAGIC FROM ${catalog}.${schema_aemo}.spot_prices
-# MAGIC WHERE SETTLEMENTDATE >= DATE_SUB(CURRENT_DATE(), 7)
-# MAGIC GROUP BY REGIONID
+# MAGIC WHERE settlement_date >= CURRENT_DATE - INTERVAL 7 DAYS
+# MAGIC GROUP BY region_id
 # MAGIC ORDER BY avg_price_dollarMWh DESC
 
 # COMMAND ----------
@@ -173,7 +173,7 @@ print("Validation SQL for Task 1: Average spot price in VIC1 yesterday\n")
 # MAGIC ```
 # MAGIC
 # MAGIC ### What you should see
-# MAGIC - A table of dispatch intervals where RRP > 500, with SETTLEMENTDATE, REGIONID, and price
+# MAGIC - A table of dispatch intervals where rrp > 500, with settlement_date, region_id, and price
 # MAGIC - Ordered from highest price to lowest (or chronologically — check the SQL)
 # MAGIC - If no spikes occurred last month in your workshop data, Genie should say "No results found" — this is correct behaviour, not an error
 # MAGIC
@@ -186,15 +186,15 @@ print("Validation SQL for Task 1: Average spot price in VIC1 yesterday\n")
 # Validation SQL — Task 3
 # MAGIC %sql
 # MAGIC SELECT
-# MAGIC     SETTLEMENTDATE,
-# MAGIC     REGIONID,
-# MAGIC     ROUND(RRP, 2)  AS spike_price_dollarMWh
+# MAGIC     settlement_date,
+# MAGIC     region_id,
+# MAGIC     ROUND(rrp, 2)  AS spike_price_dollarMWh
 # MAGIC FROM ${catalog}.${schema_aemo}.spot_prices
 # MAGIC WHERE
-# MAGIC     SETTLEMENTDATE >= DATE_TRUNC('MONTH', DATE_SUB(CURRENT_DATE(), 32))
-# MAGIC     AND SETTLEMENTDATE <  DATE_TRUNC('MONTH', CURRENT_DATE())
-# MAGIC     AND RRP > 500
-# MAGIC ORDER BY RRP DESC
+# MAGIC     settlement_date >= DATE_TRUNC('MONTH', CURRENT_DATE - INTERVAL 32 DAYS)
+# MAGIC     AND settlement_date <  DATE_TRUNC('MONTH', CURRENT_DATE)
+# MAGIC     AND rrp > 500
+# MAGIC ORDER BY rrp DESC
 # MAGIC LIMIT 100
 
 # COMMAND ----------
@@ -202,15 +202,15 @@ print("Validation SQL for Task 1: Average spot price in VIC1 yesterday\n")
 # Spike summary by region for cross-check
 # MAGIC %sql
 # MAGIC SELECT
-# MAGIC     REGIONID,
+# MAGIC     region_id,
 # MAGIC     COUNT(*)             AS spike_count,
-# MAGIC     ROUND(MAX(RRP), 2)   AS highest_spike_dollarMWh
+# MAGIC     ROUND(MAX(rrp), 2)   AS highest_spike_dollarMWh
 # MAGIC FROM ${catalog}.${schema_aemo}.spot_prices
 # MAGIC WHERE
-# MAGIC     SETTLEMENTDATE >= DATE_TRUNC('MONTH', DATE_SUB(CURRENT_DATE(), 32))
-# MAGIC     AND SETTLEMENTDATE <  DATE_TRUNC('MONTH', CURRENT_DATE())
-# MAGIC     AND RRP > 500
-# MAGIC GROUP BY REGIONID
+# MAGIC     settlement_date >= DATE_TRUNC('MONTH', CURRENT_DATE - INTERVAL 32 DAYS)
+# MAGIC     AND settlement_date <  DATE_TRUNC('MONTH', CURRENT_DATE)
+# MAGIC     AND rrp > 500
+# MAGIC GROUP BY region_id
 # MAGIC ORDER BY spike_count DESC
 
 # COMMAND ----------
@@ -234,8 +234,8 @@ print("Validation SQL for Task 1: Average spot price in VIC1 yesterday\n")
 # MAGIC ```
 # MAGIC
 # MAGIC ### What you should see
-# MAGIC - A table from the `market_notices` table filtered to `NOTICE_TYPE LIKE 'LOR%'`
-# MAGIC - Columns: NOTICEID, NOTICE_TYPE (LOR1/LOR2/LOR3), REGIONID, ISSUE_DATETIME, notice text
+# MAGIC - A table from the `market_notices` table filtered to `notice_type LIKE 'LOR%'`
+# MAGIC - Columns: notice_id, notice_type (LOR1/LOR2/LOR3), region_id, issue_time, reason text
 # MAGIC - If no LOR notices in that window: an empty result with a message from Genie
 # MAGIC
 # MAGIC ### LOR severity reference
@@ -247,30 +247,30 @@ print("Validation SQL for Task 1: Average spot price in VIC1 yesterday\n")
 # MAGIC | LOR3 | Load shedding is imminent or occurring |
 # MAGIC
 # MAGIC ### What to check in the SQL
-# MAGIC - Genie should filter `NOTICE_TYPE` for LOR variants, not just look in the text field
-# MAGIC - The 14-day window should be relative (DATE_SUB), not hardcoded
+# MAGIC - Genie should filter `notice_type` for LOR variants, not just look in the reason text field
+# MAGIC - The 14-day window should be relative, not hardcoded
 
 # COMMAND ----------
 
 # Validation SQL — Task 4
 # MAGIC %sql
 # MAGIC SELECT
-# MAGIC     NOTICEID,
-# MAGIC     NOTICE_TYPE,
-# MAGIC     REGIONID,
-# MAGIC     ISSUE_DATETIME,
-# MAGIC     EXTERNAL_REFERENCE,
-# MAGIC     LEFT(NOTICE_TEXT, 200)  AS notice_preview
+# MAGIC     notice_id,
+# MAGIC     notice_type,
+# MAGIC     region_id,
+# MAGIC     issue_time,
+# MAGIC     effective_date,
+# MAGIC     LEFT(reason, 200)  AS reason_preview
 # MAGIC FROM ${catalog}.${schema_aemo}.market_notices
 # MAGIC WHERE
-# MAGIC     ISSUE_DATETIME >= DATE_SUB(CURRENT_DATE(), 14)
-# MAGIC     AND NOTICE_TYPE LIKE 'LOR%'
-# MAGIC ORDER BY ISSUE_DATETIME DESC
+# MAGIC     issue_time >= CURRENT_DATE - INTERVAL 14 DAYS
+# MAGIC     AND notice_type LIKE 'LOR%'
+# MAGIC ORDER BY issue_time DESC
 
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC > **Debrief point:** This task highlights the value of the Space instructions. Because we defined LOR1/LOR2/LOR3 in the instructions, Genie knows to use `NOTICE_TYPE LIKE 'LOR%'` rather than a free-text search on the notice body.
+# MAGIC > **Debrief point:** This task highlights the value of the Space instructions. Because we defined LOR1/LOR2/LOR3 in the instructions, Genie knows to use `notice_type LIKE 'LOR%'` rather than a free-text search on the reason field.
 
 # COMMAND ----------
 
@@ -307,20 +307,20 @@ print("Validation SQL for Task 1: Average spot price in VIC1 yesterday\n")
 # Validation SQL — Task 5
 # MAGIC %sql
 # MAGIC SELECT
-# MAGIC     DATE_FORMAT(d.SETTLEMENTDATE, 'yyyy-MM')   AS month,
+# MAGIC     DATE_FORMAT(d.settlement_date, 'yyyy-MM')  AS month,
 # MAGIC     CASE
-# MAGIC         WHEN g.FUEL_TYPE IN ('BLACK COAL', 'BROWN COAL') THEN 'Coal'
-# MAGIC         WHEN g.FUEL_TYPE IN ('WIND', 'SOLAR')            THEN 'Renewable'
+# MAGIC         WHEN g.fuel_type IN ('BLACK COAL', 'BROWN COAL') THEN 'Coal'
+# MAGIC         WHEN g.fuel_type IN ('WIND', 'SOLAR')            THEN 'Renewable'
 # MAGIC         ELSE 'Other'
 # MAGIC     END                                        AS generation_category,
-# MAGIC     ROUND(SUM(d.TOTALCLEARED * 5.0 / 60), 0)  AS total_MWh
+# MAGIC     ROUND(SUM(d.dispatch_mw) / 12, 0)          AS total_MWh
 # MAGIC FROM ${catalog}.${schema_aemo}.dispatch_intervals d
 # MAGIC JOIN ${catalog}.${schema_aemo}.generator_registration g
-# MAGIC     ON d.DUID = g.DUID
+# MAGIC     ON d.duid = g.duid
 # MAGIC WHERE
-# MAGIC     g.REGIONID = 'QLD1'
-# MAGIC     AND d.SETTLEMENTDATE >= ADD_MONTHS(CURRENT_DATE(), -3)
-# MAGIC GROUP BY DATE_FORMAT(d.SETTLEMENTDATE, 'yyyy-MM'), generation_category
+# MAGIC     g.region_id = 'QLD1'
+# MAGIC     AND d.settlement_date >= ADD_MONTHS(CURRENT_DATE(), -3)
+# MAGIC GROUP BY DATE_FORMAT(d.settlement_date, 'yyyy-MM'), generation_category
 # MAGIC ORDER BY month ASC, generation_category ASC
 
 # COMMAND ----------
@@ -352,7 +352,7 @@ print("Validation SQL for Task 1: Average spot price in VIC1 yesterday\n")
 # MAGIC
 # MAGIC ### What you should see
 # MAGIC - A table joining `dispatch_intervals` and `generator_registration`
-# MAGIC - Columns: SETTLEMENTDATE, REGIONID, spike price, DUID, STATIONNAME, FUEL_TYPE, dispatched MW
+# MAGIC - Columns: settlement_date, region_id, spike price, duid, station_name, fuel_type, dispatched MW
 # MAGIC - The result reveals whether gas peakers or coal units were setting the market price during spikes
 # MAGIC
 # MAGIC ### Follow-up conversation feature
@@ -367,29 +367,29 @@ print("Validation SQL for Task 1: Average spot price in VIC1 yesterday\n")
 # MAGIC %sql
 # MAGIC WITH top_intervals AS (
 # MAGIC     SELECT
-# MAGIC         SETTLEMENTDATE,
-# MAGIC         REGIONID,
-# MAGIC         ROUND(RRP, 2) AS spike_price_dollarMWh
+# MAGIC         settlement_date,
+# MAGIC         region_id,
+# MAGIC         ROUND(rrp, 2) AS spike_price_dollarMWh
 # MAGIC     FROM ${catalog}.${schema_aemo}.spot_prices
-# MAGIC     WHERE SETTLEMENTDATE >= DATE_SUB(CURRENT_DATE(), 30)
-# MAGIC     ORDER BY RRP DESC
+# MAGIC     WHERE settlement_date >= CURRENT_DATE - INTERVAL 30 DAYS
+# MAGIC     ORDER BY rrp DESC
 # MAGIC     LIMIT 10
 # MAGIC )
 # MAGIC SELECT
-# MAGIC     ti.SETTLEMENTDATE,
-# MAGIC     ti.REGIONID,
+# MAGIC     ti.settlement_date,
+# MAGIC     ti.region_id,
 # MAGIC     ti.spike_price_dollarMWh,
-# MAGIC     d.DUID,
-# MAGIC     g.STATIONNAME,
-# MAGIC     g.FUEL_TYPE,
-# MAGIC     ROUND(d.TOTALCLEARED, 1) AS dispatched_MW
+# MAGIC     d.duid,
+# MAGIC     g.station_name,
+# MAGIC     g.fuel_type,
+# MAGIC     ROUND(d.dispatch_mw, 1) AS dispatched_MW
 # MAGIC FROM top_intervals ti
 # MAGIC JOIN ${catalog}.${schema_aemo}.dispatch_intervals d
-# MAGIC     ON ti.SETTLEMENTDATE = d.SETTLEMENTDATE
+# MAGIC     ON ti.settlement_date = d.settlement_date
 # MAGIC JOIN ${catalog}.${schema_aemo}.generator_registration g
-# MAGIC     ON d.DUID = g.DUID
-# MAGIC WHERE g.REGIONID = ti.REGIONID
-# MAGIC ORDER BY ti.spike_price_dollarMWh DESC, d.TOTALCLEARED DESC
+# MAGIC     ON d.duid = g.duid
+# MAGIC WHERE g.region_id = ti.region_id
+# MAGIC ORDER BY ti.spike_price_dollarMWh DESC, d.dispatch_mw DESC
 
 # COMMAND ----------
 
@@ -438,13 +438,13 @@ print("Validation SQL for Task 1: Average spot price in VIC1 yesterday\n")
 # MAGIC %sql
 # MAGIC -- This is the SQL that backs the "Add to Dashboard" widget
 # MAGIC SELECT
-# MAGIC     DATE(SETTLEMENTDATE)  AS trading_date,
-# MAGIC     REGIONID,
-# MAGIC     ROUND(AVG(RRP), 2)   AS avg_price_dollarMWh
+# MAGIC     DATE(settlement_date)  AS trading_date,
+# MAGIC     region_id,
+# MAGIC     ROUND(AVG(rrp), 2)   AS avg_price_dollarMWh
 # MAGIC FROM ${catalog}.${schema_aemo}.spot_prices
-# MAGIC WHERE SETTLEMENTDATE >= DATE_SUB(CURRENT_DATE(), 7)
-# MAGIC GROUP BY DATE(SETTLEMENTDATE), REGIONID
-# MAGIC ORDER BY trading_date ASC, REGIONID ASC
+# MAGIC WHERE settlement_date >= CURRENT_DATE - INTERVAL 7 DAYS
+# MAGIC GROUP BY DATE(settlement_date), region_id
+# MAGIC ORDER BY trading_date ASC, region_id ASC
 
 # COMMAND ----------
 
@@ -478,7 +478,7 @@ print("Validation SQL for Task 1: Average spot price in VIC1 yesterday\n")
 # MAGIC 1. The correct table(s) are being queried
 # MAGIC 2. The date filter is relative, not hardcoded
 # MAGIC 3. Any aggregation (AVG, SUM, COUNT) matches the question intent
-# MAGIC 4. JOINs use the correct key columns (DUID for generators, REGIONID for prices)
+# MAGIC 4. JOINs use the correct key columns (duid for generators, region_id for prices)
 # MAGIC
 # MAGIC **Next: Lab 03 → Controls, Governance and Access** — how to monitor who is using the Space, understand billing, and prepare for production rollout.
 

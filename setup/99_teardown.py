@@ -338,7 +338,55 @@ if not all_spaces:
 
 # COMMAND ----------
 
-# MAGIC %md ## 5 — Final Summary
+# MAGIC %md ## 5 — Delete Workshop Participant Groups
+
+# COMMAND ----------
+
+print("=" * 65)
+print("STEP 5 — DELETE WORKSHOP PARTICIPANT GROUPS")
+print("=" * 65)
+
+# All group names created by grant_workshop_access.py
+WORKSHOP_GROUP_NAMES = {
+    "workshop_s3_participants",
+    "workshop_s2_data_engineers",
+    "workshop_s2a_developers",
+    "workshop_s2c_agent_builders",
+}
+
+print(f"\nLooking for workshop groups to delete...")
+print(f"  Target groups: {', '.join(sorted(WORKSHOP_GROUP_NAMES))}")
+print()
+
+try:
+    # List groups that match any of our workshop group names
+    groups_found = []
+    for group_name in WORKSHOP_GROUP_NAMES:
+        try:
+            results = list(w.groups.list(filter=f"displayName eq '{group_name}'"))
+            groups_found.extend(results)
+        except Exception as exc:
+            print(f"  ⚠️  Could not query group '{group_name}': {exc}")
+
+    if not groups_found:
+        print("  No workshop participant groups found — already cleaned up or never created.")
+    else:
+        for grp in groups_found:
+            grp_name = grp.display_name or ""
+            grp_id   = grp.id or ""
+            _action(
+                "Participant group",
+                f"'{grp_name}' (ID: {grp_id})",
+                lambda gid=grp_id: w.groups.delete(id=gid),
+            )
+
+except Exception as exc:
+    print(f"  ❌ Could not list/delete groups: {exc}")
+    errors.append(f"Group cleanup: {exc}")
+
+# COMMAND ----------
+
+# MAGIC %md ## 6 — Final Summary
 
 # COMMAND ----------
 

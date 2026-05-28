@@ -639,4 +639,4 @@ else:
 # MAGIC - `GRANT ... ON SCHEMA` covers all current and future tables/views/functions in that schema — no per-table grants needed.
 # MAGIC - Warehouse and endpoint permissions are granted directly to users (not the group) to ensure they appear in each user's UI immediately.
 # MAGIC - Running this notebook a second time is safe — UC GRANTs and SCIM PATCH ADD are idempotent.
-# MAGIC - To revoke access after a session, use `REVOKE` SQL statements and the corresponding `permissions.set()` SDK calls, or delete the group.
+# MAGIC - To revoke access after a session, use `REVOKE` SQL statements for UC privileges, `permissions.update()` with REMOVE operations for warehouse/endpoint ACLs, or simply delete the group (which removes all inherited access).
