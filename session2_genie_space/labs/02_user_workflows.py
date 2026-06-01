@@ -10,16 +10,7 @@
 # MAGIC | ⏱️ **Duration** | 35 minutes |
 # MAGIC | **Covers** | Slides 25, 28–29 — Benchmarks first, then Example SQL, then Text |
 # MAGIC
-# MAGIC ---
-# MAGIC
-# MAGIC ## Key rule: Benchmarks before instructions (Slide 25)
-# MAGIC
-# MAGIC > *"Create a set of questions that you expect users to ask as benchmarks. Create 'correct SQL' for each. Run benchmarks as you iterate on your instructions."*
-# MAGIC
-# MAGIC **Why benchmarks come first:**
-# MAGIC - You need a baseline before you start changing things
-# MAGIC - Benchmarks are your regression test — they tell you if a change made things better or worse
-# MAGIC - Target: >80% Good before sharing with business users
+# MAGIC > *"Create benchmarks before you iterate on instructions. Run them as a regression test with every change."*
 
 # COMMAND ----------
 
@@ -36,265 +27,289 @@ print(f"Space: {SPACE_ID or 'not set'}")
 
 # MAGIC %md
 # MAGIC ---
-# MAGIC ## Step 1: Add Benchmarks (Slide 25 + Slide 36)
+# MAGIC ## Step 1: Add Benchmarks
 # MAGIC
-# MAGIC **🖱️ Navigate: Configure → Benchmarks → + Add benchmark**
+# MAGIC **🖱️ UI:** Configure → Benchmarks → + Add benchmark → paste title → add expected SQL
 # MAGIC
-# MAGIC Add 2 phrasings of each question type (Slide 36 — AEMO benchmark question bank):
-# MAGIC
-# MAGIC ### Type 1: Spot prices by region
-# MAGIC | Phrasing | Expected SQL |
-# MAGIC |---|---|
-# MAGIC | "What was the average spot price in NSW1 yesterday?" | `SELECT region_id, ROUND(AVG(rrp),2) AS avg_price FROM workshop_au.aemo.spot_prices WHERE region_id='NSW1' AND DATE(settlement_date) = CURRENT_DATE - 1` |
-# MAGIC | "Show me yesterday's regional reference price for NSW" | Same |
-# MAGIC
-# MAGIC ### Type 2: Price spikes
-# MAGIC | Phrasing | Expected SQL |
-# MAGIC |---|---|
-# MAGIC | "How many 5-minute intervals exceeded $300/MWh in VIC last week?" | `SELECT COUNT(*) FROM workshop_au.aemo.spot_prices WHERE region_id='VIC1' AND rrp > 300 AND settlement_date >= CURRENT_DATE - 7` |
-# MAGIC | "Show price spike events above $1000/MWh this month by region" | `SELECT region_id, COUNT(*) as spikes FROM ... WHERE rrp > 1000 AND ...` |
-# MAGIC
-# MAGIC ### Type 3: Generator dispatch
-# MAGIC | Phrasing | Expected SQL |
-# MAGIC |---|---|
-# MAGIC | "Which generators dispatched the most MW in QLD last week?" | `SELECT d.duid, g.station_name, ROUND(SUM(d.dispatch_mw)/12,1) AS mwh FROM dispatch_intervals d LEFT JOIN generator_registration g ON d.duid=g.duid WHERE d.region_id='QLD1' AND ...` |
-# MAGIC | "Show top 10 generators by total dispatch in South Australia this month" | Similar with SA1 |
-# MAGIC
-# MAGIC ### Type 4: Fuel mix
-# MAGIC | Phrasing | Expected SQL |
-# MAGIC |---|---|
-# MAGIC | "What was the fuel mix for dispatch in SA today?" | `SELECT fuel_type, ROUND(SUM(dispatch_mw)/12,1) AS mwh FROM dispatch_intervals WHERE region_id='SA1' AND DATE(settlement_date)=CURRENT_DATE GROUP BY fuel_type` |
-# MAGIC | "Show renewable generation as a % of total dispatch this quarter" | CASE WHEN fuel_type IN ('solar','wind') ... |
-# MAGIC
-# MAGIC ### Type 5: LOR / market notices
-# MAGIC | Phrasing | Expected SQL |
-# MAGIC |---|---|
-# MAGIC | "Were there any LOR events in the last fortnight?" | `SELECT * FROM market_notices WHERE notice_type LIKE 'LOR%' AND issue_time >= CURRENT_TIMESTAMP - INTERVAL 14 DAYS` |
-# MAGIC | "List all lack-of-reserve notices from the past 30 days" | Same with 30 days |
-# MAGIC
-# MAGIC ⚠️ **Run benchmarks BEFORE adding any golden queries.** This gives you a true baseline.
+# MAGIC **⚡ Automated:** run the cell below to upload all 10 benchmarks at once.
+# MAGIC Deletes and replaces any existing benchmark with the same title.
 
 # COMMAND ----------
 
-# Helper: SQL for each benchmark type to paste as expected SQL
-benchmarks = {
-    "avg_spot_nsw1_yesterday": """
-SELECT region_id, ROUND(AVG(rrp), 2) AS avg_price_mwh
-FROM workshop_au.aemo.spot_prices
-WHERE region_id = 'NSW1'
-  AND DATE(settlement_date) = CURRENT_DATE - 1
-GROUP BY region_id""",
+import requests, json
 
-    "price_spikes_vic_last_week": """
-SELECT COUNT(*) AS spike_count
-FROM workshop_au.aemo.spot_prices
-WHERE region_id = 'VIC1'
-  AND rrp > 300
-  AND settlement_date >= CURRENT_DATE - INTERVAL 7 DAYS""",
+BENCHMARKS = [
+    {
+        "title": "What was the average spot price in NSW1 yesterday?",
+        "sql":   f"SELECT region_id, ROUND(AVG(rrp), 2) AS avg_price_mwh FROM {CATALOG}.{SCHEMA}.spot_prices WHERE region_id = 'NSW1' AND DATE(settlement_date) = CURRENT_DATE - 1 GROUP BY region_id"
+    },
+    {
+        "title": "Show me yesterday's regional reference price for NSW",
+        "sql":   f"SELECT region_id, ROUND(AVG(rrp), 2) AS avg_price_mwh FROM {CATALOG}.{SCHEMA}.spot_prices WHERE region_id = 'NSW1' AND DATE(settlement_date) = CURRENT_DATE - 1 GROUP BY region_id"
+    },
+    {
+        "title": "How many 5-minute intervals exceeded $300 per MWh in VIC last week?",
+        "sql":   f"SELECT COUNT(*) AS spike_count FROM {CATALOG}.{SCHEMA}.spot_prices WHERE region_id = 'VIC1' AND rrp > 300 AND settlement_date >= CURRENT_DATE - INTERVAL 7 DAYS"
+    },
+    {
+        "title": "Show price spike events above $1000 per MWh this month by region",
+        "sql":   f"SELECT region_id, COUNT(*) AS spikes FROM {CATALOG}.{SCHEMA}.spot_prices WHERE rrp > 1000 AND settlement_date >= DATE_TRUNC('month', CURRENT_DATE) GROUP BY region_id ORDER BY spikes DESC"
+    },
+    {
+        "title": "Which generators dispatched the most MW in QLD last week?",
+        "sql":   f"SELECT d.duid, g.station_name, g.fuel_type, ROUND(SUM(d.dispatch_mw)/12, 1) AS total_mwh FROM {CATALOG}.{SCHEMA}.dispatch_intervals d LEFT JOIN {CATALOG}.{SCHEMA}.generator_registration g ON d.duid = g.duid WHERE d.region_id = 'QLD1' AND d.settlement_date >= CURRENT_DATE - INTERVAL 7 DAYS GROUP BY d.duid, g.station_name, g.fuel_type ORDER BY total_mwh DESC LIMIT 10"
+    },
+    {
+        "title": "Show top 10 generators by total dispatch in South Australia this month",
+        "sql":   f"SELECT d.duid, g.station_name, g.fuel_type, ROUND(SUM(d.dispatch_mw)/12, 1) AS total_mwh FROM {CATALOG}.{SCHEMA}.dispatch_intervals d LEFT JOIN {CATALOG}.{SCHEMA}.generator_registration g ON d.duid = g.duid WHERE d.region_id = 'SA1' AND d.settlement_date >= DATE_TRUNC('month', CURRENT_DATE) GROUP BY d.duid, g.station_name, g.fuel_type ORDER BY total_mwh DESC LIMIT 10"
+    },
+    {
+        "title": "What was the fuel mix for dispatch in SA today?",
+        "sql":   f"SELECT fuel_type, ROUND(SUM(dispatch_mw)/12, 0) AS total_mwh FROM {CATALOG}.{SCHEMA}.dispatch_intervals WHERE region_id = 'SA1' AND DATE(settlement_date) = CURRENT_DATE GROUP BY fuel_type ORDER BY total_mwh DESC"
+    },
+    {
+        "title": "Show renewable generation as a percentage of total dispatch this quarter",
+        "sql":   f"SELECT ROUND(SUM(CASE WHEN fuel_type IN ('solar','wind') THEN dispatch_mw ELSE 0 END) * 100.0 / NULLIF(SUM(dispatch_mw), 0), 1) AS renewable_pct FROM {CATALOG}.{SCHEMA}.dispatch_intervals WHERE settlement_date >= DATE_TRUNC('quarter', CURRENT_DATE)"
+    },
+    {
+        "title": "Were there any LOR events in the last fortnight?",
+        "sql":   f"SELECT notice_type, issue_time, region_id, SUBSTRING(reason, 1, 200) AS summary FROM {CATALOG}.{SCHEMA}.market_notices WHERE notice_type LIKE 'LOR%' AND issue_time >= CURRENT_TIMESTAMP - INTERVAL 14 DAYS ORDER BY issue_time DESC"
+    },
+    {
+        "title": "List all lack of reserve notices from the past 30 days",
+        "sql":   f"SELECT notice_type, issue_time, region_id, SUBSTRING(reason, 1, 200) AS summary FROM {CATALOG}.{SCHEMA}.market_notices WHERE notice_type LIKE 'LOR%' AND issue_time >= CURRENT_TIMESTAMP - INTERVAL 30 DAYS ORDER BY issue_time DESC"
+    },
+]
 
-    "top_generators_qld_last_week": """
-SELECT d.duid, g.station_name, g.fuel_type,
-       ROUND(SUM(d.dispatch_mw) / 12, 1) AS total_mwh
-FROM workshop_au.aemo.dispatch_intervals d
-LEFT JOIN workshop_au.aemo.generator_registration g ON d.duid = g.duid
-WHERE d.region_id = 'QLD1'
+if not SPACE_ID:
+    print("Enter Space ID in widget first.")
+else:
+    # 1. Get existing benchmarks
+    existing = requests.get(
+        f"https://{HOST}/api/2.0/genie/spaces/{SPACE_ID}/benchmark-questions",
+        headers=HEADERS
+    )
+    existing_ids = {}
+    if existing.status_code == 200:
+        for q in existing.json().get("benchmark_questions", []):
+            existing_ids[q.get("title", "")] = q.get("id")
+
+    added = deleted = errors = 0
+    for bm in BENCHMARKS:
+        # Delete existing if same title
+        if bm["title"] in existing_ids:
+            del_resp = requests.delete(
+                f"https://{HOST}/api/2.0/genie/spaces/{SPACE_ID}/benchmark-questions/{existing_ids[bm['title']]}",
+                headers=HEADERS
+            )
+            if del_resp.status_code in (200, 204):
+                deleted += 1
+
+        # Add fresh
+        add_resp = requests.post(
+            f"https://{HOST}/api/2.0/genie/spaces/{SPACE_ID}/benchmark-questions",
+            headers=HEADERS,
+            json={"title": bm["title"], "expected_sql": bm["sql"]}
+        )
+        if add_resp.status_code in (200, 201):
+            added += 1
+        else:
+            errors += 1
+            print(f"  ❌ {bm['title'][:60]}: {add_resp.status_code} {add_resp.text[:100]}")
+
+    print(f"✅ {added} benchmarks added, {deleted} replaced, {errors} errors")
+    print(f"\nNow run them: Configure → Benchmarks → Run benchmarks")
+    print(f"Note your baseline score before adding any golden queries.")
+
+# COMMAND ----------
+
+# MAGIC %md
+# MAGIC ---
+# MAGIC ## Step 2: Add Golden Queries
+# MAGIC
+# MAGIC **🖱️ UI:** Configure → Instructions → SQL Queries → + Add → paste title + SQL
+# MAGIC
+# MAGIC **⚡ Automated:** run the cell below to upload all 5 queries at once.
+# MAGIC Deletes and replaces any query with the same title.
+
+# COMMAND ----------
+
+GOLDEN_QUERIES = [
+    {
+        "name": "Average spot price by region for a date",
+        "description": "Use when asking about price levels or averages for a specific day. The :date parameter accepts a date value.",
+        "query": f"""SELECT
+    region_id,
+    ROUND(AVG(rrp), 2)  AS avg_price_mwh,
+    ROUND(MIN(rrp), 2)  AS min_price_mwh,
+    ROUND(MAX(rrp), 2)  AS max_price_mwh,
+    COUNT(*)            AS interval_count
+FROM {CATALOG}.{SCHEMA}.spot_prices
+WHERE DATE(settlement_date) = :date_period
+GROUP BY region_id
+ORDER BY avg_price_mwh DESC"""
+    },
+    {
+        "name": "Price spikes above threshold in a region",
+        "description": "Use when asking about high price events, price spikes, or prices exceeding a threshold. :region is the NEM region (e.g. VIC1). :threshold is the $/MWh threshold (default 300).",
+        "query": f"""SELECT
+    region_id,
+    DATE(settlement_date)  AS spike_date,
+    settlement_date        AS interval_time,
+    ROUND(rrp, 2)          AS price_mwh
+FROM {CATALOG}.{SCHEMA}.spot_prices
+WHERE region_id = :region
+  AND rrp > :threshold
+  AND settlement_date >= CURRENT_DATE - INTERVAL 30 DAYS
+ORDER BY rrp DESC"""
+    },
+    {
+        "name": "Top generators by dispatch in a region",
+        "description": "Use when asking which generators dispatched most, top generators, or generation output. :region is the NEM region (e.g. QLD1).",
+        "query": f"""SELECT
+    d.duid,
+    g.station_name,
+    g.fuel_type,
+    ROUND(SUM(d.dispatch_mw) / 12, 1)  AS total_mwh,
+    ROUND(AVG(d.dispatch_mw), 1)        AS avg_dispatch_mw
+FROM {CATALOG}.{SCHEMA}.dispatch_intervals d
+LEFT JOIN {CATALOG}.{SCHEMA}.generator_registration g ON d.duid = g.duid
+WHERE d.region_id = :region
   AND d.settlement_date >= CURRENT_DATE - INTERVAL 7 DAYS
 GROUP BY d.duid, g.station_name, g.fuel_type
 ORDER BY total_mwh DESC
-LIMIT 10""",
-
-    "fuel_mix_sa_today": """
-SELECT fuel_type,
-       ROUND(SUM(dispatch_mw) / 12, 1) AS total_mwh
-FROM workshop_au.aemo.dispatch_intervals
-WHERE region_id = 'SA1'
-  AND DATE(settlement_date) = CURRENT_DATE
-GROUP BY fuel_type
-ORDER BY total_mwh DESC""",
-
-    "lor_events_last_14_days": """
-SELECT notice_type, issue_time, region_id,
-       SUBSTRING(reason, 1, 200) AS summary
-FROM workshop_au.aemo.market_notices
+LIMIT 15"""
+    },
+    {
+        "name": "Fuel mix by region",
+        "description": "Use when asking about generation mix, renewable versus fossil fuel, or fuel type breakdown. :region is the NEM region.",
+        "query": f"""SELECT
+    CASE
+        WHEN fuel_type IN ('solar', 'wind') THEN 'Renewable'
+        WHEN fuel_type IN ('coal', 'gas')   THEN 'Fossil Fuel'
+        ELSE 'Other'
+    END                              AS generation_type,
+    fuel_type,
+    ROUND(SUM(dispatch_mw) / 12, 0) AS total_mwh
+FROM {CATALOG}.{SCHEMA}.dispatch_intervals
+WHERE region_id = :region
+  AND settlement_date >= CURRENT_DATE - INTERVAL 30 DAYS
+GROUP BY generation_type, fuel_type
+ORDER BY total_mwh DESC"""
+    },
+    {
+        "name": "LOR and market notices in last N days",
+        "description": "Use when asking about LOR events, lack-of-reserve notices, market interventions, or reserve warnings. :days is the lookback period in days (default 14).",
+        "query": f"""SELECT
+    notice_type,
+    issue_time,
+    effective_date,
+    region_id,
+    SUBSTRING(reason, 1, 250) AS summary
+FROM {CATALOG}.{SCHEMA}.market_notices
 WHERE notice_type LIKE 'LOR%'
-  AND issue_time >= CURRENT_TIMESTAMP - INTERVAL 14 DAYS
+  AND issue_time >= CURRENT_TIMESTAMP - INTERVAL :days DAYS
 ORDER BY issue_time DESC"""
-}
+    },
+]
 
-print("Copy these SQL statements as expected answers for your benchmark questions:\n")
-for name, sql in benchmarks.items():
-    print(f"--- {name} ---")
-    print(sql.strip())
-    print()
+if not SPACE_ID:
+    print("Enter Space ID in widget first.")
+else:
+    # Get existing queries
+    existing_resp = requests.get(
+        f"https://{HOST}/api/2.0/genie/spaces/{SPACE_ID}/sql-queries",
+        headers=HEADERS
+    )
+    existing_qs = {}
+    if existing_resp.status_code == 200:
+        for q in existing_resp.json().get("sql_queries", []):
+            existing_qs[q.get("name", "")] = q.get("id")
 
-# COMMAND ----------
+    added = deleted = errors = 0
+    for gq in GOLDEN_QUERIES:
+        if gq["name"] in existing_qs:
+            del_resp = requests.delete(
+                f"https://{HOST}/api/2.0/genie/spaces/{SPACE_ID}/sql-queries/{existing_qs[gq['name']]}",
+                headers=HEADERS
+            )
+            if del_resp.status_code in (200, 204):
+                deleted += 1
 
-# MAGIC %md
-# MAGIC ---
-# MAGIC ## Step 2: Add Golden Queries / Example SQL (Slide 28)
-# MAGIC
-# MAGIC > *"After UC metadata and Knowledge Store, Example SQL is your next best option. Leverage parameterised example SQL wherever possible. The question title will have more impact on Genie's behaviour than Usage Guidance — include the most common phrasing as the title."*
-# MAGIC
-# MAGIC **🖱️ Navigate: Configure → Instructions → SQL Queries → + Add**
-# MAGIC
-# MAGIC Add these 5 parameterised golden queries:
+        add_resp = requests.post(
+            f"https://{HOST}/api/2.0/genie/spaces/{SPACE_ID}/sql-queries",
+            headers=HEADERS,
+            json={"name": gq["name"], "description": gq["description"], "query": gq["query"]}
+        )
+        if add_resp.status_code in (200, 201):
+            added += 1
+        else:
+            errors += 1
+            print(f"  ❌ {gq['name']}: {add_resp.status_code} {add_resp.text[:100]}")
 
-# COMMAND ----------
-
-# MAGIC %md
-# MAGIC ### Query 1 — Average spot price by region
-# MAGIC **Title:** `What was the average spot price by region for :date_period?`
-# MAGIC ```sql
-# MAGIC SELECT
-# MAGIC     region_id,
-# MAGIC     ROUND(AVG(rrp), 2)  AS avg_price_mwh,
-# MAGIC     ROUND(MIN(rrp), 2)  AS min_price_mwh,
-# MAGIC     ROUND(MAX(rrp), 2)  AS max_price_mwh,
-# MAGIC     COUNT(*)            AS interval_count
-# MAGIC FROM workshop_au.aemo.spot_prices
-# MAGIC WHERE DATE(settlement_date) = :date_period
-# MAGIC GROUP BY region_id
-# MAGIC ORDER BY avg_price_mwh DESC
-# MAGIC ```
-# MAGIC **Parameters:** date_period (Date) — e.g. yesterday, last Monday
-# MAGIC **Usage guidance:** Use when asking about price levels or averages for a specific day
-
-# COMMAND ----------
-
-# MAGIC %md
-# MAGIC ### Query 2 — Price spike events
-# MAGIC **Title:** `Were there any price spikes above $:threshold per MWh in :region last month?`
-# MAGIC ```sql
-# MAGIC SELECT
-# MAGIC     region_id,
-# MAGIC     DATE(settlement_date)  AS spike_date,
-# MAGIC     settlement_date        AS interval_time,
-# MAGIC     ROUND(rrp, 2)          AS price_mwh
-# MAGIC FROM workshop_au.aemo.spot_prices
-# MAGIC WHERE region_id = :region
-# MAGIC   AND rrp > :threshold
-# MAGIC   AND settlement_date >= CURRENT_DATE - INTERVAL 30 DAYS
-# MAGIC ORDER BY rrp DESC
-# MAGIC ```
-# MAGIC **Parameters:** region (String — NEM region e.g. VIC1), threshold (Decimal — default 300)
-
-# COMMAND ----------
-
-# MAGIC %md
-# MAGIC ### Query 3 — Top generators by dispatch
-# MAGIC **Title:** `Which generators dispatched the most in :region last week?`
-# MAGIC ```sql
-# MAGIC SELECT
-# MAGIC     d.duid,
-# MAGIC     g.station_name,
-# MAGIC     g.fuel_type,
-# MAGIC     ROUND(SUM(d.dispatch_mw) / 12, 1)  AS total_mwh,
-# MAGIC     ROUND(AVG(d.dispatch_mw), 1)        AS avg_dispatch_mw
-# MAGIC FROM workshop_au.aemo.dispatch_intervals d
-# MAGIC LEFT JOIN workshop_au.aemo.generator_registration g ON d.duid = g.duid
-# MAGIC WHERE d.region_id = :region
-# MAGIC   AND d.settlement_date >= CURRENT_DATE - INTERVAL 7 DAYS
-# MAGIC GROUP BY d.duid, g.station_name, g.fuel_type
-# MAGIC ORDER BY total_mwh DESC
-# MAGIC LIMIT 15
-# MAGIC ```
-# MAGIC **Parameters:** region (String — e.g. QLD1, SA1)
-
-# COMMAND ----------
-
-# MAGIC %md
-# MAGIC ### Query 4 — Fuel mix by region
-# MAGIC **Title:** `What was the fuel mix for dispatch in :region for :period?`
-# MAGIC ```sql
-# MAGIC SELECT
-# MAGIC     CASE
-# MAGIC         WHEN fuel_type IN ('solar', 'wind')   THEN 'Renewable'
-# MAGIC         WHEN fuel_type IN ('coal', 'gas')     THEN 'Fossil Fuel'
-# MAGIC         ELSE 'Other'
-# MAGIC     END                                 AS generation_type,
-# MAGIC     fuel_type,
-# MAGIC     ROUND(SUM(dispatch_mw) / 12, 0)     AS total_mwh
-# MAGIC FROM workshop_au.aemo.dispatch_intervals
-# MAGIC WHERE region_id = :region
-# MAGIC   AND settlement_date >= CURRENT_DATE - INTERVAL 30 DAYS
-# MAGIC GROUP BY generation_type, fuel_type
-# MAGIC ORDER BY total_mwh DESC
-# MAGIC ```
-# MAGIC **Parameters:** region (String), period (String — for display only)
-
-# COMMAND ----------
-
-# MAGIC %md
-# MAGIC ### Query 5 — LOR and market notices
-# MAGIC **Title:** `Were there any LOR notices in the last :days days?`
-# MAGIC ```sql
-# MAGIC SELECT
-# MAGIC     notice_type,
-# MAGIC     issue_time,
-# MAGIC     effective_date,
-# MAGIC     region_id,
-# MAGIC     SUBSTRING(reason, 1, 250) AS summary
-# MAGIC FROM workshop_au.aemo.market_notices
-# MAGIC WHERE notice_type LIKE 'LOR%'
-# MAGIC   AND issue_time >= CURRENT_TIMESTAMP - INTERVAL :days DAYS
-# MAGIC ORDER BY issue_time DESC
-# MAGIC ```
-# MAGIC **Parameters:** days (Integer — default 14)
-# MAGIC **Usage guidance:** Use when asking about lack-of-reserve events, LOR1/LOR2/LOR3 events, reserve warnings
-
-# COMMAND ----------
-
-# Validate all 5 golden query SQLs work against actual data
-import pyspark.sql.functions as F
-
-tests = {
-    "avg_prices": f"SELECT region_id, ROUND(AVG(rrp),2) AS avg FROM {CATALOG}.{SCHEMA}.spot_prices WHERE DATE(settlement_date) = CURRENT_DATE - 1 GROUP BY region_id ORDER BY avg DESC",
-    "price_spikes": f"SELECT COUNT(*) AS spikes FROM {CATALOG}.{SCHEMA}.spot_prices WHERE rrp > 300 AND settlement_date >= CURRENT_DATE - 7",
-    "top_generators": f"SELECT d.duid, g.station_name, ROUND(SUM(d.dispatch_mw)/12,1) AS mwh FROM {CATALOG}.{SCHEMA}.dispatch_intervals d LEFT JOIN {CATALOG}.{SCHEMA}.generator_registration g ON d.duid=g.duid WHERE d.settlement_date>=CURRENT_DATE-7 GROUP BY d.duid,g.station_name ORDER BY mwh DESC LIMIT 5",
-    "fuel_mix": f"SELECT fuel_type, ROUND(SUM(dispatch_mw)/12,0) AS mwh FROM {CATALOG}.{SCHEMA}.dispatch_intervals WHERE settlement_date>=CURRENT_DATE-30 GROUP BY fuel_type ORDER BY mwh DESC",
-    "lor_events": f"SELECT notice_type, COUNT(*) AS n FROM {CATALOG}.{SCHEMA}.market_notices WHERE notice_type LIKE 'LOR%' AND issue_time>=CURRENT_TIMESTAMP-INTERVAL 30 DAYS GROUP BY notice_type"
-}
-
-for name, sql in tests.items():
-    try:
-        count = spark.sql(sql).count()
-        print(f"✅ {name}: {count} rows")
-    except Exception as e:
-        print(f"❌ {name}: {e}")
+    print(f"✅ {added} golden queries added, {deleted} replaced, {errors} errors")
 
 # COMMAND ----------
 
 # MAGIC %md
 # MAGIC ---
-# MAGIC ## Step 3: Text Instructions — last resort only (Slide 29)
+# MAGIC ## Step 3: Text Instructions — last resort only
 # MAGIC
-# MAGIC > *"General text instructions are the last option — if something could be expressed as table metadata or Example SQL, it should be. There is no filtering on general text instructions — they occupy a lot of context window."*
+# MAGIC **🖱️ UI:** Configure → Instructions → Text → + Add
 # MAGIC
-# MAGIC **🖱️ Navigate: Configure → Instructions → Text → + Add instruction**
-# MAGIC
-# MAGIC **✅ Valid text instructions (universal rules):**
-# MAGIC
-# MAGIC Add these 4 — and no more:
-# MAGIC 1. "Always express prices in $/MWh with 2 decimal places."
-# MAGIC 2. "Region codes must be NSW1, VIC1, QLD1, SA1, or TAS1 — always with the '1' suffix. Never use NSW, VIC, QLD, SA, or TAS without the suffix."
-# MAGIC 3. "LOR1 = first reserve watch warning. LOR2 = reserve shortfall is threatened. LOR3 = imminent critical shortage."
-# MAGIC 4. "When asked about 'today' with no data available, say so and suggest using yesterday instead."
-# MAGIC
-# MAGIC **❌ Anti-patterns — do NOT put these in text instructions:**
-# MAGIC - "Average spot price means the average of the rrp column" → use a golden query or SQL expression instead
-# MAGIC - "Join dispatch_intervals to generator_registration using duid" → use Join configuration instead
-# MAGIC - "LOR notices have notice_type LOR1, LOR2, or LOR3" → use entity matching instead
+# MAGIC **⚡ Automated:** uploads 4 instructions, replacing any with the same content.
+
+# COMMAND ----------
+
+TEXT_INSTRUCTIONS = [
+    "Always express prices in $/MWh with 2 decimal places.",
+    "Region codes must be NSW1, VIC1, QLD1, SA1, or TAS1 — always with the '1' suffix. Never use NSW, VIC, QLD, SA, or TAS without the suffix.",
+    "LOR1 = first reserve watch warning. LOR2 = reserve shortfall threatened. LOR3 = imminent critical shortage. Always use LIKE 'LOR%' to match all LOR types.",
+    "When asked about 'today' with no data available, say so and suggest yesterday instead.",
+]
+
+if not SPACE_ID:
+    print("Enter Space ID in widget first.")
+else:
+    existing_resp = requests.get(
+        f"https://{HOST}/api/2.0/genie/spaces/{SPACE_ID}/instructions",
+        headers=HEADERS
+    )
+    existing_text = {}
+    if existing_resp.status_code == 200:
+        for instr in existing_resp.json().get("instructions", []):
+            existing_text[instr.get("content", "")] = instr.get("id")
+
+    added = deleted = errors = 0
+    for content in TEXT_INSTRUCTIONS:
+        if content in existing_text:
+            del_resp = requests.delete(
+                f"https://{HOST}/api/2.0/genie/spaces/{SPACE_ID}/instructions/{existing_text[content]}",
+                headers=HEADERS
+            )
+            if del_resp.status_code in (200, 204):
+                deleted += 1
+
+        add_resp = requests.post(
+            f"https://{HOST}/api/2.0/genie/spaces/{SPACE_ID}/instructions",
+            headers=HEADERS,
+            json={"content": content}
+        )
+        if add_resp.status_code in (200, 201):
+            added += 1
+        else:
+            errors += 1
+            print(f"  ❌ {content[:60]}: {add_resp.status_code} {add_resp.text[:80]}")
+
+    print(f"✅ {added} instructions added, {deleted} replaced, {errors} errors")
 
 # COMMAND ----------
 
 # MAGIC %md
 # MAGIC ---
 # MAGIC ## ✅ Lab 02 Checkpoint
-# MAGIC
-# MAGIC - [ ] 10 benchmark questions added (5 types × 2 phrasings), benchmarks RUN to get baseline
-# MAGIC - [ ] 5 golden queries added with parameters and accurate titles
-# MAGIC - [ ] 4 (and only 4) text instructions added
-# MAGIC - [ ] **Baseline benchmark score noted** — you need this to measure improvement in Lab 03
+# MAGIC - [ ] 10 benchmarks uploaded (automated) — **run them now and note baseline score**
+# MAGIC - [ ] 5 golden queries uploaded (automated)
+# MAGIC - [ ] 4 text instructions uploaded (automated)
 # MAGIC
 # MAGIC **→ Next: Lab 03 — Run Benchmarks, Monitor & Iterate**
-

@@ -8,45 +8,22 @@
 # MAGIC | | |
 # MAGIC |---|---|
 # MAGIC | ⏱️ **Duration** | 40 minutes |
-# MAGIC | 👤 **Role** | Data Engineer / Genie Space Author |
 # MAGIC | **Covers** | Slides 9, 23–27 — Setup, UC Metadata, Knowledge Store |
 # MAGIC
 # MAGIC ---
 # MAGIC
-# MAGIC ## The mental model (Slide 23)
+# MAGIC ## The mental model
 # MAGIC
-# MAGIC > *"Think of Genie as a brand new analyst joining your organisation as their first job post university. This analyst is pretty good at writing SQL but has no pre-existing knowledge about your business — not high-level concepts, not low-level jargon. The only knowledge they will have is the context provided in that particular space."*
+# MAGIC > *"Think of Genie as a brand new analyst. Brilliant at SQL, but knows nothing about your business. Everything they know comes from what you put in the space."*
 # MAGIC
-# MAGIC **This changes how you build.** Everything you put in the space is onboarding material for that new analyst.
-# MAGIC
-# MAGIC ---
-# MAGIC
-# MAGIC ## Priority stack (Slides 26–29)
+# MAGIC ## Priority stack
 # MAGIC
 # MAGIC | Priority | Method | Why |
 # MAGIC |---|---|---|
-# MAGIC | **1st** | UC Metadata | First and best — column descriptions, PK/FK, value dictionaries |
-# MAGIC | **2nd** | Knowledge Store | Synonyms, join hints, show/hide — without touching UC metadata |
-# MAGIC | **3rd** | Example SQL | Parameterised golden queries for complex patterns |
-# MAGIC | **Last** | Text Instructions | Only for universal rules that can't be expressed as SQL |
-
-# COMMAND ----------
-
-# MAGIC %md
-# MAGIC ---
-# MAGIC ## Before you build: Topic selection (Slide 24)
-# MAGIC
-# MAGIC > *"Just like there's no single dashboard for the organisation, there's no single Genie space."*
-# MAGIC
-# MAGIC **For this workshop** — we're building: **AEMO NEM Market Operations**
-# MAGIC - Audience: Market operations team
-# MAGIC - Tables: spot_prices, dispatch_intervals, market_notices
-# MAGIC - 15 starter questions (Slide 34): average prices by region, price spikes, generator dispatch, fuel mix, LOR events
-# MAGIC
-# MAGIC **🖱️ Step 0 — UI: Navigate to Genie**
-# MAGIC ```
-# MAGIC Left sidebar → Genie (sparkle icon) → + New Space (top right)
-# MAGIC ```
+# MAGIC | **1st** | UC Metadata | First and best — column descriptions, PK/FK |
+# MAGIC | **2nd** | Knowledge Store | Synonyms, joins, entity matching |
+# MAGIC | **3rd** | Example SQL | Complex parameterised patterns |
+# MAGIC | **Last** | Text Instructions | Universal rules only |
 
 # COMMAND ----------
 
@@ -60,226 +37,251 @@ TOKEN   = dbutils.notebook.entry_point.getDbutils().notebook().getContext().apiT
 HEADERS = {"Authorization": f"Bearer {TOKEN}", "Content-Type": "application/json"}
 
 print(f"Catalog: {CATALOG}.{SCHEMA}")
-print(f"Space ID: {SPACE_ID or '(not yet set — create space in UI first)'}")
+print(f"Space:   {SPACE_ID or '(create the space first, then paste ID here)'}")
 
 # COMMAND ----------
 
 # MAGIC %md
 # MAGIC ---
-# MAGIC ## Step 1: UC Metadata — the highest-leverage improvement (Slide 26)
+# MAGIC ## Step 1: UC Column Comments
 # MAGIC
-# MAGIC > *"UC metadata is the first and best option for providing Genie with the context it needs."*
+# MAGIC **🖱️ UI:** Catalog → workshop_au → aemo → [table] → Columns tab → pencil icon on each column
 # MAGIC
-# MAGIC **🖱️ Navigate: Catalog → workshop_au → aemo → [table] → Columns tab → pencil icon**
-# MAGIC
-# MAGIC ### Column descriptions to add now
-# MAGIC
-# MAGIC **spot_prices table:**
-# MAGIC
-# MAGIC | Column | Description to add |
-# MAGIC |---|---|
-# MAGIC | `rrp` | Regional Reference Price in $/MWh. Normal range $50–$200. Market price cap $15,300/MWh. Price floor -$1,000/MWh. Negative prices indicate oversupply. |
-# MAGIC | `region_id` | NEM region identifier. Must be NSW1, VIC1, QLD1, SA1, or TAS1 — always with the '1' suffix. |
-# MAGIC | `settlement_date` | Trading interval end time. 30-minute intervals. Use DATE(settlement_date) to filter by day. |
-# MAGIC
-# MAGIC **dispatch_intervals table:**
-# MAGIC
-# MAGIC | Column | Description to add |
-# MAGIC |---|---|
-# MAGIC | `duid` | Dispatchable Unit Identifier. Unique per generating unit. Join to generator_registration on duid to get station name and fuel type. |
-# MAGIC | `dispatch_mw` | Actual MW dispatched in the 5-minute interval. Sum and divide by 12 to convert to MWh. |
-# MAGIC | `fuel_type` | Generation fuel: solar, wind, coal, gas, hydro, battery. Use CASE to group into Renewable / Fossil Fuel / Other. |
-# MAGIC
-# MAGIC **market_notices table:**
-# MAGIC
-# MAGIC | Column | Description to add |
-# MAGIC |---|---|
-# MAGIC | `notice_type` | Category: LOR1 (watch), LOR2 (threatened shortage), LOR3 (imminent shortage), MARKET NOTICE, SYSTEM NOTICE. |
-# MAGIC | `issue_time` | When AEMO published the notice. Use to filter recent events. |
-# MAGIC | `reason` | Free-text explanation of the notice. Contains the human-readable description. |
+# MAGIC **⚡ Or run the cell below to automate all columns at once.**
+# MAGIC The script uses `ALTER TABLE … ALTER COLUMN … COMMENT` — which replaces any existing comment.
 
 # COMMAND ----------
 
-# Verify column comments are set
-import pyspark.sql.functions as F
+# Automated: set all column comments in one run
+# Replaces existing comments. Safe to re-run.
 
-check = spark.sql(f"""
-    SELECT table_name, column_name, comment
-    FROM system.information_schema.columns
-    WHERE table_catalog = '{CATALOG}'
-      AND table_schema  = '{SCHEMA}'
-      AND table_name    IN ('spot_prices', 'dispatch_intervals', 'market_notices')
-      AND column_name   IN ('rrp', 'region_id', 'settlement_date', 'duid', 'dispatch_mw', 'fuel_type', 'notice_type', 'issue_time')
-    ORDER BY table_name, column_name
-""")
+COLUMN_COMMENTS = {
+    f"{CATALOG}.{SCHEMA}.spot_prices": {
+        "settlement_date": "Trading interval end time. 30-minute intervals. AEST/AEDT timezone. Use DATE(settlement_date) to filter by day.",
+        "region_id":       "NEM region. Must be NSW1, VIC1, QLD1, SA1, or TAS1 — always with the '1' suffix.",
+        "rrp":             "Regional Reference Price in $/MWh. Normal range $50–$200. Market cap $15,300/MWh. Floor -$1,000/MWh. Negative = oversupply.",
+        "raise_6sec":      "6-second raise FCAS price. Hide unless FCAS analysis required.",
+        "lower_6sec":      "6-second lower FCAS price. Hide unless FCAS analysis required.",
+        "total_demand_mw": "Total scheduled demand for the region in MW.",
+        "net_interchange": "Net MW flow between regions. Positive = exporting.",
+        "scheduled_generation": "Total scheduled generation in the region in MW.",
+    },
+    f"{CATALOG}.{SCHEMA}.dispatch_intervals": {
+        "settlement_date": "5-minute dispatch interval end time. Sum dispatch_mw and divide by 12 to convert to MWh.",
+        "region_id":       "NEM region where the unit dispatched. Must be NSW1, VIC1, QLD1, SA1, or TAS1.",
+        "duid":            "Dispatchable Unit Identifier. Unique per generating unit. Join to generator_registration on duid for station_name and fuel_type.",
+        "dispatch_mw":     "Actual MW dispatched in this 5-minute interval. Divide SUM(dispatch_mw)/12 to get MWh.",
+        "initial_mw":      "Initial MW target at interval start.",
+        "available_mw":    "MW available for dispatch.",
+        "ramp_rate":       "Maximum ramp rate in MW per minute.",
+        "fuel_type":       "Generation technology: solar, wind, coal, gas, hydro, battery. Group with CASE into Renewable (solar, wind) vs Fossil Fuel (coal, gas).",
+        "station_name":    "Human-readable station name e.g. Bayswater, Loy Yang A.",
+        "state":           "Australian state the unit is located in.",
+    },
+    f"{CATALOG}.{SCHEMA}.market_notices": {
+        "notice_id":     "Unique identifier for the market notice.",
+        "notice_type":   "LOR1 = reserve watch. LOR2 = shortfall threatened. LOR3 = imminent critical shortage. Use LIKE 'LOR%' to match all LOR types.",
+        "issue_time":    "When AEMO published the notice. Use to filter recent events.",
+        "reason":        "Free-text description of the notice. Use SUBSTRING(reason, 1, 200) for summaries.",
+        "effective_date":"When the notice takes effect.",
+        "region_id":     "NEM region. NULL means the notice applies NEM-wide.",
+        "intervention":  "True if this is an AEMO intervention notice.",
+    },
+    f"{CATALOG}.{SCHEMA}.generator_registration": {
+        "duid":                   "Dispatchable Unit Identifier. Primary key. Join to dispatch_intervals.duid.",
+        "station_name":           "Human-readable station name.",
+        "participant_id":         "Market participant code (company identifier).",
+        "region_id":              "NEM region where registered.",
+        "fuel_type":              "Generation technology: solar, wind, coal, gas, hydro, battery.",
+        "registered_capacity_mw": "Maximum registered capacity in MW.",
+        "dispatch_type":          "GENERATOR, LOAD, or BIDIRECTIONAL.",
+        "max_ramp_rate":          "Maximum ramp rate in MW per minute.",
+        "min_load":               "Minimum stable load in MW.",
+    },
+    f"{CATALOG}.{SCHEMA}.settlement_amounts": {
+        "settlement_date":              "Settlement week end date.",
+        "participant_id":               "Market participant code.",
+        "run_type":                     "FINAL, REVISED, or PRELIMINARY.",
+        "energy_amount_aud":            "Energy component of settlement in AUD.",
+        "fcas_amount_aud":              "FCAS (ancillary services) component in AUD.",
+        "interconnector_residue_aud":   "Interconnector residue component in AUD.",
+        "total_aud":                    "Net settlement amount in AUD.",
+        "settlement_status":            "FINAL, PENDING, or DISPUTED.",
+    },
+}
 
-rows = check.collect()
-for r in rows:
-    icon = "✅" if r['comment'] else "❌ Add description in Catalog Explorer"
-    print(f"{icon} {r['table_name']}.{r['column_name']}")
+results = []
+for table_fqn, columns in COLUMN_COMMENTS.items():
+    for col, comment in columns.items():
+        sql = f"ALTER TABLE {table_fqn} ALTER COLUMN `{col}` COMMENT '{comment}'"
+        try:
+            spark.sql(sql)
+            results.append(("✅", table_fqn.split(".")[-1], col))
+        except Exception as e:
+            results.append(("❌", table_fqn.split(".")[-1], f"{col}: {e}"))
+
+print(f"Set {sum(1 for r in results if r[0]=='✅')} column comments")
+for icon, tbl, col in results:
+    print(f"  {icon} {tbl}.{col}")
 
 # COMMAND ----------
 
 # MAGIC %md
 # MAGIC ---
-# MAGIC ## Step 2: Create the Space — UI walkthrough (Slide 9)
+# MAGIC ## Step 2: Table-level descriptions
 # MAGIC
-# MAGIC **🖱️ Navigate: Left sidebar → Genie → + New Space**
+# MAGIC **🖱️ UI:** Catalog → [table] → Overview tab → Edit description
 # MAGIC
+# MAGIC **⚡ Automated:**
+
+# COMMAND ----------
+
+TABLE_DESCRIPTIONS = {
+    f"{CATALOG}.{SCHEMA}.spot_prices": (
+        "NEM 30-minute trading interval spot prices. "
+        "Key column: rrp = Regional Reference Price in $/MWh. "
+        "Regions: NSW1, VIC1, QLD1, SA1, TAS1."
+    ),
+    f"{CATALOG}.{SCHEMA}.dispatch_intervals": (
+        "NEM 5-minute generator dispatch data. "
+        "Key columns: duid (join to generator_registration), dispatch_mw (divide by 12 for MWh), fuel_type. "
+        "12 intervals = 1 hour."
+    ),
+    f"{CATALOG}.{SCHEMA}.market_notices": (
+        "AEMO market and system notices including LOR events. "
+        "Key column: notice_type (LOR1/LOR2/LOR3 = escalating lack-of-reserve severity). "
+        "Filter: WHERE notice_type LIKE 'LOR%' for LOR events."
+    ),
+    f"{CATALOG}.{SCHEMA}.generator_registration": (
+        "NEM registered generator details. "
+        "Join to dispatch_intervals on duid to get station_name and fuel_type."
+    ),
+    f"{CATALOG}.{SCHEMA}.settlement_amounts": (
+        "Weekly NEM settlement amounts by participant. "
+        "run_type: FINAL = confirmed, PRELIMINARY = estimate. "
+        "total_aud = net settlement amount in AUD."
+    ),
+}
+
+for table_fqn, desc in TABLE_DESCRIPTIONS.items():
+    safe_desc = desc.replace("'", "\\'")
+    try:
+        spark.sql(f"COMMENT ON TABLE {table_fqn} IS '{safe_desc}'")
+        print(f"✅ {table_fqn.split('.')[-1]}")
+    except Exception as e:
+        print(f"❌ {table_fqn.split('.')[-1]}: {e}")
+
+# COMMAND ----------
+
+# MAGIC %md
+# MAGIC ---
+# MAGIC ## Step 3: Create the Space
+# MAGIC
+# MAGIC **🖱️ UI (do this first):** Left sidebar → Genie → + New Space
 # MAGIC ```
 # MAGIC Title:       AEMO NEM Operations
 # MAGIC Description: Natural language access to NEM spot prices, dispatch data,
 # MAGIC              and market notices for the Market Operations team.
 # MAGIC Warehouse:   select your serverless warehouse
-# MAGIC → Click Create
+# MAGIC → Create → Add tables: spot_prices, dispatch_intervals, market_notices
+# MAGIC → Copy the Space ID from the browser URL bar
+# MAGIC → Paste into the widget at the top of this notebook
 # MAGIC ```
 # MAGIC
-# MAGIC **🖱️ Add tables: Configure tab → Data → + Add**
-# MAGIC ```
-# MAGIC ✓ workshop_au.aemo.spot_prices
-# MAGIC ✓ workshop_au.aemo.dispatch_intervals
-# MAGIC ✓ workshop_au.aemo.market_notices
-# MAGIC → Click Confirm
-# MAGIC ```
-# MAGIC
-# MAGIC **🖱️ Review Suggested Queries** (appears automatically)
-# MAGIC - Genie searches your workspace for queries related to these tables
-# MAGIC - Accept useful ones, reject irrelevant ones
-# MAGIC - Click Done
-# MAGIC
-# MAGIC **📋 Find your Space ID:**
-# MAGIC ```
-# MAGIC Browser URL bar after opening the space:
-# MAGIC ...azuredatabricks.com/genie/spaces/01xxxxxxxxxxxxxxxxx
-# MAGIC                                     ↑ copy this
-# MAGIC ```
-# MAGIC Paste it into the widget at the top of this notebook.
+# MAGIC **⚡ Verify the space is live:**
 
 # COMMAND ----------
 
-# Smoke test — verify the space is live
-import requests
+import requests, json
 
 if SPACE_ID:
     resp = requests.get(f"https://{HOST}/api/2.0/genie/spaces/{SPACE_ID}", headers=HEADERS)
     if resp.status_code == 200:
         s = resp.json()
         print(f"✅ Space: {s.get('title')}")
-        print(f"   Datasets: {len(s.get('datasets', []))} tables")
+        print(f"   Tables: {len(s.get('datasets', []))}")
         print(f"   URL: https://{HOST}/genie/spaces/{SPACE_ID}")
     else:
-        print(f"❌ Error {resp.status_code}: {resp.text[:200]}")
+        print(f"❌ {resp.status_code}: {resp.text[:200]}")
 else:
-    print("Enter your Space ID in the widget above first.")
+    print("Enter Space ID in the widget above first.")
 
 # COMMAND ----------
 
 # MAGIC %md
 # MAGIC ---
-# MAGIC ## Step 3: Knowledge Store — second-priority context (Slide 27)
+# MAGIC ## Step 4: Knowledge Store — synonyms, entity matching, joins
 # MAGIC
-# MAGIC > *"Knowledge Store provides Genie local semantics for when you can't or don't want to update UC metadata."*
+# MAGIC **🖱️ UI for synonyms:** Configure → Data → [table] → column → Synonyms tab
+# MAGIC **🖱️ UI for entity matching:** Configure → Data → [table] → column → Format assistance → enable
+# MAGIC **🖱️ UI for joins:** Configure → Instructions → Joins → + Add
 # MAGIC
-# MAGIC **🖱️ Navigate: Configure → Data → click table name → Synonyms / Format assistance tabs**
+# MAGIC Synonyms and entity matching are set in the space UI — do these manually in the Configure tab.
+# MAGIC The join relationship can also be set via the space settings API:
+
+# COMMAND ----------
+
+# Automated: add the join relationship via API
+# (Synonyms and entity matching must be done in the UI — Configure → Data tab)
+
+if not SPACE_ID:
+    print("Enter Space ID in widget first.")
+else:
+    join_payload = {
+        "joins": [{
+            "left_table":   f"{CATALOG}.{SCHEMA}.dispatch_intervals",
+            "right_table":  f"{CATALOG}.{SCHEMA}.generator_registration",
+            "join_condition": "dispatch_intervals.duid = generator_registration.duid",
+            "relationship_type": "MANY_TO_ONE"
+        }]
+    }
+    resp = requests.patch(
+        f"https://{HOST}/api/2.0/genie/spaces/{SPACE_ID}",
+        headers=HEADERS,
+        json=join_payload
+    )
+    if resp.status_code in (200, 204):
+        print("✅ Join configured: dispatch_intervals ↔ generator_registration on duid")
+    else:
+        # Falls back to showing the manual UI steps
+        print(f"API returned {resp.status_code} — add the join manually in the UI:")
+        print("  Configure → Instructions → Joins → + Add")
+        print("  Left: dispatch_intervals  |  Right: generator_registration")
+        print("  Condition: dispatch_intervals.duid = generator_registration.duid")
+        print("  Relationship: Many-to-one")
+
+# COMMAND ----------
+
+# MAGIC %md
+# MAGIC ### Synonyms to add manually (Configure → Data → [table] → column → Synonyms)
 # MAGIC
-# MAGIC ### Add synonyms (map business language to column names)
-# MAGIC
-# MAGIC | Table | Column | Synonyms to add |
+# MAGIC | Table | Column | Synonyms |
 # MAGIC |---|---|---|
 # MAGIC | spot_prices | `region_id` | region, state, NEM region, zone |
-# MAGIC | spot_prices | `rrp` | price, spot price, market price, $/MWh |
-# MAGIC | spot_prices | `settlement_date` | date, time, interval, trading interval |
+# MAGIC | spot_prices | `rrp` | price, spot price, market price |
+# MAGIC | spot_prices | `settlement_date` | date, trading interval |
 # MAGIC | dispatch_intervals | `dispatch_mw` | dispatch, output, generation, MW |
 # MAGIC | dispatch_intervals | `fuel_type` | fuel, energy type, generation type |
 # MAGIC | market_notices | `notice_type` | notice category, type |
 # MAGIC
-# MAGIC ### Entity matching — AEMO region codes (Slide 35)
+# MAGIC ### Entity matching to enable (Configure → Data → [table] → column → Format assistance → toggle on)
 # MAGIC
-# MAGIC **🖱️ For `region_id` in spot_prices: Configure → Data → spot_prices → region_id → Format assistance → enable**
-# MAGIC
-# MAGIC This lets Genie map plain English to NEM codes:
-# MAGIC ```
-# MAGIC "NSW"        → NSW1    "New South Wales" → NSW1
-# MAGIC "VIC" or "Victoria" → VIC1
-# MAGIC "Queensland" → QLD1    "SA"              → SA1
-# MAGIC "Tasmania"   → TAS1
-# MAGIC ```
-# MAGIC
-# MAGIC **🖱️ For `notice_type` in market_notices: enable entity matching**
-# MAGIC ```
-# MAGIC "lack of reserve"    → LOR1, LOR2, LOR3
-# MAGIC "reserve warning"    → LOR1
-# MAGIC "reserve shortfall"  → LOR2
-# MAGIC "critical shortage"  → LOR3
-# MAGIC ```
-# MAGIC
-# MAGIC **🖱️ For `fuel_type` in dispatch_intervals: enable entity matching**
-# MAGIC ```
-# MAGIC "renewables"  → solar, wind
-# MAGIC "coal"        → coal
-# MAGIC "gas peakers" → gas
-# MAGIC "hydro"       → hydro
-# MAGIC ```
-# MAGIC
-# MAGIC ### Hide confusing columns
-# MAGIC **🖱️ Configure → Data → spot_prices → eye icon to hide:**
-# MAGIC - `raise_6sec`, `lower_6sec` (FCAS prices — hide unless FCAS questions expected)
-# MAGIC
-# MAGIC **🖱️ Configure → Data → dispatch_intervals → hide:**
-# MAGIC - `initial_mw`, `available_mw`, `ramp_rate` (operational fields rarely needed for business Q&A)
-
-# COMMAND ----------
-
-# MAGIC %md
-# MAGIC ---
-# MAGIC ## Step 4: Join configuration (Knowledge Store)
-# MAGIC
-# MAGIC **🖱️ Navigate: Configure → Instructions → Joins → + Add**
-# MAGIC
-# MAGIC ```
-# MAGIC Left table:     dispatch_intervals
-# MAGIC Right table:    generator_registration
-# MAGIC Join condition: dispatch_intervals.duid = generator_registration.duid
-# MAGIC Relationship:   Many-to-one
-# MAGIC → Save
-# MAGIC ```
-# MAGIC
-# MAGIC This tells Genie exactly how to join dispatch data with station names and fuel types.
-# MAGIC Without this, Genie may guess wrong or refuse to join the tables.
-
-# COMMAND ----------
-
-# Validation: test that the join works
-join_test = spark.sql(f"""
-    SELECT 
-        d.duid,
-        g.station_name,
-        g.fuel_type,
-        ROUND(SUM(d.dispatch_mw) / 12, 1) AS mwh_last_7d
-    FROM {CATALOG}.{SCHEMA}.dispatch_intervals d
-    LEFT JOIN {CATALOG}.{SCHEMA}.generator_registration g ON d.duid = g.duid
-    WHERE d.settlement_date >= CURRENT_DATE - INTERVAL 7 DAYS
-    GROUP BY d.duid, g.station_name, g.fuel_type
-    ORDER BY mwh_last_7d DESC
-    LIMIT 5
-""")
-display(join_test)
-print("✅ Join works. Add this relationship in Configure → Instructions → Joins.")
+# MAGIC | Column | Maps |
+# MAGIC |---|---|
+# MAGIC | `region_id` | NSW → NSW1, Victoria → VIC1, QLD → QLD1, SA → SA1, TAS → TAS1 |
+# MAGIC | `notice_type` | lack of reserve → LOR%, reserve warning → LOR1, critical shortage → LOR3 |
+# MAGIC | `fuel_type` | renewables → solar/wind, coal → coal, gas peakers → gas |
 
 # COMMAND ----------
 
 # MAGIC %md
 # MAGIC ---
 # MAGIC ## ✅ Lab 01 Checkpoint
-# MAGIC
-# MAGIC Before moving to Lab 02, confirm:
-# MAGIC - [ ] Column descriptions added for rrp, region_id, settlement_date, duid, dispatch_mw, notice_type
-# MAGIC - [ ] Space created with 3 AEMO tables
-# MAGIC - [ ] Synonyms added for region_id and rrp  
-# MAGIC - [ ] Entity matching enabled for region_id (NSW→NSW1 etc.)
-# MAGIC - [ ] Entity matching enabled for notice_type (lack of reserve→LOR%)
-# MAGIC - [ ] Join configured: dispatch_intervals ↔ generator_registration
-# MAGIC - [ ] Space ID entered in widget above
+# MAGIC - [ ] Column comments set (automated ✅)
+# MAGIC - [ ] Table descriptions set (automated ✅)
+# MAGIC - [ ] Space created with 3 tables, Space ID in widget
+# MAGIC - [ ] Synonyms added for region_id and rrp (UI)
+# MAGIC - [ ] Entity matching enabled for region_id and notice_type (UI)
+# MAGIC - [ ] Join configured (API or UI)
 # MAGIC
 # MAGIC **→ Next: Lab 02 — Benchmarks, Golden Queries & Instructions**
-
