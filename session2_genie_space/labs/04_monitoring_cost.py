@@ -8,6 +8,7 @@
 # MAGIC | | |
 # MAGIC |---|---|
 # MAGIC | ⏱️ **Duration** | 25 minutes |
+# MAGIC | **Prerequisites** | Lab 03 complete — benchmarks run, at least one iteration done |
 # MAGIC | **Covers** | Slides 19, 32 — Audit logging, feedback alerts, cost tracking |
 # MAGIC
 # MAGIC > *"Genie logs each event with user identity, timestamp, and workspace — done through System Tables."*
@@ -41,8 +42,7 @@ usage_sql = f"""
 SELECT
     DATE(event_time)                        AS date,
     user_identity.email                     AS user,
-    COUNT(*)                                AS questions_asked,
-    COUNT(CASE WHEN action_name = 'genieCreateConversationMessage' THEN 1 END) AS questions,
+    COUNT(CASE WHEN action_name = 'genieCreateConversationMessage' THEN 1 END) AS questions_asked,
     COUNT(CASE WHEN action_name = 'genieSendMessageFeedback'
                AND request_params.feedback_rating = 'POSITIVE' THEN 1 END)    AS thumbs_up,
     COUNT(CASE WHEN action_name = 'genieSendMessageFeedback'
@@ -277,15 +277,4 @@ except Exception as e:
 # MAGIC - [ ] Alert configured (or noted for post-session setup)
 # MAGIC - [ ] Monitoring dashboard created (or planned)
 # MAGIC
-# MAGIC ---
-# MAGIC
-# MAGIC ## 🎯 Session 2 Complete
-# MAGIC
-# MAGIC You've built, configured, and instrumented a production-quality Genie Space:
-# MAGIC
-# MAGIC | Lab | What you did |
-# MAGIC |---|---|
-# MAGIC | 01 | UC metadata, synonyms, entity matching, join config |
-# MAGIC | 02 | Benchmarks (baseline), golden queries, text instructions |
-# MAGIC | 03 | Run benchmarks, diagnose failures, Monitor tab, rollout plan |
-# MAGIC | 04 | Usage monitoring, feedback score, cost tracking, alert, dashboard |
+# MAGIC **→ Next: Lab 05 — Operating Model, Certification & Permissions**

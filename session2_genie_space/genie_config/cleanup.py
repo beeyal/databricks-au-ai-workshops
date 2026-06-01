@@ -155,7 +155,7 @@ else:
 # MAGIC ---
 # MAGIC ## Step 4: Revoke UC permissions
 # MAGIC
-# MAGIC Revokes the grants applied in `aemo_space_config.py` Step 6.
+# MAGIC Revokes the grants applied in `aemo_space_config.py` Step 7 (or `setup/setup.py` Step 6).
 
 # COMMAND ----------
 

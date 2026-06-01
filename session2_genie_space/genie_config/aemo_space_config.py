@@ -1,89 +1,87 @@
 # Databricks notebook source
 # MAGIC %md
 # MAGIC <div style="background: linear-gradient(135deg, #1B3139 0%, #243447 100%); padding: 24px; border-radius: 8px; margin-bottom: 8px">
-# MAGIC   <h1 style="color: #FF6B35; margin: 0 0 8px 0; font-size: 26px">AEMO Data Setup</h1>
-# MAGIC   <p style="color: #AECBCC; margin: 0; font-size: 13px">Session 2 pre-requisite — run this BEFORE the labs</p>
+# MAGIC   <h1 style="color: #FF6B35; margin: 0 0 8px 0; font-size: 26px">AEMO Reference Space — Facilitator Setup</h1>
+# MAGIC   <p style="color: #AECBCC; margin: 0; font-size: 13px">Session 2 facilitator notebook — builds a complete reference Genie Space for demonstration</p>
 # MAGIC </div>
 # MAGIC
-# MAGIC **Run this notebook once as a workspace admin before Session 2.**
-# MAGIC It loads the AEMO sample data into Unity Catalog and adds column comments.
-# MAGIC The labs will create the Genie Space.
+# MAGIC **Run this notebook as a workspace admin AFTER `setup/setup.py`.**
+# MAGIC It configures a fully-instrumented reference Genie Space that the facilitator uses to demonstrate
+# MAGIC what a well-built space looks like. Labs participants build their own spaces.
 # MAGIC
-# MAGIC Expected runtime: ~5 minutes
+# MAGIC **Prerequisites:**
+# MAGIC - `setup/setup.py` has been run and all 6 AEMO tables are loaded in Unity Catalog
+# MAGIC - A Pro or Serverless SQL warehouse is available
+# MAGIC - Genie feature is enabled in the workspace
+# MAGIC
+# MAGIC Expected runtime: ~3 minutes
 
 # COMMAND ----------
 
-dbutils.widgets.text("catalog",      "workshop_au",             "Catalog")
-dbutils.widgets.text("schema",       "aemo",                    "Schema")
-dbutils.widgets.text("data_path",    "dbfs:/tmp/au_workshop/sample_data/aemo", "DBFS path to AEMO CSVs")
+dbutils.widgets.text("catalog",      "workshop_au", "Catalog")
+dbutils.widgets.text("schema",       "aemo",        "Schema")
+dbutils.widgets.text("warehouse_id", "",            "SQL Warehouse ID (for Genie Space)")
+dbutils.widgets.text("space_id",     "",            "Existing Space ID (leave blank to create new)")
 
-CATALOG   = dbutils.widgets.get("catalog")
-SCHEMA    = dbutils.widgets.get("schema")
-DATA_PATH = dbutils.widgets.get("data_path")
+CATALOG      = dbutils.widgets.get("catalog")
+SCHEMA       = dbutils.widgets.get("schema")
+WAREHOUSE_ID = dbutils.widgets.get("warehouse_id")
+SPACE_ID     = dbutils.widgets.get("space_id")
 
-print(f"Catalog : {CATALOG}.{SCHEMA}")
-print(f"Data    : {DATA_PATH}")
-print()
-print("Upload CSVs first if not already on DBFS:")
-print(f"  databricks fs cp -r ./data/sample_data/aemo/ {DATA_PATH}/")
+HOST    = spark.conf.get("spark.databricks.workspaceUrl")
+TOKEN   = dbutils.notebook.entry_point.getDbutils().notebook().getContext().apiToken().get()
+HEADERS = {"Authorization": f"Bearer {TOKEN}", "Content-Type": "application/json"}
+
+print(f"Catalog  : {CATALOG}.{SCHEMA}")
+print(f"Host     : {HOST}")
+print(f"Space ID : {SPACE_ID or '(will create new)'}")
+if not WAREHOUSE_ID:
+    print("\n⚠️  Enter a warehouse_id in the widget above to create the Genie Space.")
 
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC ## Step 1: Create catalog and schema
+# MAGIC ---
+# MAGIC ## Step 1: Verify AEMO tables are loaded
+# MAGIC
+# MAGIC Confirm all 6 tables exist before proceeding. If any are missing, run `setup/setup.py` first.
 
 # COMMAND ----------
 
-spark.sql(f"CREATE CATALOG IF NOT EXISTS {CATALOG}")
-spark.sql(f"CREATE SCHEMA  IF NOT EXISTS {CATALOG}.{SCHEMA}")
-print(f"✅ {CATALOG}.{SCHEMA} ready")
+import pyspark.sql.utils
 
-# COMMAND ----------
+REQUIRED_TABLES = [
+    "spot_prices",
+    "dispatch_intervals",
+    "market_notices",
+    "generator_registration",
+    "settlement_amounts",
+    "constraint_sets",
+]
 
-# MAGIC %md
-# MAGIC ## Step 2: Load AEMO tables from CSV
-
-# COMMAND ----------
-
-# Table definitions: name → (csv_filename, partition_columns)
-TABLES = {
-    "spot_prices":            ("spot_prices.csv",            ["region_id"]),
-    "dispatch_intervals":     ("dispatch_intervals.csv",      ["region_id", "fuel_type"]),
-    "market_notices":         ("market_notices.csv",          []),
-    "generator_registration": ("generator_registration.csv",  ["region_id"]),
-    "settlement_amounts":     ("settlement_amounts.csv",       ["run_type"]),
-    "constraint_sets":        ("constraint_sets.csv",           ["region_affected"]),
-}
-
-results = []
-for table_name, (csv_file, partitions) in TABLES.items():
-    fqn  = f"{CATALOG}.{SCHEMA}.{table_name}"
-    path = f"{DATA_PATH}/{csv_file}"
+all_present = True
+for tbl in REQUIRED_TABLES:
+    fqn = f"{CATALOG}.{SCHEMA}.{tbl}"
     try:
-        # Read CSV
-        df = (spark.read.format("csv")
-              .option("header", "true")
-              .option("inferSchema", "true")
-              .load(path))
-
-        # Write as Delta — overwrite so this is safe to re-run
-        writer = df.write.format("delta").mode("overwrite").option("overwriteSchema", "true")
-        if partitions:
-            writer = writer.partitionBy(*partitions)
-        writer.saveAsTable(fqn)
-
         count = spark.table(fqn).count()
-        results.append(("✅", table_name, f"{count:,} rows"))
+        print(f"  ✅ {tbl}: {count:,} rows")
     except Exception as e:
-        results.append(("❌", table_name, str(e)[:120]))
+        print(f"  ❌ {tbl}: {e}")
+        all_present = False
 
-for icon, tbl, msg in results:
-    print(f"{icon} {tbl}: {msg}")
+if not all_present:
+    raise RuntimeError("Some tables are missing. Run setup/setup.py first.")
+else:
+    print("\nAll tables present — proceeding.")
 
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC ## Step 3: Add column comments (all tables)
+# MAGIC ---
+# MAGIC ## Step 2: Ensure column comments are set (idempotent)
+# MAGIC
+# MAGIC Re-applying comments here is safe — setup.py may already have done this.
+# MAGIC These comments are the most important Genie tuning signal.
 
 # COMMAND ----------
 
@@ -157,7 +155,8 @@ ok = err = 0
 for table_fqn, columns in COLUMN_COMMENTS.items():
     for col, comment in columns.items():
         try:
-            spark.sql(f"ALTER TABLE {table_fqn} ALTER COLUMN `{col}` COMMENT '{comment}'")
+            safe_comment = comment.replace("'", "\\'")
+            spark.sql(f"ALTER TABLE {table_fqn} ALTER COLUMN `{col}` COMMENT '{safe_comment}'")
             ok += 1
         except Exception as e:
             print(f"  ⚠️  {table_fqn.split('.')[-1]}.{col}: {e}")
@@ -168,89 +167,314 @@ print(f"✅ {ok} column comments set ({err} errors)")
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC ## Step 4: Add table descriptions
-
-# COMMAND ----------
-
-TABLE_DESCRIPTIONS = {
-    f"{CATALOG}.{SCHEMA}.spot_prices":            "NEM 30-minute trading interval spot prices. Key column: rrp = Regional Reference Price in $/MWh. Regions: NSW1, VIC1, QLD1, SA1, TAS1.",
-    f"{CATALOG}.{SCHEMA}.dispatch_intervals":     "NEM 5-minute generator dispatch data. Key columns: duid (join to generator_registration), dispatch_mw (divide by 12 for MWh), fuel_type. 12 intervals = 1 hour.",
-    f"{CATALOG}.{SCHEMA}.market_notices":         "AEMO market and system notices including LOR events. Filter: WHERE notice_type LIKE 'LOR%' for LOR events. LOR1/LOR2/LOR3 = escalating reserve severity.",
-    f"{CATALOG}.{SCHEMA}.generator_registration": "NEM registered generator details. Join to dispatch_intervals on duid to get station_name and fuel_type.",
-    f"{CATALOG}.{SCHEMA}.settlement_amounts":     "Weekly NEM settlement amounts by participant. run_type: FINAL = confirmed, PRELIMINARY = estimate. total_aud = net amount.",
-    f"{CATALOG}.{SCHEMA}.constraint_sets":        "NEM network and system constraints. Activated when a network element is at risk. rhs_value = MW limit. Join region_affected to spot_prices.region_id.",
-}
-
-for fqn, desc in TABLE_DESCRIPTIONS.items():
-    try:
-        spark.sql(f"COMMENT ON TABLE {fqn} IS '{desc}'")
-        print(f"✅ {fqn.split('.')[-1]}")
-    except Exception as e:
-        print(f"❌ {fqn.split('.')[-1]}: {e}")
-
-# COMMAND ----------
-
-# MAGIC %md
-# MAGIC ## Step 5: Smoke test — verify row counts and sample data
-
-# COMMAND ----------
-
-print("Table row counts:")
-all_ok = True
-expected = {
-    "spot_prices":            1_000,
-    "dispatch_intervals":     5_000,
-    "market_notices":           100,
-    "generator_registration":    50,
-    "settlement_amounts":        100,
-    "constraint_sets":         1_000,
-}
-for tbl, min_rows in expected.items():
-    try:
-        count = spark.table(f"{CATALOG}.{SCHEMA}.{tbl}").count()
-        ok    = count >= min_rows
-        icon  = "✅" if ok else "⚠️ "
-        print(f"  {icon} {tbl}: {count:,} rows")
-        if not ok:
-            all_ok = False
-    except Exception as e:
-        print(f"  ❌ {tbl}: {e}")
-        all_ok = False
-
-print()
-if all_ok:
-    print("✅ All tables loaded. Ready for Session 2 labs.")
-    print()
-    print("Next steps:")
-    print("  1. Open Lab 01: session2_genie_space/labs/01_genie_space_setup.py")
-    print("  2. Run Step 1 (column comments) — already done here, will be a no-op")
-    print("  3. Create the Genie Space via UI and paste the Space ID into the widget")
-else:
-    print("⚠️  Some tables are empty or missing.")
-    print(f"   Upload CSVs to {DATA_PATH}/ and re-run this notebook.")
-
-# COMMAND ----------
-
-# MAGIC %md
-# MAGIC ## What this notebook does NOT do
+# MAGIC ---
+# MAGIC ## Step 3: Create the reference Genie Space (or reuse existing)
 # MAGIC
-# MAGIC The following are handled by the labs — do not add them here:
-# MAGIC
-# MAGIC - ❌ Create the Genie Space → **Lab 01** (participants do this in the UI)
-# MAGIC - ❌ Add golden queries → **Lab 02** (automated upload script)
-# MAGIC - ❌ Add text instructions → **Lab 02**
-# MAGIC - ❌ Add benchmarks → **Lab 02**
-# MAGIC - ❌ Set permissions → **Lab 05**
+# MAGIC If `space_id` widget is blank, a new space is created via the Genie API.
+# MAGIC If you already have a reference space, paste its ID in the widget to skip creation.
+
+# COMMAND ----------
+
+import requests, json
+
+if SPACE_ID:
+    # Verify the existing space is reachable
+    resp = requests.get(f"https://{HOST}/api/2.0/genie/spaces/{SPACE_ID}", headers=HEADERS)
+    if resp.status_code == 200:
+        print(f"✅ Using existing space: {resp.json().get('title')} ({SPACE_ID})")
+    else:
+        print(f"⚠️  Space {SPACE_ID} not found ({resp.status_code}). Will create a new one.")
+        SPACE_ID = ""
+
+if not SPACE_ID:
+    if not WAREHOUSE_ID:
+        print("❌ warehouse_id is required to create a new Genie Space.")
+        print("   Enter it in the widget above and re-run.")
+    else:
+        space_payload = {
+            "title":       "AEMO NEM Operations — Reference Space",
+            "description": (
+                "Reference space for facilitators. Natural language access to NEM spot prices, "
+                "dispatch intervals, market notices, generator registration, settlement amounts, "
+                "and network constraint sets. Demonstrates a fully configured Genie Space."
+            ),
+            "warehouse_id": WAREHOUSE_ID,
+            "datasets": [
+                {"table_name": f"{CATALOG}.{SCHEMA}.spot_prices"},
+                {"table_name": f"{CATALOG}.{SCHEMA}.dispatch_intervals"},
+                {"table_name": f"{CATALOG}.{SCHEMA}.market_notices"},
+                {"table_name": f"{CATALOG}.{SCHEMA}.generator_registration"},
+                {"table_name": f"{CATALOG}.{SCHEMA}.settlement_amounts"},
+                {"table_name": f"{CATALOG}.{SCHEMA}.constraint_sets"},
+            ],
+        }
+        resp = requests.post(
+            f"https://{HOST}/api/2.0/genie/spaces",
+            headers=HEADERS,
+            json=space_payload,
+        )
+        if resp.status_code in (200, 201):
+            SPACE_ID = resp.json().get("id", resp.json().get("space_id", ""))
+            print(f"✅ Created Genie Space: {SPACE_ID}")
+            print(f"   URL: https://{HOST}/genie/spaces/{SPACE_ID}")
+            print(f"\n   Paste this Space ID into the 'space_id' widget so you can re-run cells without creating duplicates.")
+        else:
+            print(f"❌ Failed to create space: {resp.status_code}")
+            print(resp.text[:400])
 
 # COMMAND ----------
 
 # MAGIC %md
 # MAGIC ---
-# MAGIC ## Step 6: Grant participant access
+# MAGIC ## Step 4: Configure the join relationship
+# MAGIC
+# MAGIC `dispatch_intervals` ↔ `generator_registration` on `duid` (many-to-one).
+# MAGIC This lets Genie resolve "Bayswater" or "Loy Yang A" as station names without the user knowing duids.
+
+# COMMAND ----------
+
+if not SPACE_ID:
+    print("Skip — no Space ID. Complete Step 3 first.")
+else:
+    join_payload = {
+        "joins": [{
+            "left_table":        f"{CATALOG}.{SCHEMA}.dispatch_intervals",
+            "right_table":       f"{CATALOG}.{SCHEMA}.generator_registration",
+            "join_condition":    "dispatch_intervals.duid = generator_registration.duid",
+            "relationship_type": "MANY_TO_ONE",
+        }]
+    }
+    resp = requests.patch(
+        f"https://{HOST}/api/2.0/genie/spaces/{SPACE_ID}",
+        headers=HEADERS,
+        json=join_payload,
+    )
+    if resp.status_code in (200, 204):
+        print("✅ Join configured: dispatch_intervals ↔ generator_registration on duid")
+    else:
+        print(f"API returned {resp.status_code} — add the join manually:")
+        print("  Configure → Instructions → Joins → + Add")
+        print("  Left: dispatch_intervals  |  Right: generator_registration")
+        print("  Condition: dispatch_intervals.duid = generator_registration.duid")
+        print("  Relationship: Many-to-one")
+
+# COMMAND ----------
+
+# MAGIC %md
+# MAGIC ---
+# MAGIC ## Step 5: Add text instructions
+# MAGIC
+# MAGIC Text instructions are universal rules Genie should always apply.
+# MAGIC Keep these short and factual — Genie reads all of them on every query.
+
+# COMMAND ----------
+
+INSTRUCTIONS = [
+    "All NEM regions must be referenced with the '1' suffix: NSW1, VIC1, QLD1, SA1, TAS1. Never use NSW, VIC, QLD, SA, or TAS alone.",
+    "spot_prices intervals are 30 minutes. dispatch_intervals are 5 minutes (12 per hour). Always clarify which table when users ask about 'prices' vs 'dispatch'.",
+    "dispatch_mw is MW per 5-minute interval. Multiply SUM(dispatch_mw) / 12 to convert to MWh.",
+    "rrp above $300/MWh indicates a high-price event. rrp above $5,000/MWh is a spike worth investigating.",
+    "LOR events escalate: LOR1 = reserve watch, LOR2 = shortfall threatened, LOR3 = imminent critical shortage. Always show all three in LOR summaries.",
+    "settlement_amounts.run_type = FINAL means confirmed. PRELIMINARY is an estimate. Exclude PRELIMINARY unless the user asks for it.",
+    "constraint_sets.deactivated_datetime IS NULL means the constraint is currently active.",
+    "When users ask about 'renewables', include solar and wind. When they ask about 'fossil fuels', include coal and gas.",
+]
+
+if not SPACE_ID:
+    print("Skip — no Space ID. Complete Step 3 first.")
+else:
+    ok = err = 0
+    for instruction in INSTRUCTIONS:
+        payload = {"content": instruction}
+        resp = requests.post(
+            f"https://{HOST}/api/2.0/genie/spaces/{SPACE_ID}/instructions",
+            headers=HEADERS,
+            json=payload,
+        )
+        if resp.status_code in (200, 201):
+            ok += 1
+        else:
+            print(f"  ⚠️  Failed ({resp.status_code}): {instruction[:60]}...")
+            err += 1
+
+    print(f"✅ {ok} instructions added ({err} errors)")
+
+# COMMAND ----------
+
+# MAGIC %md
+# MAGIC ---
+# MAGIC ## Step 6: Add golden queries
+# MAGIC
+# MAGIC Golden queries are routing rules. When a user's question matches the title exactly, Genie runs
+# MAGIC the pre-written SQL and labels it **Trusted** — bypassing LLM generation entirely.
+# MAGIC These are the most important quality lever after column comments.
+
+# COMMAND ----------
+
+GOLDEN_QUERIES = [
+    {
+        "name": "Current spot price by region",
+        "description": "Latest rrp for each NEM region from the most recent settlement interval.",
+        "sql": f"""
+SELECT
+    region_id,
+    rrp AS spot_price_per_mwh,
+    total_demand_mw,
+    settlement_date AS latest_interval
+FROM {CATALOG}.{SCHEMA}.spot_prices
+WHERE settlement_date = (SELECT MAX(settlement_date) FROM {CATALOG}.{SCHEMA}.spot_prices)
+ORDER BY region_id
+""".strip(),
+    },
+    {
+        "name": "Daily average spot price by region",
+        "description": "Average rrp per region per day. Group by DATE(settlement_date) and region_id.",
+        "sql": f"""
+SELECT
+    DATE(settlement_date) AS trading_date,
+    region_id,
+    ROUND(AVG(rrp), 2)          AS avg_rrp_per_mwh,
+    ROUND(MAX(rrp), 2)          AS max_rrp_per_mwh,
+    ROUND(MIN(rrp), 2)          AS min_rrp_per_mwh
+FROM {CATALOG}.{SCHEMA}.spot_prices
+GROUP BY 1, 2
+ORDER BY 1 DESC, 2
+""".strip(),
+    },
+    {
+        "name": "Top generators by output today",
+        "description": "Highest-output generating units for today ranked by total MWh dispatched.",
+        "sql": f"""
+SELECT
+    gr.station_name,
+    gr.fuel_type,
+    gr.region_id,
+    ROUND(SUM(di.dispatch_mw) / 12, 1) AS total_mwh_today
+FROM {CATALOG}.{SCHEMA}.dispatch_intervals di
+JOIN {CATALOG}.{SCHEMA}.generator_registration gr
+    ON di.duid = gr.duid
+WHERE DATE(di.settlement_date) = CURRENT_DATE
+GROUP BY 1, 2, 3
+ORDER BY total_mwh_today DESC
+LIMIT 20
+""".strip(),
+    },
+    {
+        "name": "Generation mix by fuel type",
+        "description": "Total MWh dispatched by fuel type for the most recent full day.",
+        "sql": f"""
+SELECT
+    fuel_type,
+    ROUND(SUM(dispatch_mw) / 12, 0) AS total_mwh,
+    ROUND(SUM(dispatch_mw) / 12 * 100.0 / SUM(SUM(dispatch_mw) / 12) OVER (), 1) AS pct_of_total
+FROM {CATALOG}.{SCHEMA}.dispatch_intervals
+WHERE DATE(settlement_date) = DATE_SUB(CURRENT_DATE, 1)
+GROUP BY fuel_type
+ORDER BY total_mwh DESC
+""".strip(),
+    },
+    {
+        "name": "Active LOR notices",
+        "description": "All open LOR market notices — lack-of-reserve events still in effect.",
+        "sql": f"""
+SELECT
+    notice_type,
+    issue_time,
+    effective_date,
+    region_id,
+    SUBSTRING(reason, 1, 300) AS reason_summary
+FROM {CATALOG}.{SCHEMA}.market_notices
+WHERE notice_type LIKE 'LOR%'
+  AND effective_date >= CURRENT_DATE
+ORDER BY notice_type DESC, issue_time DESC
+""".strip(),
+    },
+    {
+        "name": "High price events above threshold",
+        "description": "Trading intervals where rrp exceeded $300/MWh, ordered by price descending.",
+        "sql": f"""
+SELECT
+    settlement_date,
+    region_id,
+    ROUND(rrp, 2)          AS rrp_per_mwh,
+    total_demand_mw,
+    scheduled_generation
+FROM {CATALOG}.{SCHEMA}.spot_prices
+WHERE rrp > 300
+ORDER BY rrp DESC
+LIMIT 50
+""".strip(),
+    },
+    {
+        "name": "Active network constraints",
+        "description": "Network constraints currently in effect — where deactivated_datetime is null.",
+        "sql": f"""
+SELECT
+    constraint_id,
+    constraint_type,
+    region_affected,
+    interconnector,
+    rhs_value            AS mw_limit,
+    activated_datetime,
+    SUBSTRING(reason, 1, 200) AS reason_summary
+FROM {CATALOG}.{SCHEMA}.constraint_sets
+WHERE deactivated_datetime IS NULL
+ORDER BY activated_datetime DESC
+""".strip(),
+    },
+    {
+        "name": "Settlement amounts by participant",
+        "description": "Final net settlement amounts by participant for the most recent settlement run.",
+        "sql": f"""
+SELECT
+    participant_id,
+    run_type,
+    ROUND(energy_amount_aud, 0)          AS energy_aud,
+    ROUND(fcas_amount_aud, 0)            AS fcas_aud,
+    ROUND(interconnector_residue_aud, 0) AS ic_residue_aud,
+    ROUND(total_aud, 0)                  AS net_total_aud,
+    settlement_status
+FROM {CATALOG}.{SCHEMA}.settlement_amounts
+WHERE run_type = 'FINAL'
+  AND settlement_date = (SELECT MAX(settlement_date) FROM {CATALOG}.{SCHEMA}.settlement_amounts WHERE run_type = 'FINAL')
+ORDER BY ABS(total_aud) DESC
+""".strip(),
+    },
+]
+
+if not SPACE_ID:
+    print("Skip — no Space ID. Complete Step 3 first.")
+else:
+    ok = err = 0
+    for gq in GOLDEN_QUERIES:
+        payload = {
+            "name":        gq["name"],
+            "description": gq["description"],
+            "sql":         gq["sql"],
+        }
+        resp = requests.post(
+            f"https://{HOST}/api/2.0/genie/spaces/{SPACE_ID}/queries",
+            headers=HEADERS,
+            json=payload,
+        )
+        if resp.status_code in (200, 201):
+            ok += 1
+            print(f"  ✅ {gq['name']}")
+        else:
+            err += 1
+            print(f"  ⚠️  {gq['name']}: {resp.status_code} {resp.text[:100]}")
+
+    print(f"\n✅ {ok} golden queries added ({err} errors)")
+
+# COMMAND ----------
+
+# MAGIC %md
+# MAGIC ---
+# MAGIC ## Step 7: Grant participant access
 # MAGIC
 # MAGIC Enter participant emails as a comma-separated list. The script grants:
-# MAGIC - `USE CATALOG` + `USE SCHEMA` + `SELECT` on the AEMO schema (so Genie can query tables)
-# MAGIC - `CREATE` permission on the schema (so participants can create their own Genie Spaces)
+# MAGIC - `USE CATALOG` + `USE SCHEMA` + `SELECT` (so Genie can query tables)
+# MAGIC - `CREATE TABLE` on the schema (so participants can save Genie Space assets)
 
 # COMMAND ----------
 
@@ -297,3 +521,81 @@ if participants:
     print(f"Current grants on {CATALOG}.{SCHEMA}:")
     display(spark.sql(f"SHOW GRANTS ON SCHEMA {CATALOG}.{SCHEMA}"))
 
+# COMMAND ----------
+
+# MAGIC %md
+# MAGIC ---
+# MAGIC ## Step 8: Validate the reference space
+# MAGIC
+# MAGIC Run a test question against the space to confirm it is live and responding.
+
+# COMMAND ----------
+
+import time
+
+if not SPACE_ID:
+    print("Skip — no Space ID. Complete Step 3 first.")
+else:
+    test_question = "What is the current spot price in NSW1?"
+
+    # Start a conversation
+    conv_resp = requests.post(
+        f"https://{HOST}/api/2.0/genie/spaces/{SPACE_ID}/start-conversation",
+        headers=HEADERS,
+        json={"content": test_question},
+    )
+
+    if conv_resp.status_code not in (200, 201):
+        print(f"❌ Could not start conversation: {conv_resp.status_code} {conv_resp.text[:200]}")
+    else:
+        data        = conv_resp.json()
+        conv_id     = data.get("conversation_id")
+        message_id  = data.get("message_id")
+
+        print(f"Question: {test_question}")
+        print(f"Conv ID : {conv_id}")
+        print(f"Waiting for response", end="")
+
+        # Poll for completion (max 60s)
+        for _ in range(30):
+            time.sleep(2)
+            print(".", end="", flush=True)
+            msg_resp = requests.get(
+                f"https://{HOST}/api/2.0/genie/spaces/{SPACE_ID}/conversations/{conv_id}/messages/{message_id}",
+                headers=HEADERS,
+            )
+            if msg_resp.status_code == 200:
+                msg = msg_resp.json()
+                status = msg.get("status", "")
+                if status in ("COMPLETED", "FAILED", "CANCELLED"):
+                    print()
+                    if status == "COMPLETED":
+                        attachments = msg.get("attachments", [])
+                        for att in attachments:
+                            if att.get("query"):
+                                print(f"✅ Genie generated SQL:\n{att['query'].get('query', '')}")
+                            elif att.get("text"):
+                                print(f"✅ Genie response: {att['text'].get('content', '')[:300]}")
+                    else:
+                        print(f"⚠️  Status: {status}")
+                    break
+        else:
+            print("\n⚠️  Timed out waiting for response — space may still be initializing.")
+
+    print(f"\nReference space URL: https://{HOST}/genie/spaces/{SPACE_ID}")
+    print(f"Space ID (save this): {SPACE_ID}")
+
+# COMMAND ----------
+
+# MAGIC %md
+# MAGIC ---
+# MAGIC ## What this notebook does NOT do
+# MAGIC
+# MAGIC The following are handled by labs — do not add them here:
+# MAGIC
+# MAGIC - ❌ Load CSV data → **`setup/setup.py`** (run that first)
+# MAGIC - ❌ Have participants create their own Genie Space → **Lab 01** (UI)
+# MAGIC - ❌ Walk through the instruction hierarchy → **Lab 02**
+# MAGIC - ❌ Run benchmarks → **Lab 03**
+# MAGIC - ❌ Monitor the space → **Lab 04**
+# MAGIC - ❌ Set advanced permissions / operating model → **Lab 05**

@@ -2,7 +2,7 @@
 # MAGIC %md
 # MAGIC <div style="background: linear-gradient(135deg, #1B3139 0%, #243447 100%); padding: 24px; border-radius: 8px; margin-bottom: 8px">
 # MAGIC   <h1 style="color: #FF6B35; margin: 0 0 8px 0; font-size: 28px">⚡ Lab 03: Rate Limits & Guardrails</h1>
-# MAGIC   <p style="color: #AECBCC; margin: 0; font-size: 14px">Workshop 1: Admin Track · Australian Regulated Industries</p>
+# MAGIC   <p style="color: #AECBCC; margin: 0; font-size: 14px">Workshop 1: Admin Track · Australian Regulated Industries · Databricks</p>
 # MAGIC </div>
 # MAGIC
 # MAGIC | | |
@@ -398,11 +398,9 @@ AU_PII_TEST_CASES = [
     },
     {
         "name": "ACN (Australian Company Number)",
-        "text": "The embedded network operator with ACN 123 456 789 has applied for network exemption.",
-        "expected_block": True,
-        "pii_type": "ACN",
         "prompt": "The embedded network operator with ACN 123 456 789 has applied for network exemption.",
         "expected_code": 400,
+        "pii_type": "ACN",
     },
     {
         "name": "No PII — safe regulatory query",

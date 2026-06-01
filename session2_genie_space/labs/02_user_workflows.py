@@ -8,6 +8,7 @@
 # MAGIC | | |
 # MAGIC |---|---|
 # MAGIC | ⏱️ **Duration** | 35 minutes |
+# MAGIC | **Prerequisites** | Lab 01 complete — Genie Space created, Space ID pasted in widget |
 # MAGIC | **Covers** | Slides 25, 28–29 — Benchmarks first, then Example SQL, then Text |
 # MAGIC
 # MAGIC > *"Create benchmarks before you iterate on instructions. Run them as a regression test with every change."*
@@ -21,7 +22,12 @@ SCHEMA   = "aemo"
 HOST     = spark.conf.get("spark.databricks.workspaceUrl")
 TOKEN    = dbutils.notebook.entry_point.getDbutils().notebook().getContext().apiToken().get()
 HEADERS  = {"Authorization": f"Bearer {TOKEN}", "Content-Type": "application/json"}
-print(f"Space: {SPACE_ID or 'not set'}")
+if not SPACE_ID:
+    raise RuntimeError(
+        "Space ID is empty. Paste your Genie Space ID into the 'genie_space_id' widget above "
+        "(copy it from the browser URL bar while viewing your space)."
+    )
+print(f"Space: {SPACE_ID}")
 
 # COMMAND ----------
 
@@ -29,10 +35,21 @@ print(f"Space: {SPACE_ID or 'not set'}")
 # MAGIC ---
 # MAGIC ## Step 1: Add Benchmarks
 # MAGIC
+# MAGIC **Important distinction:** benchmarks are an *evaluation tool*, not instructions to Genie.
+# MAGIC They measure whether Genie generates the SQL you expect — they do not change how Genie behaves.
+# MAGIC Run your baseline score now, before adding any golden queries or text instructions,
+# MAGIC so you can see what each addition actually moves.
+# MAGIC
+# MAGIC **How the API works:** all space configuration (benchmarks, golden queries, text instructions)
+# MAGIC lives inside a single `serialized_space` JSON blob. There are no separate endpoints for each type.
+# MAGIC Every automated cell in this lab follows the same pattern:
+# MAGIC 1. `GET /api/2.0/genie/spaces/{id}?include_serialized_space=true` — fetch current config
+# MAGIC 2. Parse and update the relevant section of the JSON
+# MAGIC 3. `PATCH /api/2.0/genie/spaces/{id}` — write it back
+# MAGIC
 # MAGIC **🖱️ UI:** Configure → Benchmarks → + Add benchmark → paste title → add expected SQL
 # MAGIC
-# MAGIC **⚡ Automated:** run the cell below to upload all 10 benchmarks at once.
-# MAGIC Deletes and replaces any existing benchmark with the same title.
+# MAGIC **⚡ Automated:** run the cell below to replace the benchmark question set in one go.
 
 # COMMAND ----------
 
@@ -81,45 +98,48 @@ BENCHMARKS = [
     },
 ]
 
-if not SPACE_ID:
-    print("Enter Space ID in widget first.")
-else:
-    # 1. Get existing benchmarks
-    existing = requests.get(
-        f"https://{HOST}/api/2.0/genie/spaces/{SPACE_ID}/benchmark-questions",
-        headers=HEADERS
+def _get_serialized_space(host, space_id, headers):
+    """Fetch the current space and return (space_dict, config_dict).
+    serialized_space is a JSON string nested inside the space response — parse it here."""
+    resp = requests.get(
+        f"https://{host}/api/2.0/genie/spaces/{space_id}",
+        params={"include_serialized_space": "true"},
+        headers=headers
     )
-    existing_ids = {}
-    if existing.status_code == 200:
-        for q in existing.json().get("benchmark_questions", []):
-            existing_ids[q.get("title", "")] = q.get("id")
+    resp.raise_for_status()
+    space = resp.json()
+    raw = space.get("serialized_space") or "{}"
+    config = json.loads(raw)
+    return space, config
 
-    added = deleted = errors = 0
-    for bm in BENCHMARKS:
-        # Delete existing if same title
-        if bm["title"] in existing_ids:
-            del_resp = requests.delete(
-                f"https://{HOST}/api/2.0/genie/spaces/{SPACE_ID}/benchmark-questions/{existing_ids[bm['title']]}",
-                headers=HEADERS
-            )
-            if del_resp.status_code in (200, 204):
-                deleted += 1
+def _patch_space(host, space_id, headers, config, etag=None):
+    """Write the updated config back. Returns the response object."""
+    body = {"serialized_space": json.dumps(config)}
+    if etag:
+        body["etag"] = etag
+    return requests.patch(
+        f"https://{host}/api/2.0/genie/spaces/{space_id}",
+        headers=headers,
+        json=body
+    )
 
-        # Add fresh
-        add_resp = requests.post(
-            f"https://{HOST}/api/2.0/genie/spaces/{SPACE_ID}/benchmark-questions",
-            headers=HEADERS,
-            json={"title": bm["title"], "expected_sql": bm["sql"]}
-        )
-        if add_resp.status_code in (200, 201):
-            added += 1
-        else:
-            errors += 1
-            print(f"  ❌ {bm['title'][:60]}: {add_resp.status_code} {add_resp.text[:100]}")
+# Upload benchmarks via serialized_space PATCH
+space, config = _get_serialized_space(HOST, SPACE_ID, HEADERS)
+etag = space.get("etag")
 
-    print(f"✅ {added} benchmarks added, {deleted} replaced, {errors} errors")
+config["benchmark_questions"] = [
+    {"title": bm["title"], "expected_sql": bm["sql"]}
+    for bm in BENCHMARKS
+]
+
+patch_resp = _patch_space(HOST, SPACE_ID, HEADERS, config, etag)
+if patch_resp.status_code in (200, 204):
+    print(f"✅ {len(BENCHMARKS)} benchmarks written to space")
     print(f"\nNow run them: Configure → Benchmarks → Run benchmarks")
     print(f"Note your baseline score before adding any golden queries.")
+else:
+    print(f"❌ PATCH failed: {patch_resp.status_code}")
+    print(patch_resp.text[:400])
 
 # COMMAND ----------
 
@@ -129,8 +149,8 @@ else:
 # MAGIC
 # MAGIC **🖱️ UI:** Configure → Instructions → SQL Queries → + Add → paste title + SQL
 # MAGIC
-# MAGIC **⚡ Automated:** run the cell below to upload all 5 queries at once.
-# MAGIC Deletes and replaces any query with the same title.
+# MAGIC **⚡ Automated:** run the cell below to replace all golden queries at once.
+# MAGIC Same pattern as Step 1: reads serialized_space, replaces the sql_queries array, PATCHes back.
 
 # COMMAND ----------
 
@@ -213,41 +233,21 @@ ORDER BY issue_time DESC"""
     },
 ]
 
-if not SPACE_ID:
-    print("Enter Space ID in widget first.")
+# Upload golden queries via serialized_space PATCH
+space, config = _get_serialized_space(HOST, SPACE_ID, HEADERS)
+etag = space.get("etag")
+
+config["sql_queries"] = [
+    {"name": gq["name"], "description": gq["description"], "query": gq["query"]}
+    for gq in GOLDEN_QUERIES
+]
+
+patch_resp = _patch_space(HOST, SPACE_ID, HEADERS, config, etag)
+if patch_resp.status_code in (200, 204):
+    print(f"✅ {len(GOLDEN_QUERIES)} golden queries written to space")
 else:
-    # Get existing queries
-    existing_resp = requests.get(
-        f"https://{HOST}/api/2.0/genie/spaces/{SPACE_ID}/sql-queries",
-        headers=HEADERS
-    )
-    existing_qs = {}
-    if existing_resp.status_code == 200:
-        for q in existing_resp.json().get("sql_queries", []):
-            existing_qs[q.get("name", "")] = q.get("id")
-
-    added = deleted = errors = 0
-    for gq in GOLDEN_QUERIES:
-        if gq["name"] in existing_qs:
-            del_resp = requests.delete(
-                f"https://{HOST}/api/2.0/genie/spaces/{SPACE_ID}/sql-queries/{existing_qs[gq['name']]}",
-                headers=HEADERS
-            )
-            if del_resp.status_code in (200, 204):
-                deleted += 1
-
-        add_resp = requests.post(
-            f"https://{HOST}/api/2.0/genie/spaces/{SPACE_ID}/sql-queries",
-            headers=HEADERS,
-            json={"name": gq["name"], "description": gq["description"], "query": gq["query"]}
-        )
-        if add_resp.status_code in (200, 201):
-            added += 1
-        else:
-            errors += 1
-            print(f"  ❌ {gq['name']}: {add_resp.status_code} {add_resp.text[:100]}")
-
-    print(f"✅ {added} golden queries added, {deleted} replaced, {errors} errors")
+    print(f"❌ PATCH failed: {patch_resp.status_code}")
+    print(patch_resp.text[:400])
 
 # COMMAND ----------
 
@@ -257,7 +257,7 @@ else:
 # MAGIC
 # MAGIC **🖱️ UI:** Configure → Instructions → Text → + Add
 # MAGIC
-# MAGIC **⚡ Automated:** uploads 4 instructions, replacing any with the same content.
+# MAGIC **⚡ Automated:** replaces the text instructions array in one PATCH call.
 
 # COMMAND ----------
 
@@ -268,40 +268,18 @@ TEXT_INSTRUCTIONS = [
     "When asked about 'today' with no data available, say so and suggest yesterday instead.",
 ]
 
-if not SPACE_ID:
-    print("Enter Space ID in widget first.")
+# Upload text instructions via serialized_space PATCH
+space, config = _get_serialized_space(HOST, SPACE_ID, HEADERS)
+etag = space.get("etag")
+
+config["text_instructions"] = TEXT_INSTRUCTIONS
+
+patch_resp = _patch_space(HOST, SPACE_ID, HEADERS, config, etag)
+if patch_resp.status_code in (200, 204):
+    print(f"✅ {len(TEXT_INSTRUCTIONS)} text instructions written to space")
 else:
-    existing_resp = requests.get(
-        f"https://{HOST}/api/2.0/genie/spaces/{SPACE_ID}/instructions",
-        headers=HEADERS
-    )
-    existing_text = {}
-    if existing_resp.status_code == 200:
-        for instr in existing_resp.json().get("instructions", []):
-            existing_text[instr.get("content", "")] = instr.get("id")
-
-    added = deleted = errors = 0
-    for content in TEXT_INSTRUCTIONS:
-        if content in existing_text:
-            del_resp = requests.delete(
-                f"https://{HOST}/api/2.0/genie/spaces/{SPACE_ID}/instructions/{existing_text[content]}",
-                headers=HEADERS
-            )
-            if del_resp.status_code in (200, 204):
-                deleted += 1
-
-        add_resp = requests.post(
-            f"https://{HOST}/api/2.0/genie/spaces/{SPACE_ID}/instructions",
-            headers=HEADERS,
-            json={"content": content}
-        )
-        if add_resp.status_code in (200, 201):
-            added += 1
-        else:
-            errors += 1
-            print(f"  ❌ {content[:60]}: {add_resp.status_code} {add_resp.text[:80]}")
-
-    print(f"✅ {added} instructions added, {deleted} replaced, {errors} errors")
+    print(f"❌ PATCH failed: {patch_resp.status_code}")
+    print(patch_resp.text[:400])
 
 # COMMAND ----------
 

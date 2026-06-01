@@ -8,11 +8,12 @@
 # MAGIC | | |
 # MAGIC |---|---|
 # MAGIC | ⏱️ **Duration** | 30 minutes |
+# MAGIC | **Prerequisites** | Lab 02 complete — benchmarks uploaded and baseline score noted |
 # MAGIC | **Covers** | Slides 13, 16, 31–32 — Feedback, Benchmarks, Rollout, Alerts |
 # MAGIC
 # MAGIC ---
 # MAGIC
-# MAGIC ## The iteration loop (Slide 25)
+# MAGIC ## The iteration loop
 # MAGIC
 # MAGIC ```
 # MAGIC Baseline benchmarks (Lab 02) ──►
@@ -232,20 +233,5 @@ if SPACE_ID:
 # MAGIC - [ ] Feedback alert SQL understood
 # MAGIC - [ ] Space shared with at least 1 other participant (CAN RUN)
 # MAGIC
-# MAGIC ---
-# MAGIC
-# MAGIC ## 🎯 Session 2 Complete
-# MAGIC
-# MAGIC You've built a quality Genie Space following the official best practices:
-# MAGIC 1. ✅ UC metadata first — descriptions, synonyms, entity matching, join config
-# MAGIC 2. ✅ Benchmarks created before iterating
-# MAGIC 3. ✅ Golden queries with parameterisation and accurate titles
-# MAGIC 4. ✅ Text instructions used sparingly (4 rules only)
-# MAGIC 5. ✅ Feedback alerting configured
-# MAGIC 6. ✅ Rollout plan understood
-# MAGIC
-# MAGIC **Next steps for AEMO:**
-# MAGIC - Use the space yourself for 2 weeks answering real market operations questions
-# MAGIC - Add golden queries for every question type that fails
-# MAGIC - When benchmark score > 80% — identify your 5-10 pilot business users
+# MAGIC **→ Next: Lab 04 — Monitoring Usage, Cost & Feedback**
 

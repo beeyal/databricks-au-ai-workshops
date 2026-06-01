@@ -2,7 +2,7 @@
 # MAGIC %md
 # MAGIC <div style="background: linear-gradient(135deg, #1B3139 0%, #243447 100%); padding: 24px; border-radius: 8px; margin-bottom: 8px">
 # MAGIC   <h1 style="color: #FF6B35; margin: 0 0 8px 0; font-size: 28px">🔒 Lab 05: Data Residency & Compliance Evidence</h1>
-# MAGIC   <p style="color: #AECBCC; margin: 0; font-size: 14px">Workshop 1: Admin Track · Australian Regulated Industries</p>
+# MAGIC   <p style="color: #AECBCC; margin: 0; font-size: 14px">Workshop 1: Admin Track · Australian Regulated Industries · Databricks</p>
 # MAGIC </div>
 # MAGIC
 # MAGIC | | |
@@ -58,6 +58,11 @@
 # MAGIC Navigate: Left sidebar → Catalog → [catalog] → [table] → Overview tab → Tags section
 # MAGIC You should see: existing key-value tags and a [+ Add tag] button; SQL alternative: ALTER TABLE ... SET TAGS (...)
 # MAGIC ```
+# MAGIC
+# MAGIC > ⚠️ **Two workspace settings must both be correct for AI to work:**
+# MAGIC > - **Geography enforcement** → Account Console → Security and compliance → **ON** (keeps data in AU East)
+# MAGIC > - **Partner-Powered AI Features** → workspace settings → must remain **ON** (NEVER turn this off — it disables Genie, Genie Code, and AI/BI entirely)
+# MAGIC > These are different settings with different purposes. Geography enforcement controls where data goes. Partner-Powered controls whether AI features work at all.
 
 # COMMAND ----------
 
@@ -461,7 +466,7 @@ SCHEMA_NAME  = SCHEMA_W
 #     "workspace_url":                   compliance_package["workspace_url"],
 #     "geography_enforcement_compliant": compliance_package["section_1_infrastructure"]["geography_enforcement_enabled"],
 #     "workspace_region":                compliance_package["section_1_infrastructure"]["workspace_region"],
-#     "non_compliant_count":             compliance_package["section_2_feature_inventory"]["not_approved_for_regulated_data_count"],
+#     "non_compliant_count":             compliance_package["section_2_feature_inventory"]["non_compliant"],
 #     "full_package_json":               json.dumps(compliance_package, default=str),
 # }
 # spark.createDataFrame([row]).write.format("delta").mode("append").option("mergeSchema", "true") \
@@ -566,7 +571,7 @@ AI_TAG_SCHEMA = {
     "data_classification": (["public", "internal", "confidential", "restricted", "secret"], "internal"),
     "data_residency":      (["au-east", "any-au", "global"],                                "au-east"),
     "pii_processes":       (["yes", "no", "conditional"],                                   "no"),
-    "regulatory_scope":    (["soci-act-2018", "privacy-act-1988", "aescsf", "ner", "none"],   "none"),
+    "regulatory_scope":    (["soci-act-2018", "privacy-act-1988", "aescsf", "aer", "ner", "none"], "none"),
     "ai_approved":         (["approved", "pending-review", "not-approved", "conditional"],  "pending-review"),
     "owner_team":          (None,                                                            None),
 }

@@ -8,6 +8,7 @@
 # MAGIC | | |
 # MAGIC |---|---|
 # MAGIC | ⏱️ **Duration** | 20 minutes |
+# MAGIC | **Prerequisites** | Labs 01–04 complete — space configured, benchmarks run, monitoring reviewed |
 # MAGIC | **Covers** | Exploratory vs Certified spaces, certification checklist, space registry |
 # MAGIC
 # MAGIC ---
@@ -282,6 +283,8 @@ display(spark.sql(f"SELECT * FROM {CATALOG}.{SCHEMA_GOV}.genie_space_registry OR
 # MAGIC | Data Analyst | Yes (Exploratory only) | CAN RUN | CAN MANAGE |
 # MAGIC | Business User | No | CAN RUN | No access |
 # MAGIC | Line Manager | No | CAN RUN | No access |
+# MAGIC
+# MAGIC > **Note:** "Can create spaces?" is a recommended policy, not a system-enforced restriction. Databricks does not currently have a workspace-level toggle to prevent specific users from creating Genie Spaces. Enforce this through team process: only data engineers and analysts should have workspace access, and only data engineers should have the CAN MANAGE permission on Certified spaces.
 # MAGIC
 # MAGIC **What this means in practice:**
 # MAGIC - Business users never see an Exploratory space — they only access spaces the data team has certified

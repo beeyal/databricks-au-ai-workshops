@@ -1,12 +1,14 @@
 # Databricks notebook source
 # MAGIC %md
-# MAGIC <div style="background: linear-gradient(135deg, #1B3139 0%, #243447 100%); padding: 20px; border-radius: 8px; margin-bottom: 8px">
-# MAGIC   <h1 style="color: #FF6B35; margin: 0 0 6px 0; font-size: 26px">Lab 01: Workspace AI Settings & Access Control</h1>
-# MAGIC   <p style="color: #AECBCC; margin: 0; font-size: 13px">Workshop 1: Admin Track · Australian Regulated Industries · Databricks</p>
+# MAGIC <div style="background: linear-gradient(135deg, #1B3139 0%, #243447 100%); padding: 24px; border-radius: 8px; margin-bottom: 8px">
+# MAGIC   <h1 style="color: #FF6B35; margin: 0 0 8px 0; font-size: 28px">Lab 01: Workspace AI Settings & Access Control</h1>
+# MAGIC   <p style="color: #AECBCC; margin: 0; font-size: 14px">Workshop 1: Admin Track · Australian Regulated Industries · Databricks</p>
 # MAGIC </div>
 # MAGIC
 # MAGIC | | |
 # MAGIC |---|---|
+# MAGIC | ⏱️ **Duration** | 35–40 minutes |
+# MAGIC | **Prerequisites** | Workshop workspace UC-enabled, DBR 14.3 LTS cluster attached |
 # MAGIC | **Role** | Workspace Admin / Account Admin |
 # MAGIC | **Data residency** | All API calls stay in AU East |
 # MAGIC | **Cluster** | DBR 14.3 LTS or later |
@@ -33,12 +35,26 @@
 # MAGIC
 # MAGIC > This setting is NOT in the workspace admin console. It lives on the workspace detail page inside the Account Console.
 # MAGIC
+# MAGIC
+# MAGIC > ⚠️ **Two settings must be correct for AI features to work:**
+# MAGIC > - **Geography enforcement** → Account Console → Security and compliance → must be **ON**
+# MAGIC > - **Partner-Powered AI Features** → workspace settings → must remain **ON**
+# MAGIC > Turning Partner-Powered OFF disables Genie, Genie Code, and AI/BI entirely.
+# MAGIC > It is NOT a data residency control — geography enforcement is the correct lever for data residency.
+# MAGIC
 # MAGIC ---
 # MAGIC
 # MAGIC **Task 2 — Workspace-level AI feature flags**
 # MAGIC
-# MAGIC Navigate: Workspace sidebar → Settings (gear icon, bottom of sidebar) → AI & Machine Learning
-# MAGIC You should see: Toggles for Genie, AI/BI Dashboards, AI Playground, Mosaic AI Agent Framework.
+# MAGIC There are three possible navigation paths depending on your workspace UI version — use whichever one matches what you see:
+# MAGIC
+# MAGIC - **Path A (current UI, DBR 15+):** Left sidebar → Settings (gear icon, bottom of sidebar) → AI & Machine Learning
+# MAGIC - **Path B (older Admin Console UI):** Left sidebar → Settings (gear icon) → Admin Console → Feature enablement → AI features
+# MAGIC - **Path C (Settings menu bar):** Top-right Settings → Workspace settings → scroll to AI & Machine Learning section
+# MAGIC
+# MAGIC You should see: Toggles for Genie Spaces, AI/BI Dashboards, AI Playground, and Mosaic AI Agent Framework.
+# MAGIC
+# MAGIC > **Note:** When the Geography Enforcement toggle is ON (Task 1), cross-geo models such as FMAPI Pay-Per-Token are hidden from the AI Playground model picker — this is expected and correct behaviour, not a bug.
 # MAGIC
 # MAGIC ---
 # MAGIC
@@ -118,8 +134,10 @@ print("Token         : [loaded]")
 # MAGIC
 # MAGIC ---
 # MAGIC
-# MAGIC 🖱️ **UI:** Settings (gear icon, bottom of left sidebar) → AI & Machine Learning
-# MAGIC You should see: toggles for Genie, AI/BI Dashboards, AI Playground, Mosaic AI Agent Framework — these correspond to the typed settings below. The legacy export/download toggles are under Settings → Workspace settings → Advanced.
+# MAGIC 🖱️ **UI:** Settings (gear icon, bottom of left sidebar) → AI & Machine Learning (or Admin Console → Feature enablement → AI features on older UI)
+# MAGIC You should see: toggles for Genie Spaces, AI/BI Dashboards, AI Playground, Mosaic AI Agent Framework — these correspond to the typed settings below. The legacy export/download toggles are under Settings → Workspace settings → Advanced.
+# MAGIC
+# MAGIC > **Geography enforcement interaction:** When the geography enforcement toggle is ON, cross-geo models (e.g. FMAPI Pay-Per-Token) are hidden from the AI Playground model picker. If users report missing models in the Playground, verify geography enforcement status before troubleshooting anything else.
 # MAGIC
 # MAGIC ⚡ **Or run the cell below to read all AI feature flags and legacy conf keys at once:**
 
@@ -611,7 +629,10 @@ from databricks.sdk.service.iam import Group, Patch, PatchOp, PatchSchema
 
 def assign_sp_to_group(w: WorkspaceClient, sp_id: int, group_display_name: str) -> None:
     """
-    Add a service principal to an existing workspace group using SCIM PATCH (or sync via AIM for Entra ID).
+    Add a service principal to an existing workspace group using SCIM PATCH.
+    Production preference: use AIM (Automatic Identity Management) for Entra ID — groups and SPs
+    sync automatically and this manual step is unnecessary. Use this function only when AIM is
+    not yet configured or for non-Entra identity providers.
     Uses typed SDK objects (Patch/PatchOp/PatchSchema) rather than raw dicts —
     PatchOp.ADD issues a PATCH (additive), so existing members are preserved.
     Idempotent — safe to call multiple times.

@@ -1,8 +1,8 @@
 # Databricks notebook source
 # MAGIC %md
-# MAGIC <div style="background: linear-gradient(135deg, #1B3139 0%, #243447 100%); padding: 20px; border-radius: 8px; margin-bottom: 8px">
-# MAGIC   <h1 style="color: #FF6B35; margin: 0 0 6px 0; font-size: 26px">Lab 02: AI Gateway Setup & Configuration</h1>
-# MAGIC   <p style="color: #AECBCC; margin: 0; font-size: 13px">Workshop 1: Admin Track · Australian Regulated Industries · Databricks</p>
+# MAGIC <div style="background: linear-gradient(135deg, #1B3139 0%, #243447 100%); padding: 24px; border-radius: 8px; margin-bottom: 8px">
+# MAGIC   <h1 style="color: #FF6B35; margin: 0 0 8px 0; font-size: 28px">Lab 02: AI Gateway Setup & Configuration</h1>
+# MAGIC   <p style="color: #AECBCC; margin: 0; font-size: 14px">Workshop 1: Admin Track · Australian Regulated Industries · Databricks</p>
 # MAGIC </div>
 # MAGIC
 # MAGIC | | |
@@ -28,7 +28,7 @@
 # MAGIC | V1 (GA) | Left sidebar → Serving → AI Gateway tab | Yes | **Yes** |
 # MAGIC | V2 (Beta) | Left sidebar → AI Gateway (top-level, only visible if enabled via Account Console → Previews) | No | No — lacks guardrails |
 # MAGIC
-# MAGIC > Use V1 for all regulated workloads. V2 Beta does not yet support centralised guardrail policy (PII blocking, safety filter). Until V2 reaches GA with full guardrail parity, use V1 for all regulated data.
+# MAGIC > **V2 Beta does not yet have centralised guardrail policy (PII blocking, safety filter at endpoint level only). Use V1 for all regulated workloads.** Until V2 reaches GA with full guardrail parity, V2 endpoints should not be used for data classified above Public.
 
 # COMMAND ----------
 
@@ -130,7 +130,10 @@ print(f"Auth : {w.config.auth_type}")
 # MAGIC
 # MAGIC **Model used in this lab:** `databricks-claude-haiku-4-5` — available on Provisioned Throughput in AU East. All tokens stay within the australiaeast Azure region.
 # MAGIC
-# MAGIC > Do NOT use `databricks-meta-llama-*` — Llama has no committed AU East date and is cross-geo.
+# MAGIC > **Geography enforcement and cross-geo models:**
+# MAGIC > - If geography enforcement is **ON** (recommended for regulated workspaces): cross-geo models (e.g. `databricks-meta-llama-*`) will not appear in the model selector at all — the UI and API enforce residency automatically.
+# MAGIC > - If geography enforcement is **OFF**: cross-geo models appear and are selectable, but routing traffic to them violates data residency requirements — do not use them for data classified above Public.
+# MAGIC > - For this lab, always use `databricks-claude-haiku-4-5` (PT, AU East, in-region). Do NOT use `databricks-meta-llama-*` — Llama has no committed AU East date.
 # MAGIC
 # MAGIC **Option A — V1 (GA, has full guardrails — use this for regulated workloads):**
 # MAGIC Navigate: Left sidebar → Serving → click the **AI Gateway** tab at the top of the Serving page → click **+ Create**
@@ -192,7 +195,7 @@ print(f"  Payload log table     : {CATALOG_NAME}.{SCHEMA_NAME}.{PAYLOAD_TABLE_NA
 # MAGIC → Click Create
 # MAGIC ```
 # MAGIC
-# MAGIC **If you created it via the UI, skip to the "Test the endpoint" section below.**
+# MAGIC **If you created it via the UI, skip directly to Section 7: "Test the Endpoint Interactively" below.**
 # MAGIC Run the code below instead if you want to automate the setup (e.g. for deploying to multiple workspaces).
 
 # COMMAND ----------
@@ -492,6 +495,14 @@ print("Azure OpenAI endpoint creation is commented out -- uncomment after settin
 
 # COMMAND ----------
 
+def _get_current_gateway_config(workspace_url: str, headers: dict, endpoint_name: str) -> dict:
+    """Fetch the current ai_gateway config dict for an endpoint (used before partial updates)."""
+    url = f"{workspace_url}/api/2.0/serving-endpoints/{endpoint_name}"
+    response = requests.get(url, headers=headers, timeout=30)
+    response.raise_for_status()
+    return response.json().get("ai_gateway", {})
+
+
 def update_rate_limits(
     workspace_url: str,
     headers: dict,
@@ -501,18 +512,21 @@ def update_rate_limits(
 ) -> dict:
     """
     Update the AI Gateway rate limits on an existing endpoint.
-    This replaces the entire rate_limits array -- include all limits you want in one call.
+
+    IMPORTANT: The PUT /ai-gateway endpoint REPLACES the entire gateway config.
+    This function fetches the current config first and merges in the new rate limits
+    so that guardrails and inference table settings are preserved.
     """
     url = f"{workspace_url}/api/2.0/serving-endpoints/{endpoint_name}/ai-gateway"
 
-    payload = {
-        "rate_limits": [
-            {"calls": endpoint_qpm, "renewal_period": "minute", "key": "endpoint"},
-            {"calls": user_qpm, "renewal_period": "minute", "key": "user"},
-        ]
-    }
+    # Fetch existing config so we don't wipe guardrails or inference table settings
+    existing = _get_current_gateway_config(workspace_url, headers, endpoint_name)
+    existing["rate_limits"] = [
+        {"calls": endpoint_qpm, "renewal_period": "minute", "key": "endpoint"},
+        {"calls": user_qpm, "renewal_period": "minute", "key": "user"},
+    ]
 
-    response = requests.put(url, headers=headers, json=payload, timeout=30)
+    response = requests.put(url, headers=headers, json=existing, timeout=30)
     response.raise_for_status()
     return response.json()
 
@@ -556,15 +570,17 @@ def call_gateway_with_tags(
     Call an AI Gateway endpoint with usage tracking tags.
     Uses the OpenAI Python SDK -- AI Gateway exposes an OpenAI-compatible /chat/completions interface.
     """
+    # base_url must point to /serving-endpoints (NOT .../invocations).
+    # The OpenAI SDK appends /chat/completions internally; the model param routes to the endpoint.
     client = openai.OpenAI(
         api_key=token,
-        base_url=f"{workspace_url}/serving-endpoints/{endpoint_name}/invocations",
+        base_url=f"{workspace_url}/serving-endpoints",
     )
 
     tag_value = f"team={team};project={project};environment={environment}"
 
     completion = client.chat.completions.create(
-        model=endpoint_name,
+        model=endpoint_name,          # SDK uses this as the path component: /serving-endpoints/<endpoint_name>/invocations
         messages=[{"role": "user", "content": prompt}],
         extra_headers={"databricks-request-tag": tag_value},
         max_tokens=200,
@@ -636,27 +652,30 @@ def update_guardrails(
 ) -> dict:
     """
     Update guardrails on an existing AI Gateway endpoint.
-    This replaces the entire guardrails config -- specify all settings in one call.
 
     pii_input_behavior  : "NONE" or "BLOCK"
     pii_output_behavior : "NONE" or "BLOCK"
+
+    IMPORTANT: The PUT /ai-gateway endpoint REPLACES the entire gateway config.
+    This function fetches the current config first and merges in the new guardrail
+    settings so that rate limits and inference table settings are preserved.
     """
     url = f"{workspace_url}/api/2.0/serving-endpoints/{endpoint_name}/ai-gateway"
 
-    payload = {
-        "guardrails": {
-            "input": {
-                "pii": {"behavior": pii_input_behavior},
-                "safety": safety_input,
-            },
-            "output": {
-                "pii": {"behavior": pii_output_behavior},
-                "safety": safety_output,
-            },
-        }
+    # Fetch existing config so we don't wipe rate limits or inference table settings
+    existing = _get_current_gateway_config(workspace_url, headers, endpoint_name)
+    existing["guardrails"] = {
+        "input": {
+            "pii": {"behavior": pii_input_behavior},
+            "safety": safety_input,
+        },
+        "output": {
+            "pii": {"behavior": pii_output_behavior},
+            "safety": safety_output,
+        },
     }
 
-    response = requests.put(url, headers=headers, json=payload, timeout=30)
+    response = requests.put(url, headers=headers, json=existing, timeout=30)
     response.raise_for_status()
     return response.json()
 
@@ -701,19 +720,23 @@ def enable_payload_logging(
     """
     Enable or reconfigure inference table (payload logging) on an existing endpoint.
     Full table path: {catalog}.{schema}.{table_prefix}_payload_logs
+
+    IMPORTANT: The PUT /ai-gateway endpoint REPLACES the entire gateway config.
+    This function fetches the current config first and merges in the new inference
+    table settings so that rate limits and guardrails are preserved.
     """
     url = f"{workspace_url}/api/2.0/serving-endpoints/{endpoint_name}/ai-gateway"
 
-    payload = {
-        "inference_table_config": {
-            "enabled": True,
-            "catalog_name": catalog,
-            "schema_name": schema,
-            "table_name_prefix": table_prefix,
-        }
+    # Fetch existing config so we don't wipe rate limits or guardrail settings
+    existing = _get_current_gateway_config(workspace_url, headers, endpoint_name)
+    existing["inference_table_config"] = {
+        "enabled": True,
+        "catalog_name": catalog,
+        "schema_name": schema,
+        "table_name_prefix": table_prefix,
     }
 
-    response = requests.put(url, headers=headers, json=payload, timeout=30)
+    response = requests.put(url, headers=headers, json=existing, timeout=30)
     response.raise_for_status()
     return response.json()
 
@@ -1023,20 +1046,30 @@ print("  Lab 02 -- Final Checkpoint Summary")
 print("=" * 60)
 print()
 
+# Detect which optional steps were actually completed this session.
+# "True" items are always done (code ran). "Detected" items check runtime state.
+_endpoint_deployed = "endpoint" in dir() and endpoint is not None  # noqa: F821 — set in Section 1b if uncommented
+_aoai_deployed     = "result" in dir() and isinstance(result, dict) and "name" in result  # noqa: F821 — set in Section 2 if uncommented
+
 outcomes = [
-    ("Section 1", "FMAPI PT endpoint config built (databricks-claude-haiku-4-5, AU East)", True),
-    ("Section 2", "Azure OpenAI Regional (australiaeast) config built",                   True),
-    ("Section 3", "Rate limits: endpoint-level + per-user QPM configured",                True),
-    ("Section 4", "Usage tracking enabled with team/project/environment tags",            True),
-    ("Section 5", "PII BLOCK guardrail on input and output (v1 only)",                    True),
-    ("Section 6", "Payload logging to Delta table configured (AU East)",                  True),
-    ("Section 7", "Four tests defined: connectivity, prompt, PII, safety",                True),
-    ("Section 8", "Compliance summary function for audit evidence",                       True),
+    ("Section 1", "AI Gateway config object built (AiGatewayConfig)",                            True),
+    ("Section 1", "FMAPI PT endpoint deployed (databricks-claude-haiku-4-5, AU East)",            _endpoint_deployed),
+    ("Section 2", "Azure OpenAI Regional endpoint deployed (australiaeast)",                       _aoai_deployed),
+    ("Section 3", "Rate limits helper defined (endpoint-level + per-user QPM)",                    True),
+    ("Section 4", "Usage tracking + request tags helper defined",                                  True),
+    ("Section 5", "Guardrails helper defined (PII BLOCK on input and output, v1 only)",            True),
+    ("Section 6", "Payload logging helper defined (Delta table, AU East)",                         True),
+    ("Section 7", "Four test functions defined (connectivity, prompt, PII, safety)",               True),
+    ("Section 8", "Compliance summary function defined for audit evidence",                        True),
 ]
 
 for section, description, done in outcomes:
     icon = "✅" if done else "⬜"
     print(f"  {icon}  [{section}] {description}")
+
+print()
+if not _endpoint_deployed:
+    print("  Note: PT endpoint not yet deployed. Uncomment create_pt_gateway_endpoint() in Section 1b to deploy.")
 
 print()
 print("-" * 60)

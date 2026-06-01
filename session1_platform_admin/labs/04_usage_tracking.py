@@ -2,7 +2,7 @@
 # MAGIC %md
 # MAGIC <div style="background: linear-gradient(135deg, #1B3139 0%, #243447 100%); padding: 24px; border-radius: 8px; margin-bottom: 8px">
 # MAGIC   <h1 style="color: #FF6B35; margin: 0 0 8px 0; font-size: 28px">📊 Lab 04: Usage Tracking & Cost Attribution</h1>
-# MAGIC   <p style="color: #AECBCC; margin: 0; font-size: 14px">Workshop 1: Admin Track · Australian Regulated Industries</p>
+# MAGIC   <p style="color: #AECBCC; margin: 0; font-size: 14px">Workshop 1: Admin Track · Australian Regulated Industries · Databricks</p>
 # MAGIC </div>
 # MAGIC
 # MAGIC | | |
@@ -45,14 +45,17 @@
 
 # COMMAND ----------
 
-dbutils.widgets.text("catalog",     "workshop_au",          "Catalog name")
-dbutils.widgets.text("schema",      "ai_governance",        "Schema name")
-dbutils.widgets.text("gw_endpoint", "au_east_llm_inregion", "AI Gateway endpoint name")
+dbutils.widgets.text("workspace_url", "https://<your-workspace>.azuredatabricks.net", "Workspace URL")
+dbutils.widgets.text("catalog",       "workshop_au",          "Catalog name")
+dbutils.widgets.text("schema",        "ai_governance",        "Schema name")
+dbutils.widgets.text("gw_endpoint",   "au_east_llm_inregion", "AI Gateway endpoint name")
 
-CATALOG_W   = dbutils.widgets.get("catalog")
-SCHEMA_W    = dbutils.widgets.get("schema")
-GW_ENDPOINT = dbutils.widgets.get("gw_endpoint")
+WORKSPACE_URL_W = dbutils.widgets.get("workspace_url")
+CATALOG_W       = dbutils.widgets.get("catalog")
+SCHEMA_W        = dbutils.widgets.get("schema")
+GW_ENDPOINT     = dbutils.widgets.get("gw_endpoint")
 
+print(f"Workspace URL  : {WORKSPACE_URL_W}")
 print(f"Catalog.Schema : {CATALOG_W}.{SCHEMA_W}")
 print(f"GW endpoint    : {GW_ENDPOINT}")
 
@@ -322,10 +325,6 @@ TOKEN_PRICES = {
         "input_per_1m":  3.00,
         "output_per_1m": 15.00,
     },
-    "databricks-qwen3-embedding-0-6b": {  # IN-REGION embedding model
-        "input_per_1m":  0.025,
-        "output_per_1m": 0.00,
-    },
 }
 
 print("Token pricing configured for cost attribution:")
@@ -404,6 +403,19 @@ cost_by_team = spark.sql(f"""
 """)
 
 display(cost_by_team)
+
+# COMMAND ----------
+
+# TODO: Uncomment to export the monthly cost attribution to a UC volume for finance reporting
+# from datetime import date as _date
+# spark.sql(f"CREATE VOLUME IF NOT EXISTS {CATALOG_NAME}.{SCHEMA_NAME}.cost_reports")
+# (cost_by_team.coalesce(1).write
+#     .mode("overwrite")
+#     .option("header", "true")
+#     .csv(f"/Volumes/{CATALOG_NAME}/{SCHEMA_NAME}/cost_reports/cost_by_team_{_date.today().strftime('%Y-%m')}.csv"))
+# print(f"Cost report exported — download via: Catalog → Volumes → {CATALOG_NAME}.{SCHEMA_NAME}.cost_reports")
+
+print("Cost attribution export is commented out — uncomment after view is created and volume is available.")
 
 # COMMAND ----------
 
@@ -773,38 +785,20 @@ for query_name, sql in REFERENCE_QUERIES.items():
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC <div style="border-left: 4px solid #FF3621; padding-left: 16px; margin: 24px 0">
-# MAGIC <h2 style="color: #1B3139; margin: 0">Checkpoint</h2>
-# MAGIC </div>
-
-# COMMAND ----------
-
-print("=" * 60)
-print("Lab 04 — Checkpoint Summary")
-print("=" * 60)
-
-checks = [
-    "system.ai_gateway.usage schema explored",
-    "Recent requests: date, endpoint, team, project, token counts",
-    "Top users by token consumption (30-day)",
-    "Daily trend for capacity and anomaly detection",
-    "Guardrail hit analysis query written",
-    "system.access.audit: model serving invocations, Genie, AI Playground, change log",
-    "Cost attribution view defined (by team / project / environment)",
-    "Untagged request detection query written",
-    "Budget check functions: daily and monthly",
-    "Budget alert job scheduling pattern documented (UI + SDK)",
-    "Reference SQL query card printed",
-]
-
-for check in checks:
-    print(f"  [DONE]  {check}")
-
-print()
-print("-" * 60)
-print("  Next lab  : 05_data_residency_compliance.py")
-print("  Topic     : Generating a compliance evidence package for SOCI Act + Privacy Act audit")
-print("-" * 60)
+# MAGIC ---
+# MAGIC ## ✅ Lab 04 Checkpoint
+# MAGIC - [ ] `system.ai_gateway.usage` schema explored — date, endpoint, team, project, token counts
+# MAGIC - [ ] Top users by token consumption (30-day) queried
+# MAGIC - [ ] Daily trend query written (capacity and anomaly detection)
+# MAGIC - [ ] Guardrail hit analysis query written
+# MAGIC - [ ] `system.access.audit` queried — model serving, Genie, AI Playground, change log
+# MAGIC - [ ] Cost attribution view defined (by team / project / environment)
+# MAGIC - [ ] Untagged request detection query written
+# MAGIC - [ ] Budget check functions (daily and monthly) reviewed
+# MAGIC - [ ] Budget alert job scheduling pattern documented (UI + SDK)
+# MAGIC - [ ] Reference SQL query card printed
+# MAGIC
+# MAGIC **→ Next: Lab 05 — Data Residency & Compliance Evidence**
 
 # COMMAND ----------
 

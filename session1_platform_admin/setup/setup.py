@@ -268,7 +268,7 @@ if all_ok:
     print()
     print("Next steps:")
     print("  1. Share the catalog/schema names with participants")
-    print("  2. Open Lab 01: session1_platform_admin/labs/01_ai_gateway_config.py")
+    print("  2. Open Lab 01: session1_platform_admin/labs/01_workspace_ai_settings.py")
     print(f"  3. Confirm endpoint names: PT={PT_EP}, VS={VS_EP}")
 else:
     print("⚠️  One or more tables are empty or missing.")
@@ -281,8 +281,8 @@ else:
 # MAGIC
 # MAGIC The following are handled by the labs — do not add them here:
 # MAGIC
-# MAGIC - AI Gateway configuration (route creation, rate limits, guardrails) → **Lab 01**
-# MAGIC - UC permissions settings and attribute-based access control → **Lab 02**
-# MAGIC - Compliance evidence collection and audit log queries → **Lab 03**
-# MAGIC - Vector Search index creation → **Lab 04**
-# MAGIC - Data classification tagging → **Lab 05**
+# MAGIC - Workspace AI settings, geography enforcement, UC grants for AI assets → **Lab 01**
+# MAGIC - AI Gateway configuration (route creation, rate limits, guardrails) → **Lab 02**
+# MAGIC - Rate limit tuning and AU PII guardrail testing → **Lab 03**
+# MAGIC - Usage tracking, cost attribution, and system table queries → **Lab 04**
+# MAGIC - Compliance evidence collection and audit log export → **Lab 05**

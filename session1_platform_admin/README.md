@@ -1,7 +1,7 @@
 # Session 1: Governing Databricks AI Features in Australian Regulated Industries
 
 **Track:** Platform Admin / Security  
-**Duration:** 2 hours  
+**Duration:** ~3 hours (5 labs × 30–45 min each)  
 **Audience:** Workspace admins, security architects, platform engineers, cloud infrastructure leads
 
 ---
@@ -82,21 +82,33 @@ Key topics: AI Gateway endpoint creation, routing rules, rate limits, guardrail 
 **Duration:** 35–40 minutes  
 **Difficulty:** Intermediate
 
-Every AI action in Databricks — a Genie query, a model serving call, a Playground session, a Notebook Assistant generation — is recorded in `system.access.audit`. Query this table to build an audit view of AI activity in your workspace. Understand what each action type means, how to filter for AI-specific events, and how to export audit data for SIEM or compliance reporting systems.
+Build on the AI Gateway endpoint created in Lab 02. Tune per-user and per-endpoint QPM/TPM limits to protect against runaway costs and enforce fair-use quotas. Configure AU-specific PII guardrails that block Tax File Numbers, Medicare numbers, and ABNs from reaching the LLM. Test the guardrails by firing requests that should and should not be blocked, then generate a guardrail verification report suitable for a compliance audit.
 
-Key topics: `system.access.audit` schema, AI event types (`genieQuery`, `serveModelQuery`, `aiGatewayRequest`), filtering, export patterns.
+Key topics: QPM/TPM rate limit configuration, 429 handling, AU PII pattern guardrails, guardrail testing, verification report artefact.
 
 ---
 
-### Lab 04 — Usage Tracking
+### Lab 04 — Usage Tracking & Cost Attribution
 
 **File:** `labs/04_usage_tracking.py`  
 **Duration:** 30–35 minutes  
 **Difficulty:** Intermediate
 
-Apply the Unity Catalog governance model to AI assets end-to-end. Map out the full permission chain from raw data through to a Genie Space query: table SELECT → model EXECUTE → endpoint CAN_QUERY → Genie Space CAN_USE. Implement data tagging for regulated data assets and explore how tags propagate through the AI pipeline.
+Query the Databricks system tables that record AI activity and cost. Build a cost attribution view across `system.ai_gateway.usage` (token usage, guardrail hits, latency), `system.billing.usage` (Model Serving DBUs), and `system.access.audit` (Genie and endpoint invocations). Configure a budget alert on the billing system table and produce a reference SQL card participants can take back to their organisations.
 
-Key topics: Full permission chain, certified table badge, governed tags on AI assets, data classification for regulated data, lineage through AI pipelines.
+Key topics: `system.ai_gateway.usage`, `system.billing.usage`, `system.access.audit`, cost attribution by team/project tag, budget alerts.
+
+---
+
+### Lab 05 — Data Residency & Compliance Evidence
+
+**File:** `labs/05_data_residency_compliance.py`  
+**Duration:** 30–35 minutes  
+**Difficulty:** Intermediate
+
+Assemble a compliance evidence package that satisfies SOCI Act 2018 and Privacy Act 1988 obligations. Run a pre-flight checklist that programmatically verifies geography enforcement is on, AI Gateway is routing only to in-region endpoints, and PII guardrails are active. Query `system.access.audit` to export an AI-action audit log. Package all artefacts into a structured evidence bundle.
+
+Key topics: Geography enforcement API check, pre-flight checklist script, `system.access.audit` AI event export, SOCI Act evidence bundle, Privacy Act PII controls documentation.
 
 ---
 
@@ -104,11 +116,12 @@ Key topics: Full permission chain, certified table badge, governed tags on AI as
 
 At the end of this workshop, your workshop workspace will have:
 
-- A documented inventory of all AI features and their enabled/disabled state (output of Lab 1)
-- An AI Gateway endpoint routing all LLM traffic through the in-region PT endpoint with rate limits applied (Lab 2)
-- A live audit query dashboard showing AI activity in the workspace (Lab 3)
-- A complete Unity Catalog permission structure for AI assets, following least-privilege for a regulated utility (Lab 4)
-- A checklist of controls you can take back to your organisation's AI governance framework
+- A documented inventory of all AI features and their enabled/disabled state (Lab 01)
+- An AI Gateway endpoint routing all LLM traffic through the in-region PT endpoint (Lab 02)
+- Configured rate limits and AU PII guardrails, with a guardrail verification report (Lab 03)
+- A cost attribution view across AI usage system tables with a budget alert configured (Lab 04)
+- A compliance evidence package with pre-flight checklist and SOCI Act audit log export (Lab 05)
+- A controls checklist you can take back to your organisation's AI governance framework
 
 ---
 

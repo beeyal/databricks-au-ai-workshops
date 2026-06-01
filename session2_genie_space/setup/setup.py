@@ -157,7 +157,8 @@ ok = err = 0
 for table_fqn, columns in COLUMN_COMMENTS.items():
     for col, comment in columns.items():
         try:
-            spark.sql(f"ALTER TABLE {table_fqn} ALTER COLUMN `{col}` COMMENT '{comment}'")
+            safe_comment = comment.replace("'", "\\'")
+            spark.sql(f"ALTER TABLE {table_fqn} ALTER COLUMN `{col}` COMMENT '{safe_comment}'")
             ok += 1
         except Exception as e:
             print(f"  ⚠️  {table_fqn.split('.')[-1]}.{col}: {e}")
@@ -183,7 +184,8 @@ TABLE_DESCRIPTIONS = {
 
 for fqn, desc in TABLE_DESCRIPTIONS.items():
     try:
-        spark.sql(f"COMMENT ON TABLE {fqn} IS '{desc}'")
+        safe_desc = desc.replace("'", "\\'")
+        spark.sql(f"COMMENT ON TABLE {fqn} IS '{safe_desc}'")
         print(f"✅ {fqn.split('.')[-1]}")
     except Exception as e:
         print(f"❌ {fqn.split('.')[-1]}: {e}")

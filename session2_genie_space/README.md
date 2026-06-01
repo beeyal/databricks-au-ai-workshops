@@ -43,7 +43,9 @@ Following the official Databricks Genie best practices (docs + internal field gu
 |---|---|---|---|
 | 01 | Designing and Setting Up Your Genie Space | 40 min | Design principles, UC metadata, create via UI |
 | 02 | The Instruction Hierarchy | 35 min | SQL Expressions, golden queries, joins, text instructions |
-| 03 | Benchmarks, Monitoring & Iteration | 30 min | Benchmark loop, Monitor tab, feedback alerts, rollout |
+| 03 | Benchmarks, Monitoring & Iteration | 30 min |
+| 04 | Monitoring Usage, Cost & Feedback | 25 min |
+| 05 | Operating Model — Exploratory vs Certified | 20 min | Benchmark loop, Monitor tab, feedback alerts, rollout |
 
 ---
 

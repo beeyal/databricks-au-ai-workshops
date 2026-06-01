@@ -8,13 +8,19 @@
 # MAGIC | | |
 # MAGIC |---|---|
 # MAGIC | ⏱️ **Duration** | 40 minutes |
+# MAGIC | **Prerequisites** | AEMO tables loaded — run `session2_genie_space/setup/setup.py` first if not done by facilitator |
 # MAGIC | **Covers** | Slides 9, 23–27 — Setup, UC Metadata, Knowledge Store |
+# MAGIC
+# MAGIC > **Before running any code cell:** confirm `workshop_au.aemo` tables exist — run the verify cell below. If tables are missing, ask your facilitator to run `session2_genie_space/setup/setup.py`.
 # MAGIC
 # MAGIC ---
 # MAGIC
 # MAGIC ## The mental model
 # MAGIC
 # MAGIC > *"Think of Genie as a brand new analyst. Brilliant at SQL, but knows nothing about your business. Everything they know comes from what you put in the space."*
+# MAGIC
+# MAGIC > ⚠️ **Prerequisite:** Both workspace settings must be ON before Genie works:
+# MAGIC > Geography enforcement (Account Console → Security and compliance) + Partner-Powered AI Features (workspace settings). Never disable Partner-Powered — it kills Genie entirely.
 # MAGIC
 # MAGIC ## Priority stack
 # MAGIC
@@ -38,6 +44,34 @@ HEADERS = {"Authorization": f"Bearer {TOKEN}", "Content-Type": "application/json
 
 print(f"Catalog: {CATALOG}.{SCHEMA}")
 print(f"Space:   {SPACE_ID or '(create the space first, then paste ID here)'}")
+
+# COMMAND ----------
+
+# Verify AEMO tables exist before proceeding — STOP if any table is missing
+REQUIRED_TABLES = [
+    f"{CATALOG}.{SCHEMA}.spot_prices",
+    f"{CATALOG}.{SCHEMA}.dispatch_intervals",
+    f"{CATALOG}.{SCHEMA}.market_notices",
+    f"{CATALOG}.{SCHEMA}.generator_registration",
+    f"{CATALOG}.{SCHEMA}.settlement_amounts",
+]
+
+missing = []
+for t in REQUIRED_TABLES:
+    try:
+        spark.sql(f"SELECT 1 FROM {t} LIMIT 1")
+        print(f"  [OK] {t.split('.')[-1]}")
+    except Exception:
+        missing.append(t)
+        print(f"  [MISSING] {t}")
+
+if missing:
+    raise RuntimeError(
+        f"\n{len(missing)} table(s) missing in {CATALOG}.{SCHEMA}. "
+        "Ask your facilitator to run session2_genie_space/setup/setup.py before continuing."
+    )
+else:
+    print(f"\nAll {len(REQUIRED_TABLES)} tables present — ready to proceed.")
 
 # COMMAND ----------
 
@@ -183,7 +217,8 @@ for table_fqn, desc in TABLE_DESCRIPTIONS.items():
 # MAGIC Description: Natural language access to NEM spot prices, dispatch data,
 # MAGIC              and market notices for the Market Operations team.
 # MAGIC Warehouse:   select your serverless warehouse
-# MAGIC → Create → Add tables: spot_prices, dispatch_intervals, market_notices
+# MAGIC → Create → Add tables: spot_prices, dispatch_intervals, market_notices, generator_registration
+# MAGIC   (generator_registration is required for the duid join configured in Step 4)
 # MAGIC → Copy the Space ID from the browser URL bar
 # MAGIC → Paste into the widget at the top of this notebook
 # MAGIC ```
