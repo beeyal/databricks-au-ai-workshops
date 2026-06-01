@@ -47,7 +47,7 @@ print(f"Space: {SPACE_ID}")
 # MAGIC 2. Parse and update the relevant section of the JSON
 # MAGIC 3. `PATCH /api/2.0/genie/spaces/{id}` — write it back
 # MAGIC
-# MAGIC **🖱️ UI:** Configure → Benchmarks → + Add benchmark → paste title → add expected SQL
+# MAGIC **🖱️ UI:** Benchmarks tab (top-level tab in the space, alongside Configure) → + Add benchmark → paste title → add expected SQL
 # MAGIC
 # MAGIC **⚡ Automated:** run the cell below to replace the benchmark question set in one go.
 
@@ -135,7 +135,7 @@ config["benchmark_questions"] = [
 patch_resp = _patch_space(HOST, SPACE_ID, HEADERS, config, etag)
 if patch_resp.status_code in (200, 204):
     print(f"✅ {len(BENCHMARKS)} benchmarks written to space")
-    print(f"\nNow run them: Configure → Benchmarks → Run benchmarks")
+    print(f"\nNow run them: Benchmarks tab (top-level, not under Configure) → Run benchmarks")
     print(f"Note your baseline score before adding any golden queries.")
 else:
     print(f"❌ PATCH failed: {patch_resp.status_code}")

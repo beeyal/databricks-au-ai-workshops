@@ -249,7 +249,7 @@ else:
 # MAGIC
 # MAGIC **🖱️ UI for synonyms:** Configure → Data → [table] → column → Synonyms tab
 # MAGIC **🖱️ UI for entity matching:** Configure → Data → [table] → column → Format assistance → enable
-# MAGIC **🖱️ UI for joins:** Configure → Instructions → Joins → + Add
+# MAGIC **🖱️ UI for joins:** Configure → Joins (top-level section in Configure, may be separate from Instructions depending on workspace version) → + Add
 # MAGIC
 # MAGIC Synonyms and entity matching are set in the space UI — do these manually in the Configure tab.
 # MAGIC The join relationship can also be set via the space settings API:
@@ -280,7 +280,7 @@ else:
     else:
         # Falls back to showing the manual UI steps
         print(f"API returned {resp.status_code} — add the join manually in the UI:")
-        print("  Configure → Instructions → Joins → + Add")
+        print("  Configure → Joins (top-level section in Configure, may be separate from Instructions depending on workspace version) → + Add")
         print("  Left: dispatch_intervals  |  Right: generator_registration")
         print("  Condition: dispatch_intervals.duid = generator_registration.duid")
         print("  Relationship: Many-to-one")

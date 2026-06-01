@@ -48,9 +48,11 @@
 # MAGIC
 # MAGIC There are three possible navigation paths depending on your workspace UI version — use whichever one matches what you see:
 # MAGIC
-# MAGIC - **Path A (current UI, DBR 15+):** Left sidebar → Settings (gear icon, bottom of sidebar) → AI & Machine Learning
-# MAGIC - **Path B (older Admin Console UI):** Left sidebar → Settings (gear icon) → Admin Console → Feature enablement → AI features
-# MAGIC - **Path C (Settings menu bar):** Top-right Settings → Workspace settings → scroll to AI & Machine Learning section
+# MAGIC - **Path A (current UI):** Click your username (top-right of workspace) → Settings → scroll to find AI / Machine Learning feature toggles
+# MAGIC - **Path B:** Left sidebar → Settings icon (if present) → Workspace admin → feature settings
+# MAGIC - **Path C:** The exact section label varies by workspace version — look for "Previews", "AI features", or "Machine Learning" sections
+# MAGIC
+# MAGIC > ⚠️ Exact UI labels vary. If you can't find AI toggles, ask your workspace admin or check via the API below.
 # MAGIC
 # MAGIC You should see: Toggles for Genie Spaces, AI/BI Dashboards, AI Playground, and Mosaic AI Agent Framework.
 # MAGIC
@@ -134,8 +136,8 @@ print("Token         : [loaded]")
 # MAGIC
 # MAGIC ---
 # MAGIC
-# MAGIC 🖱️ **UI:** Settings (gear icon, bottom of left sidebar) → AI & Machine Learning (or Admin Console → Feature enablement → AI features on older UI)
-# MAGIC You should see: toggles for Genie Spaces, AI/BI Dashboards, AI Playground, Mosaic AI Agent Framework — these correspond to the typed settings below. The legacy export/download toggles are under Settings → Workspace settings → Advanced.
+# MAGIC 🖱️ **UI:** Click username (top-right) → Settings → look for AI / Machine Learning or Previews section
+# MAGIC You should see: toggles for Genie Spaces, AI/BI Dashboards, AI Playground. Exact section name varies by workspace version. Export/download toggles may be under Settings → Workspace settings → Advanced.
 # MAGIC
 # MAGIC > **Geography enforcement interaction:** When the geography enforcement toggle is ON, cross-geo models (e.g. FMAPI Pay-Per-Token) are hidden from the AI Playground model picker. If users report missing models in the Playground, verify geography enforcement status before troubleshooting anything else.
 # MAGIC

@@ -43,7 +43,7 @@ HEADERS  = {"Authorization": f"Bearer {TOKEN}", "Content-Type": "application/jso
 # MAGIC
 # MAGIC > *"Benchmarks detect drift or inconsistencies over time. They surface regressions or bugs early and before org-wide adoption."*
 # MAGIC
-# MAGIC **🖱️ Navigate: Configure → Benchmarks → Run benchmarks**
+# MAGIC **🖱️ Navigate: Benchmarks tab (top-level, not under Configure) → Run benchmarks**
 # MAGIC
 # MAGIC Watch the Evaluations tab:
 # MAGIC ```
@@ -70,7 +70,7 @@ if SPACE_ID:
     else:
         runs = runs_resp.json().get("eval_runs", [])
         if not runs:
-            print("No benchmark runs yet — run benchmarks in the UI first (Configure → Benchmarks → Run benchmarks).")
+            print("No benchmark runs yet — run benchmarks in the UI first (Benchmarks tab (top-level, not under Configure) → Run benchmarks).")
         else:
             latest_run_id = runs[0].get("eval_run_id")
             run_status    = runs[0].get("eval_run_status")
@@ -154,7 +154,7 @@ else:
 # MAGIC
 # MAGIC > *"User feedback continuously improves Genie's quality by capturing real-world user input and routing it to authors for action."*
 # MAGIC
-# MAGIC **🖱️ Navigate: Configure → Monitor**
+# MAGIC **🖱️ Navigate: Monitor tab (top-level tab, not under Configure)**
 # MAGIC
 # MAGIC ```
 # MAGIC Filter by:  [All] [👍 Thumbs up] [👎 Thumbs down] [🔧 Fix it] [📋 Request review]

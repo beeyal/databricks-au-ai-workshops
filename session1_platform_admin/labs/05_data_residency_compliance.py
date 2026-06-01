@@ -262,7 +262,7 @@ print(f"\n{icon} {geo_result['reason']}")
 # MAGIC
 # MAGIC Query workspace-level AI feature flags and record current state. This forms the Feature Inventory section of the compliance evidence package.
 # MAGIC
-# MAGIC 🖱️ **UI:** Settings (gear icon) → AI & Machine Learning — check each toggle; Settings → Workspace settings → Advanced for legacy export/download flags. Cross-reference against the residency table in the header above.
+# MAGIC 🖱️ **UI:** Click username (top-right) → Settings → look for AI / Machine Learning or Previews section. Section label varies by workspace version. Cross-reference against the residency table in the header above.
 # MAGIC You should see: Each toggle's current state. Features marked cross-geo in the table above should be OFF for any workspace handling regulated data.
 # MAGIC
 # MAGIC ⚡ **Run the cell below to check all 11 AI features programmatically and print a residency/approved-status table:**

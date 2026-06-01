@@ -32,7 +32,7 @@ print(f"Monitoring last {LOOKBACK} days | Space: {SPACE_ID or 'all spaces'}")
 # MAGIC ---
 # MAGIC ## Step 1: Who is using Genie and how often?
 # MAGIC
-# MAGIC **🖱️ UI:** Configure → Monitor tab (shows questions + ratings per user)
+# MAGIC **🖱️ UI:** Monitor tab (top-level, not under Configure) (shows questions + ratings per user)
 # MAGIC
 # MAGIC **⚡ Automated — full usage breakdown:**
 
