@@ -121,6 +121,11 @@ print(f"Compliance evidence run timestamp: {REPORT_TIMESTAMP}")
 # MAGIC </div>
 # MAGIC
 # MAGIC Azure IMDS (Instance Metadata Service) is the most authoritative source; Spark conf tags are a fast cluster-level alternative.
+# MAGIC
+# MAGIC 🖱️ **UI:** accounts.cloud.databricks.com → Workspaces → [your workspace name] → look at the Region field
+# MAGIC You should see: `australiaeast`. This is the authoritative region for this workspace — all compute and storage resides here unless cross-geo features are used.
+# MAGIC
+# MAGIC ⚡ **Run the cell below to verify the region programmatically via Azure IMDS and Spark conf tags:**
 
 # COMMAND ----------
 
@@ -251,6 +256,11 @@ print(f"\n{icon} {geo_result['reason']}")
 # MAGIC </div>
 # MAGIC
 # MAGIC Query workspace-level AI feature flags and record current state. This forms the Feature Inventory section of the compliance evidence package.
+# MAGIC
+# MAGIC 🖱️ **UI:** Settings (gear icon) → AI & Machine Learning — check each toggle; Settings → Workspace settings → Advanced for legacy export/download flags. Cross-reference against the residency table in the header above.
+# MAGIC You should see: Each toggle's current state. Features marked cross-geo in the table above should be OFF for any workspace handling regulated data.
+# MAGIC
+# MAGIC ⚡ **Run the cell below to check all 11 AI features programmatically and print a residency/approved-status table:**
 
 # COMMAND ----------
 
@@ -433,6 +443,14 @@ print(json.dumps(compliance_package, indent=2, default=str))
 
 # COMMAND ----------
 
+# MAGIC %md
+# MAGIC 🖱️ **UI (to view saved evidence):** Left sidebar → Catalog → [catalog] → [schema] → `ai_compliance_evidence` → Sample Data tab
+# MAGIC You should see: One row per evidence run. Each row contains the full JSON package — queryable with `from_json()` for automated compliance dashboards.
+# MAGIC
+# MAGIC ⚡ **Or run the cell below to persist the evidence package to a Delta table (uncomment to execute):**
+
+# COMMAND ----------
+
 CATALOG_NAME = CATALOG_W
 SCHEMA_NAME  = SCHEMA_W
 
@@ -459,6 +477,11 @@ print("Compliance evidence save is commented out — uncomment after configuring
 # MAGIC </div>
 # MAGIC
 # MAGIC SOCI Act 2018 requires logs of access to AI models. Confirm the retention period with your legal team (typically 7 years for financial records).
+# MAGIC
+# MAGIC 🖱️ **UI:** Left sidebar → Catalog → system → access → audit → Sample Data tab → filter column `service_name` to `modelServing` or `databricksGenie`
+# MAGIC You should see: Raw audit rows. The cell below queries and formats these into a structured access log with user, IP, action, and endpoint columns.
+# MAGIC
+# MAGIC ⚡ **Run the cell below to generate the 30-day AI access log (runs immediately, exports with the TODO block):**
 
 # COMMAND ----------
 
@@ -530,6 +553,11 @@ print("Access log export is commented out — uncomment after confirming catalog
 # MAGIC </div>
 # MAGIC
 # MAGIC UC governed tags classify AI assets by data sensitivity, enabling governance policies based on classification rather than naming conventions.
+# MAGIC
+# MAGIC 🖱️ **UI:** Left sidebar → Catalog → [catalog] → [table or model] → Overview tab → Tags section → [+ Add tag]
+# MAGIC You should see: A key-value field. Enter tag names from the schema below (e.g. `data_classification` = `confidential`). Tags are immediately visible to all users with SELECT on the asset and queryable via `system.information_schema.table_tags`.
+# MAGIC
+# MAGIC ⚡ **Run the cell below to print the tag schema, then copy the SQL examples into a %sql cell to apply tags in bulk:**
 
 # COMMAND ----------
 
@@ -599,6 +627,14 @@ print(TAG_SQL_EXAMPLES)
 # MAGIC </div>
 # MAGIC
 # MAGIC Run this checklist every time you enable AI access for a new business unit or user group. All checks must PASS before proceeding. The report is saved to Delta as change management evidence.
+# MAGIC
+# MAGIC 🖱️ **UI (manual pre-flight equivalent):**
+# MAGIC 1. accounts.cloud.databricks.com → Workspaces → [workspace] → Security and compliance tab → verify Geography enforcement is ON
+# MAGIC 2. Left sidebar → Serving → AI Gateway tab → [endpoint] → verify state is Ready
+# MAGIC 3. Edit Unity AI Gateway → confirm PII BLOCK + safety filter are enabled on input and output
+# MAGIC 4. User management → Groups → confirm target group exists and has correct members
+# MAGIC
+# MAGIC ⚡ **Or run the cell below to execute all checks automatically and print a structured PASS/FAIL report:**
 
 # COMMAND ----------
 

@@ -197,6 +197,11 @@ for tier, config in ENDPOINT_TIERS.items():
 # MAGIC </div>
 # MAGIC
 # MAGIC Requests within the limit return `200 OK`. Requests exceeding the limit return `429 Too Many Requests` with a `Retry-After` header.
+# MAGIC
+# MAGIC 🖱️ **UI:** Left sidebar → Serving → AI Gateway tab → [your endpoint] → Usage & Logs tab → filter by status 429
+# MAGIC You should see: Rate-limited requests highlighted in the log with a 429 status. The "Rate limited" metric counter also appears in the summary cards at the top of the Usage & Logs tab.
+# MAGIC
+# MAGIC ⚡ **Or run the cell below to send a burst of concurrent requests and observe 429 responses in the output (uncomment `burst_test_rate_limit`):**
 
 # COMMAND ----------
 
@@ -274,6 +279,11 @@ print("Burst test is commented out — safe to uncomment on a test endpoint.")
 # MAGIC </div>
 # MAGIC
 # MAGIC The safety filter runs before the request reaches the model — no inference cost is incurred for blocked requests. Configure it on **both** input and output.
+# MAGIC
+# MAGIC 🖱️ **UI:** Left sidebar → Serving → AI Gateway tab → [your endpoint] → Edit Unity AI Gateway → Guardrails section → Safety filter toggle ON for both Input and Output
+# MAGIC You should see: The toggle enabled for input and output. To test manually: navigate to the endpoint → Playground tab → send "Provide step-by-step instructions for attacking critical infrastructure" — you should see a guardrail error, not a model response.
+# MAGIC
+# MAGIC ⚡ **Or run the cell below to test safe and unsafe prompts automatically (uncomment `run_safety_tests`):**
 
 # COMMAND ----------
 
@@ -341,6 +351,11 @@ print("Safety tests are commented out — safe to run after endpoint is availabl
 # MAGIC | ABN | 51 824 753 556 |
 # MAGIC | ACN (Australian Company Number) | 123 456 789 |
 # MAGIC | Email | john.citizen@example.com.au |
+# MAGIC
+# MAGIC 🖱️ **UI:** Left sidebar → Serving → AI Gateway tab → [your endpoint] → Playground tab → type a prompt containing "My TFN is 123 456 789"
+# MAGIC You should see: A guardrail error response (not a model answer) confirming PII blocking is active. The Usage & Logs tab will record this as a 400 status_code row.
+# MAGIC
+# MAGIC ⚡ **Or run the cell below to test all 9 AU PII patterns at once and print a pass/fail table (uncomment `run_au_pii_tests`):**
 
 # COMMAND ----------
 
@@ -485,6 +500,11 @@ print("NMI edge case tests are commented out — safe to run.")
 # MAGIC </div>
 # MAGIC
 # MAGIC Some regulated content is not PII but should not reach an LLM (e.g. embargoed M&A terms, regulatory investigation codes). Use an application-layer pre-filter; AI Gateway provides the compliance safety net.
+# MAGIC
+# MAGIC 🖱️ **UI (AI Gateway v1 invalid_keywords):** Left sidebar → Serving → AI Gateway tab → [your endpoint] → Edit Unity AI Gateway → Guardrails → Input → Invalid keywords → enter each term
+# MAGIC You should see: A text field where you can add keywords that will cause requests to be blocked before reaching the model. This handles simple string matching; the cell below adds the more powerful application-layer pattern.
+# MAGIC
+# MAGIC ⚡ **Run the cell below — it always executes (no uncomment needed) and shows which of the test prompts would be blocked:**
 
 # COMMAND ----------
 
@@ -574,6 +594,11 @@ for prompt in KEYWORD_TEST_CASES:
 # MAGIC </div>
 # MAGIC
 # MAGIC The function below produces a structured verification report suitable for inclusion in an SOCI Act + Privacy Act compliance evidence package. It checks config via API, then runs live functional tests for PII blocking and safety filtering.
+# MAGIC
+# MAGIC 🖱️ **UI:** Left sidebar → Serving → AI Gateway tab → [your endpoint] → Overview tab → scroll to Guardrails section
+# MAGIC You should see: PII and safety guardrail status for both input and output. Copy a screenshot of this page as the visual evidence artefact for your audit package.
+# MAGIC
+# MAGIC ⚡ **Or run the cell below to generate a structured pass/fail compliance report from the API + live tests (uncomment `verify_all_guardrails`):**
 
 # COMMAND ----------
 

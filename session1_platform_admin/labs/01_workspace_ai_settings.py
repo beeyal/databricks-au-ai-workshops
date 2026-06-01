@@ -115,6 +115,13 @@ print("Token         : [loaded]")
 # MAGIC | `restrict_workspace_admins` | Typed Settings | Non-admin restrictions |
 # MAGIC | `enableExportNotebook` | Legacy workspace-conf | Notebook source download |
 # MAGIC | `enableResultsDownloading` | Legacy workspace-conf | Query result CSV export |
+# MAGIC
+# MAGIC ---
+# MAGIC
+# MAGIC 🖱️ **UI:** Settings (gear icon, bottom of left sidebar) → AI & Machine Learning
+# MAGIC You should see: toggles for Genie, AI/BI Dashboards, AI Playground, Mosaic AI Agent Framework — these correspond to the typed settings below. The legacy export/download toggles are under Settings → Workspace settings → Advanced.
+# MAGIC
+# MAGIC ⚡ **Or run the cell below to read all AI feature flags and legacy conf keys at once:**
 
 # COMMAND ----------
 
@@ -175,6 +182,7 @@ for key in WORKSPACE_CONF_KEYS:
 # COMMAND ----------
 
 # MAGIC %md
+# MAGIC ---
 # MAGIC **For a SOCI Act / critical infrastructure regulated workspace, the recommended hardened values are:**
 # MAGIC
 # MAGIC | Key | Recommended | Why |
@@ -192,8 +200,10 @@ for key in WORKSPACE_CONF_KEYS:
 # MAGIC
 # MAGIC Genie Spaces execute queries in-region — they are safe for regulated data. The workspace-level toggle is the coarsest control available. Finer per-user and per-table access is handled via UC grants (Section 4).
 # MAGIC
-# MAGIC Navigate: Settings → AI & Machine Learning → Genie toggle
-# MAGIC You should see: A toggle that maps directly to `aibi_genie_space_enabled_ws_setting`. Flipping it in the UI is equivalent to the PATCH call below.
+# MAGIC 🖱️ **UI:** Settings (gear icon) → AI & Machine Learning → Genie toggle
+# MAGIC You should see: A toggle labelled "Genie Spaces" that maps directly to `aibi_genie_space_enabled_ws_setting`. Flipping it in the UI is equivalent to the PATCH call below.
+# MAGIC
+# MAGIC ⚡ **Or run the cell below to enable/disable via the Settings API (uncomment the line you want):**
 
 # COMMAND ----------
 
@@ -239,8 +249,10 @@ print("Genie Space toggle: commented out for safety. Uncomment to make a change.
 # MAGIC
 # MAGIC **Who can change it:** Account Admins only. Workspace-only Admins will receive a 403 — expected.
 # MAGIC
-# MAGIC Navigate: accounts.cloud.databricks.com → Workspaces → [your workspace name] → Security and compliance tab
-# MAGIC You should see: Toggle "Enforce data processing within workspace Geography for Designated Services" — must be ON.
+# MAGIC 🖱️ **UI:** accounts.cloud.databricks.com → Workspaces → [your workspace name] → Security and compliance tab
+# MAGIC You should see: Toggle "Enforce data processing within workspace Geography for Designated Services" — must be ON. This setting is NOT in the workspace admin console.
+# MAGIC
+# MAGIC ⚡ **Or run the cell below to check it programmatically (Account Admin token required):**
 
 # COMMAND ----------
 
@@ -379,6 +391,11 @@ else:
 
 # MAGIC %md
 # MAGIC ### 4a. Grant permissions on a registered model
+# MAGIC
+# MAGIC 🖱️ **UI:** Left sidebar → Catalog → expand catalog → schema → [model name] → Permissions tab → Grant
+# MAGIC You should see: A dialog to add a principal (user, group, or service principal) with a privilege selector. EXECUTE = run inference, ALL PRIVILEGES = full management.
+# MAGIC
+# MAGIC ⚡ **Or run the cell below to generate the GRANT SQL:**
 
 # COMMAND ----------
 
@@ -544,8 +561,10 @@ print("Genie Space permission calls are commented out — uncomment after settin
 # MAGIC
 # MAGIC Automated AI workloads (scheduled inference jobs, embedding pipelines) should run as service principals — not personal accounts. This prevents workload failure when staff leave, provides a clean audit trail in `system.access.audit`, and enables least-privilege access.
 # MAGIC
-# MAGIC Navigate: Account Console → User management → Service principals
-# MAGIC You should see: List of existing SPs. To create via UI: click "Add service principal" → enter name → Add → Secrets tab → Generate secret (shown once only).
+# MAGIC 🖱️ **UI:** accounts.cloud.databricks.com → User management → Service principals tab → Add service principal
+# MAGIC You should see: A name field — enter `svc-<workload>` format. After creation, go to the SP detail page → Secrets tab → Generate secret (save the secret immediately — it is shown once only).
+# MAGIC
+# MAGIC ⚡ **Or run the cell below to create the service principal via the SDK (uncomment the call):**
 
 # COMMAND ----------
 
@@ -629,6 +648,11 @@ print("SP group assignment is commented out — run after creating the service p
 # MAGIC | `grp_regulatory` | CAN_USE (reporting spaces only) | None | No |
 # MAGIC | `grp_ai_admins` | CAN_MANAGE | CAN_MANAGE | Yes |
 # MAGIC | `grp_data_science` | CAN_USE (dev) | CAN_MANAGE | Yes |
+# MAGIC
+# MAGIC 🖱️ **UI:** accounts.cloud.databricks.com → User management → Groups tab → Add group
+# MAGIC You should see: A name field. Enter the group name, then add members and assign workspace access from the group detail page.
+# MAGIC
+# MAGIC ⚡ **Or run the cell below to create all four governance groups in one pass (uncomment to execute):**
 
 # COMMAND ----------
 

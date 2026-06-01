@@ -241,6 +241,11 @@ print(f"  Rate limits        : 60 QPM endpoint-wide, 20 QPM per user")
 
 # MAGIC %md
 # MAGIC ### 1b. Create the endpoint via the SDK
+# MAGIC
+# MAGIC 🖱️ **UI:** Left sidebar → Serving → AI Gateway tab → "+ Create" → select "Databricks Foundation Models" as provider → choose `databricks-claude-haiku-4-5` → configure rate limits and guardrails in the form → click Create
+# MAGIC You should see: The new endpoint appear in the AI Gateway list with status "Not Ready", then transition to "Ready" after ~3 minutes.
+# MAGIC
+# MAGIC ⚡ **Or run the cell below to create it via the SDK with all settings pre-configured (uncomment to deploy):**
 
 # COMMAND ----------
 
@@ -432,8 +437,10 @@ print("Azure OpenAI endpoint creation is commented out -- uncomment after settin
 # MAGIC %md
 # MAGIC ## Section 3: Set and Update Rate Limits
 # MAGIC
-# MAGIC Navigate: Left sidebar → Serving → AI Gateway tab → click the endpoint name → "Edit endpoint" or "Edit Unity AI Gateway" → Rate limits section
-# MAGIC You should see: Options for Queries Per Minute (QPM) or Tokens Per Minute (TPM). You can set an endpoint-level ceiling, per-user default, and per-group overrides.
+# MAGIC 🖱️ **UI:** Left sidebar → Serving → AI Gateway tab → click the endpoint name → "Edit endpoint" (or "Edit Unity AI Gateway") → Rate limits section
+# MAGIC You should see: Options for Queries Per Minute (QPM) or Tokens Per Minute (TPM). You can set an endpoint-level ceiling, per-user default, and per-group overrides. Click "+ Add rate limit" for each rule.
+# MAGIC
+# MAGIC ⚡ **Or run the cell below to update rate limits via the API (uncomment the call):**
 # MAGIC
 # MAGIC | Key type | Scope | Use case |
 # MAGIC |---|---|---|
@@ -572,8 +579,10 @@ print("Tagged API call defined -- uncomment after endpoint is available.")
 # MAGIC | `NONE` | PII detection disabled | Development / testing only |
 # MAGIC | `BLOCK` | Request rejected if PII detected | **Recommended for regulated data** |
 # MAGIC
-# MAGIC Navigate: Left sidebar → Serving → AI Gateway tab → click the endpoint name → "Edit endpoint" or "Edit Unity AI Gateway" → Guardrails section
-# MAGIC You should see: Input guardrails (Safety filter on/off, PII detection with Block or Mask options) and Output guardrails (same options). Guardrails add ~200-500ms latency.
+# MAGIC 🖱️ **UI:** Left sidebar → Serving → AI Gateway tab → click the endpoint name → "Edit endpoint" (or "Edit Unity AI Gateway") → Guardrails section
+# MAGIC You should see: Input guardrails with PII detection set to None/Block, and a Safety filter toggle. Repeat for Output guardrails. Guardrails add ~200-500ms latency — expected and acceptable for regulated workloads.
+# MAGIC
+# MAGIC ⚡ **Or run the cell below to update guardrails via the API (uncomment the call):**
 
 # COMMAND ----------
 
@@ -633,8 +642,10 @@ print("Guardrail update function defined -- uncomment after endpoint creation.")
 # MAGIC
 # MAGIC Payload logging stores every request and response in a Delta table -- required for SOCI Act CPS 234 audit evidence. The table is created automatically at `{catalog}.{schema}.{table_prefix}_payload_logs` on the first logged request.
 # MAGIC
-# MAGIC Navigate: Left sidebar → Serving → AI Gateway tab → click the endpoint name → "Edit endpoint" or "Edit Unity AI Gateway" → Inference tables section
-# MAGIC You should see: Fields to specify catalog.schema for the Delta table. Data stays in AU East.
+# MAGIC 🖱️ **UI:** Left sidebar → Serving → AI Gateway tab → click the endpoint name → "Edit endpoint" (or "Edit Unity AI Gateway") → Inference tables section
+# MAGIC You should see: Fields for catalog name and schema name. Enter the target catalog/schema and the table name prefix. Data stays in AU East. The table is auto-created on the first logged request.
+# MAGIC
+# MAGIC ⚡ **Or run the cell below to enable payload logging via the API (uncomment the call):**
 # MAGIC
 # MAGIC **Auto-created table schema:** `request_id`, `timestamp_ms`, `model_name`, `request` (full prompt JSON), `response` (full completion JSON), `execution_duration_ms`, `status_code` (400 = blocked by guardrail).
 
@@ -884,7 +895,10 @@ print("All four test functions are defined -- uncomment the test block above aft
 # MAGIC %md
 # MAGIC ## Section 8: Verify Full Endpoint Configuration via REST API
 # MAGIC
-# MAGIC Use this function to confirm all settings are active -- useful for post-deployment validation in CI/CD or providing audit evidence.
+# MAGIC 🖱️ **UI:** Left sidebar → Serving → AI Gateway tab → click the endpoint name → Overview tab
+# MAGIC You should see: All AI Gateway settings summarised — usage tracking, inference tables, guardrails, and rate limits in one view. This is useful for a quick visual check; the cell below is suitable for CI/CD or audit evidence.
+# MAGIC
+# MAGIC ⚡ **Or run the cell below to fetch and print a compliance summary from the API (uncomment the call):**
 
 # COMMAND ----------
 

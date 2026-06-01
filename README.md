@@ -1,112 +1,82 @@
-# Databricks AI Workshops — AEMO Enablement Programme
+# AEMO AI Enablement Workshops — Databricks
 
-Six-session hands-on AI enablement for AEMO on Azure Australia East. All content scoped to in-region features only. Governed under SOCI Act 2018 + Privacy Act 1988 (not APRA — AEMO is an energy market operator, not an APRA-regulated entity).
+Six-session hands-on AI enablement programme for AEMO on Azure Australia East. All content is scoped to in-region features only and governed under the SOCI Act 2018, Privacy Act 1988, and the Australian Energy Sector Cyber Security Framework (AESCSF).
 
 ---
 
 ## Quick Start
 
-### Import into Databricks Repos
+1. **Clone the repo** into Databricks Repos: `https://github.com/beeyal/databricks-au-ai-workshops`
+2. **Run the session setup** — navigate to `<session_folder>/setup/setup.py` and run it top to bottom before the session starts
+3. **Open the labs** — work through `<session_folder>/labs/` in order
 
-1. In your Databricks workspace, go to **Repos** (left sidebar)
-2. Click **Add Repo**
-3. Enter: `https://github.com/beeyal/databricks-au-ai-workshops`
-4. Click **Create repo**
-
-### Run workspace setup
-
-Navigate to `setup/00_workspace_setup.py` and run it top to bottom. This creates the `workshop_au` Unity Catalog, loads the NEM12 synthetic dataset, and verifies that required AI features are enabled. Allow approximately 15 minutes.
-
-### Run the preflight check
-
-Navigate to `setup/preflight_check.py` and run all 10 checks. Every check must return `[PASS]` before any session starts. If any check returns `[FAIL]` or `[WARN]`, refer to [FACILITATOR_GUIDE.md](FACILITATOR_GUIDE.md) for remediation steps.
+Each session is self-contained. Run `setup/setup.py`, do the labs, run `setup/cleanup.py` when done.
 
 ---
 
 ## Session Overview
 
-Session 3 is run by the Databricks LDT team and is not in this repository.
+| Session | Folder | Audience | Duration |
+|---------|--------|----------|----------|
+| 1: Platform Admins | `session1_platform_admin/` | Workspace admins | 2 hrs |
+| 2: Building Genie Space | `session2_genie_space/` | Data engineers, analysts | 2.5 hrs |
+| 3: Line-of-Business | `session3_lob/` | 100 business users | Half day — LDT team |
+| 4: MCP Agents (optional) | `session4_mcp_agents/` | Data engineers | Half day |
+| 5: Genie Code (optional) | `session5_genie_code/` | Data scientists | 1 hr |
+| 6: AI Ideation (optional) | `session6_ideation/` | 20–30 business users | Half day |
 
-| Session | Title | Audience | Duration | Status |
-|---------|-------|----------|----------|--------|
-| 1 | Platform Administrators | Workspace admins | 2 hours | Ready |
-| 2 | Building Your Genie Space | Data engineers, analysts | 1.5 hours | Ready |
-| 3 | Line-of-Business Training | 100 business users | Half day | LDT team |
-| 4 | Building Agents, MCPs & Apps | Data engineers, scientists | Half day | Ready |
-| 5 | Extending Genie Code | Data scientists, developers | 1 hour | Ready |
-| 6 | AI Ideation and Building | 20-30 business participants | Half day | Ready |
-
----
-
-## Repository Structure
-
-```
-databricks-au-ai-workshops/
-├── setup/                         ← Run these before any session
-│   ├── preflight_check.py         ← 10 checks, run first
-│   ├── 00_workspace_setup.py      ← Load sample data (~15 min)
-│   ├── grant_workshop_access.py   ← Provision participant access
-│   └── 99_teardown.py             ← Post-workshop cleanup
-├── workshop1_admin/               ← Session 1 Part 2 labs
-├── session2_genie_space/          ← Session 2 labs
-├── workshop2c_mcp_agents/         ← Session 4 labs
-├── session5_genie_code/           ← Session 5 labs
-├── session6_ideation/             ← Session 6 activities
-├── data/                          ← Sample datasets (AEMO NEM synthetic)
-└── [docs]                         ← README, FACILITATOR_GUIDE, etc.
-```
+Session 3 is delivered by the Databricks Learning & Development Team (LDT) and is not in this repository.
 
 ---
 
-## Data Residency
+## Key Principle
 
-All content uses only AU East in-region features. The single most important setting:
+Each session folder contains:
 
-**Account Console → Workspaces → [workspace] → Security and compliance → "Enforce data processing within workspace Geography" must be ON.**
+- `setup/setup.py` — loads data, grants permissions, runs a smoke test. Run this once before participants arrive.
+- `labs/` — the actual workshop labs (mix of UI walkthroughs and automated scripts).
+- `setup/cleanup.py` — removes everything created in the session, revokes grants. Run this after the workshop.
 
-| Feature | Residency | Safe for regulated data |
-|---------|-----------|------------------------|
-| Genie Spaces | In-region | Yes |
-| AI Gateway | In-region | Yes |
-| FMAPI Provisioned Throughput | In-region | Yes — requires endpoint deployment |
-| Genie Code (Notebook Assistant) | In-region | Yes |
-| FMAPI Pay-Per-Token | Cross-geo | No — do not use for regulated data |
-| Knowledge Assistant | Cross-geo | No — workaround required |
-| Foundation Model Fine-tuning | Not available | N/A — not available in AU East |
+Sessions share the `workshop_au` Unity Catalog. If you are running multiple sessions in the same workspace, run each session's setup in order (Session 1 → 2 → ...) and clean up in reverse order.
 
 ---
 
-## Regulatory Framework
+## Data
 
-AEMO, APA, and AusNet are governed by:
+The workshops use two sets of synthetic data — no actual customer or network data is used.
 
-- **SOCI Act 2018** — critical infrastructure obligations
-- **Privacy Act 1988 + APPs** — personal information handling
-- **AESCSF** — Australian Energy Sector Cyber Security Framework
-- **AER** — Australian Energy Regulator obligations
-- **NER** — National Electricity Rules
-
-These organisations are **not** governed by APRA (which applies to banks, insurers, and superannuation funds).
-
----
-
-## Sample Dataset
-
-The workshops use a synthetic National Electricity Market (NEM) dataset. No actual customer or network data is used.
+**AEMO NEM data** (in `workshop_au.aemo`):
 
 | Table | Description |
 |-------|-------------|
-| `workshop_au.meters.nem12_interval_reads` | Half-hourly interval meter reads (NMI, kWh, quality flag) |
-| `workshop_au.meters.nmi_registry` | NMI master data — region, connection class, tariff type |
-| `workshop_au.regulatory.compliance_events` | Simulated AEMO compliance and outage events |
-| `workshop_au.regulatory.reference_docs` | Sample regulatory reference documents for Genie Spaces |
+| `dispatch_intervals` | 5-minute generator dispatch data by DUID and region |
+| `spot_prices` | 30-minute NEM spot prices (RRP) by region |
+| `market_notices` | AEMO market and system notices including LOR events |
+| `generator_registration` | Registered NEM generator details |
+| `settlement_amounts` | Weekly settlement amounts by participant |
+
+**Energy grid data** (in `workshop_au.energy`):
+
+| Table | Description |
+|-------|-------------|
+| `energy_assets` | Asset registry — substations, lines, transformers |
+| `outage_events` | Planned and unplanned outage events |
+| `maintenance_work_orders` | Scheduled maintenance records |
+| `meter_readings` | Interval meter reads |
+
+Raw CSVs and generator scripts are in `data/`.
 
 ---
 
-## Support
+## Requirements
 
-| Contact | For |
-|---------|-----|
-| Workshop facilitator (see invite) | Day-of logistics, access issues |
-| Databricks Australia SA team | Technical questions, follow-up POC support |
-| GitHub Issues on this repo | Bug reports, lab errors, content feedback |
+- Python 3.11+
+- Databricks workspace on Azure `australiaeast`
+- Unity Catalog enabled
+- Workspace admin role for setup steps
+
+---
+
+## Repository
+
+`https://github.com/beeyal/databricks-au-ai-workshops`

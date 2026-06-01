@@ -84,6 +84,11 @@ for table in SYSTEM_TABLES:
 # MAGIC </div>
 # MAGIC
 # MAGIC Each row in `system.ai_gateway.usage` represents one request routed through an AI Gateway endpoint. The table has ~15 minute latency — data from Labs 02/03 may already be visible.
+# MAGIC
+# MAGIC 🖱️ **UI:** Left sidebar → Serving → AI Gateway tab → [your endpoint] → Usage & Logs tab
+# MAGIC You should see: Token consumption chart, request latency, error rates (200/400/429 breakdown), and a per-request log with user, token count, and status. This is the visual summary of the same data queried below.
+# MAGIC
+# MAGIC ⚡ **Or run the cells below to query `system.ai_gateway.usage` directly for custom aggregations and cost attribution:**
 
 # COMMAND ----------
 
@@ -190,6 +195,11 @@ display(guardrail_hits)
 # MAGIC | `genieConversation` | `databricksGenie` | Genie Space conversation |
 # MAGIC | `aiPlaygroundQuery` | `aiPlayground` | AI Playground used |
 # MAGIC | `updateAiGateway` | `modelServing` | AI Gateway config changed |
+# MAGIC
+# MAGIC 🖱️ **UI:** Left sidebar → Catalog → system → access → audit → Sample Data tab (or open a Query Editor and run `SELECT * FROM system.access.audit LIMIT 100`)
+# MAGIC You should see: Raw audit rows with event_time, user_identity, action_name, service_name, and request_params. The queries below filter these to AI-specific events.
+# MAGIC
+# MAGIC ⚡ **Run the cells below to query AI events from `system.access.audit`:**
 
 # COMMAND ----------
 
@@ -294,6 +304,10 @@ display(gateway_changes)
 # MAGIC </div>
 # MAGIC
 # MAGIC Applications pass cost centre tags via the `databricks-request-tag` HTTP header (e.g. `team=network-ops;project=meter-anomaly`). These appear in `system.ai_gateway.usage.request_tags` as a MAP column.
+# MAGIC
+# MAGIC 🖱️ **UI:** Left sidebar → Catalog → [catalog] → [schema] → after running the cell below, click `ai_gateway_cost_attribution` to browse the view. For finance reporting, pin the "Monthly cost by team" query result as an AI/BI dashboard widget.
+# MAGIC
+# MAGIC ⚡ **Run the cell below to create the cost attribution view (uncomment the spark.sql call, then run the query cells):**
 
 # COMMAND ----------
 
@@ -494,6 +508,11 @@ display(guardrail_summary)
 # MAGIC </div>
 # MAGIC
 # MAGIC Pattern: define thresholds, query `system.ai_gateway.usage` for current spend, send a notification when a threshold is crossed. Schedule this notebook as a Databricks job (8am AEST daily).
+# MAGIC
+# MAGIC 🖱️ **UI (to schedule this notebook):** Top-right toolbar of this notebook → Schedules & Triggers → Add trigger → Scheduled → Cron expression `0 0 8 * * ?` → Timezone: Australia/Sydney → Create
+# MAGIC You should see: The notebook appear in the Jobs list with a cron schedule. On failure it will send email alerts to the addresses in `BUDGET_CONFIG["alert_recipients"]`.
+# MAGIC
+# MAGIC ⚡ **Run the cells below to define thresholds and execute the budget check now (runs immediately — no uncomment needed):**
 
 # COMMAND ----------
 
