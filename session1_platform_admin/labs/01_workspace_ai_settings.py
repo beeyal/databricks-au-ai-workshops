@@ -16,7 +16,7 @@
 # MAGIC **By the end of this lab you will have:**
 # MAGIC - [ ] Verified current AI feature flags via the REST API
 # MAGIC - [ ] Confirmed the geography enforcement toggle is ON (Account Console only)
-# MAGIC - [ ] Reviewed Genie Space toggle behaviour at workspace level
+# MAGIC - [ ] Understood how Genie Space access is controlled (space sharing + UC grants, no workspace toggle)
 # MAGIC - [ ] Granted UC permissions for AI assets (models, endpoints, Genie Spaces)
 # MAGIC - [ ] Created a service principal for automated AI workloads
 # MAGIC - [ ] Configured groups for business-unit-level access control
@@ -201,58 +201,41 @@ for key in WORKSPACE_CONF_KEYS:
 
 # MAGIC %md
 # MAGIC ---
-# MAGIC **For a SOCI Act / critical infrastructure regulated workspace, the recommended hardened values are:**
+# MAGIC **General workspace security settings worth reviewing (not specific to SOCI Act — check with your CISO):**
 # MAGIC
-# MAGIC | Key | Recommended | Why |
+# MAGIC | Key | Common secure value | What it controls |
 # MAGIC |---|---|---|
-# MAGIC | `enableResultsDownloading` | `false` | Prevents bulk data exfiltration via CSV |
-# MAGIC | `enableExportNotebook` | `false` | Prevents code + credentials leaving the platform |
-# MAGIC | `aibi_genie_space_enabled_ws_setting` | `true` (access controlled via UC grants) | Genie is in-region; restrict per-user via UC, not global toggle |
+# MAGIC | `enableResultsDownloading` | `false` | Prevents users downloading query results as CSV |
+# MAGIC | `enableExportNotebook` | `false` | Prevents exporting notebooks outside the platform |
 # MAGIC
-# MAGIC If `enableResultsDownloading` or `enableExportNotebook` is `true` in a regulated workspace, flag to your CISO and disable under Settings → Workspace settings.
+# MAGIC These are general data governance settings. Whether to enable them depends on your organisation's policy — discuss with your CISO rather than assuming they must be disabled.
 
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC ## Section 2: Enable / Disable Genie Spaces at Workspace Level
+# MAGIC ## Section 2: How Genie Space Access Is Actually Controlled
 # MAGIC
-# MAGIC Genie Spaces execute queries in-region — they are safe for regulated data. The workspace-level toggle is the coarsest control available. Finer per-user and per-table access is handled via UC grants (Section 4).
+# MAGIC There is no workspace-level "Genie on/off" toggle. Access to Genie Spaces works through two layers:
 # MAGIC
-# MAGIC 🖱️ **UI:** Settings (gear icon) → AI & Machine Learning → Genie toggle
-# MAGIC You should see: A toggle labelled "Genie Spaces" that maps directly to `aibi_genie_space_enabled_ws_setting`. Flipping it in the UI is equivalent to the PATCH call below.
+# MAGIC | Layer | What it controls | Where to configure |
+# MAGIC |---|---|---|
+# MAGIC | **Partner-Powered AI Features** | Master switch — turns off ALL AI features including Genie, Genie Code, AI/BI | Workspace Settings → AI features → Partner-Powered AI Features (keep this ON) |
+# MAGIC | **Genie Space sharing** | Who can access a specific space | Space → Share button → add users/groups with CAN_RUN |
+# MAGIC | **UC grants** | What data each user can see inside the space | GRANT SELECT ON TABLE/SCHEMA |
 # MAGIC
-# MAGIC ⚡ **Or run the cell below to enable/disable via the Settings API (uncomment the line you want):**
+# MAGIC The right way to restrict Genie access for regulated data is **not** to disable Genie globally — it is to:
+# MAGIC 1. Only share Genie Spaces with the right groups
+# MAGIC 2. Use UC row/column filters so each user only sees data they're permitted to see
+# MAGIC 3. Keep geography enforcement ON so data stays in AU East
+# MAGIC
+# MAGIC ⚡ **Read the current AI feature flags (informational — do not change unless intentional):**
 
 # COMMAND ----------
 
-def set_genie_space_enabled(workspace_url: str, headers: dict, enabled: bool) -> dict:
-    """
-    Enable or disable Genie Spaces at the workspace level via the Settings API.
-    The API uses optimistic concurrency — GET the current ETag first, include it in the PATCH body.
-    """
-    url = f"{workspace_url}/api/2.0/settings/types/aibi_genie_space_enabled_ws_setting/names/default"
-
-    payload = {
-        "setting_name": "default",
-        "aibi_genie_space_enabled_ws_setting": {
-            "enabled": enabled
-        }
-    }
-
-    # GET the current state first to obtain the required ETag
-    get_response = requests.get(url, headers=headers, timeout=30)
-    if get_response.status_code == 200:
-        etag = get_response.json().get("etag", "")
-        if etag:
-            payload["etag"] = etag
-
-    response = requests.patch(url, headers=headers, json=payload, timeout=30)
-    response.raise_for_status()
-    return response.json()
-
-
-# TODO: Uncomment ONE of the lines below and run this cell to change the setting.
-# set_genie_space_enabled(WORKSPACE_URL, HEADERS, enabled=True)   # Turn Genie on
+# Note: there is no API to enable/disable Genie specifically.
+# Access is controlled via space sharing (CAN_RUN) and UC grants.
+# The cell below reads current AI feature flags so you can see what's on/off.
+print("Reading AI feature flags...")
 # set_genie_space_enabled(WORKSPACE_URL, HEADERS, enabled=False)  # Turn Genie off
 
 # HTTP 409 Conflict = stale ETag; re-run the cell to auto-fetch a fresh one.
@@ -777,7 +760,7 @@ print()
 outcomes = [
     ("Section 1", "Workspace AI feature flags queried via REST API",       True),
     ("Section 1", "Legacy workspace-conf keys (export, results) reviewed", True),
-    ("Section 2", "Genie Space toggle mechanism understood",               True),
+    ("Section 2", "Genie access control model understood (space sharing + UC grants)", True),
     ("Section 3", "Geography enforcement setting checked",                 True),
     ("Section 4", "UC GRANT SQL for registered models reviewed",           True),
     ("Section 4", "SDK-based serving endpoint permissions reviewed",       True),
@@ -805,7 +788,7 @@ print("─" * 60)
 # MAGIC <ul>
 # MAGIC <li>Queried workspace AI feature flags (typed Settings API + legacy workspace-conf)</li>
 # MAGIC <li>Located and verified the geography enforcement toggle (Account Console only)</li>
-# MAGIC <li>Toggled Genie Spaces at workspace level (UI + API)</li>
+# MAGIC <li>Understood Genie access model: space sharing + UC grants (no workspace on/off toggle)</li>
 # MAGIC <li>Wrote GRANT SQL and SDK calls for registered models, serving endpoints, Genie Spaces</li>
 # MAGIC <li>Created a service principal with OAuth credentials for automated workloads</li>
 # MAGIC <li>Designed a group structure for energy utility AI governance</li>
