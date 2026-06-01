@@ -132,8 +132,14 @@ print(f"Auth : {w.config.auth_type}")
 # MAGIC
 # MAGIC > Do NOT use `databricks-meta-llama-*` — Llama has no committed AU East date and is cross-geo.
 # MAGIC
-# MAGIC Navigate: Left sidebar → Serving → AI Gateway tab → click "+ Create"
-# MAGIC You should see: Provider selection — choose "Databricks Foundation Models" for in-region PT, then select `databricks-claude-haiku-4-5`.
+# MAGIC **Option A — V1 (GA, has full guardrails — use this for regulated workloads):**
+# MAGIC Navigate: Left sidebar → Serving → click the **AI Gateway** tab at the top of the Serving page → click **+ Create**
+# MAGIC
+# MAGIC **Option B — V2 / Unity AI Gateway (Beta, newer UI):**
+# MAGIC Navigate: Left sidebar → **AI Gateway** (appears as a standalone item if V2 is enabled via Account Console → Previews → AI Gateway V2) → click **Create Unity AI Gateway Endpoint**
+# MAGIC
+# MAGIC Either path creates a gateway endpoint. **Use V1 for this lab** — V2 is Beta and centralised guardrail policy is not yet GA.
+# MAGIC You should see: Provider selection → choose "Databricks Foundation Models" → select `databricks-claude-haiku-4-5`.
 
 # COMMAND ----------
 
@@ -154,7 +160,40 @@ print(f"  Payload log table     : {CATALOG_NAME}.{SCHEMA_NAME}.{PAYLOAD_TABLE_NA
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC ### 1a. Define the AI Gateway configuration object
+# MAGIC ### 1a. What this section does — and the UI alternative
+# MAGIC
+# MAGIC This section builds a Python configuration object that captures all the settings we want:
+# MAGIC rate limits, guardrails, payload logging, and usage tracking.
+# MAGIC **No API call happens here** — 1b is where the endpoint is actually created.
+# MAGIC
+# MAGIC **You can do ALL of this through the UI instead:**
+# MAGIC
+# MAGIC ```
+# MAGIC Left sidebar → Serving → AI Gateway tab → + Create
+# MAGIC
+# MAGIC In the creation form, fill in:
+# MAGIC   Provider:          Databricks Foundation Models
+# MAGIC   Model:             databricks-claude-haiku-4-5
+# MAGIC
+# MAGIC   Rate limits tab:
+# MAGIC     Endpoint limit:   60 QPM
+# MAGIC     Per-user limit:   20 QPM
+# MAGIC
+# MAGIC   Guardrails tab:
+# MAGIC     Input:  Safety filter ON, PII detection → BLOCK
+# MAGIC     Output: Safety filter ON, PII detection → BLOCK
+# MAGIC
+# MAGIC   Inference tables tab:
+# MAGIC     Enable: ON
+# MAGIC     Catalog: workshop_au
+# MAGIC     Schema:  ai_governance
+# MAGIC     Table prefix: ai_gw_payloads
+# MAGIC
+# MAGIC → Click Create
+# MAGIC ```
+# MAGIC
+# MAGIC **If you created it via the UI, skip to the "Test the endpoint" section below.**
+# MAGIC Run the code below instead if you want to automate the setup (e.g. for deploying to multiple workspaces).
 
 # COMMAND ----------
 

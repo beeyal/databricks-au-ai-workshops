@@ -611,7 +611,7 @@ from databricks.sdk.service.iam import Group, Patch, PatchOp, PatchSchema
 
 def assign_sp_to_group(w: WorkspaceClient, sp_id: int, group_display_name: str) -> None:
     """
-    Add a service principal to an existing workspace group using SCIM PATCH.
+    Add a service principal to an existing workspace group using SCIM PATCH (or sync via AIM for Entra ID).
     Uses typed SDK objects (Patch/PatchOp/PatchSchema) rather than raw dicts —
     PatchOp.ADD issues a PATCH (additive), so existing members are preserved.
     Idempotent — safe to call multiple times.
@@ -642,7 +642,17 @@ print("SP group assignment is commented out — run after creating the service p
 # MAGIC
 # MAGIC Groups created in the Account Console are account-level and available to all workspaces sharing that metastore. Always create AI governance groups at the account level — not inside workspace Admin settings.
 # MAGIC
-# MAGIC **Production recommendation:** Sync groups from Azure AD / Entra ID via SCIM. Find the SCIM endpoint at Account Console → Settings → Identity and Access → SCIM provisioning.
+# MAGIC **Production recommendation — AIM (Automatic Identity Management):**
+# MAGIC AIM is now GA for Entra ID and is the preferred path over SCIM. With AIM:
+# MAGIC - Users are provisioned just-in-time on first sign-in — no pre-staging required
+# MAGIC - Groups sync automatically from Entra ID, including nested groups
+# MAGIC - Service Principals are also synced alongside human identities
+# MAGIC
+# MAGIC Configure at: Account Console → Settings → Identity and Access → Automatic identity management
+# MAGIC
+# MAGIC **AEMO-specific:** AEMO is on Azure with Entra ID. AIM will be auto-enabled on your Azure Databricks account by **August 24, 2026** (Microsoft-driven rollout). Review your account cohort at the internal dashboard to check for any Entra ID mismatches to resolve before that date. Exception process: go/aim/file-exception
+# MAGIC
+# MAGIC If AIM is not yet configured, SCIM remains available. Find the SCIM endpoint at Account Console → Settings → Identity and Access → SCIM provisioning.
 # MAGIC
 # MAGIC | Group | Genie | Model serving | Playground |
 # MAGIC |---|---|---|---|
@@ -794,5 +804,5 @@ print("─" * 60)
 # MAGIC | Get endpoint permissions | GET | `/api/2.0/permissions/serving-endpoints/{name}` |
 # MAGIC | Get Genie Space permissions | GET | `/api/2.0/permissions/dashboards/{space-id}` |
 # MAGIC | Set Genie Space permissions | PATCH | `/api/2.0/permissions/dashboards/{space-id}` |
-# MAGIC | Create service principal | POST | `/api/2.0/preview/scim/v2/ServicePrincipals` |
+# MAGIC | Create service principal | POST | `/api/2.0/preview/scim/v2/ServicePrincipals` | (or via AIM automatic sync — preferred) |
 # MAGIC | Create SP OAuth secret | POST | `/api/2.0/accounts/{id}/servicePrincipals/{sp-id}/credentials/secrets` |
