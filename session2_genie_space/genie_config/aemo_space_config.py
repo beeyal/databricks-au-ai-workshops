@@ -227,3 +227,59 @@ else:
 # MAGIC - ❌ Add text instructions → **Lab 02**
 # MAGIC - ❌ Add benchmarks → **Lab 02**
 # MAGIC - ❌ Set permissions → **Lab 05**
+
+# COMMAND ----------
+
+# MAGIC %md
+# MAGIC ---
+# MAGIC ## Step 6: Grant participant access
+# MAGIC
+# MAGIC Enter participant emails as a comma-separated list. The script grants:
+# MAGIC - `USE CATALOG` + `USE SCHEMA` + `SELECT` on the AEMO schema (so Genie can query tables)
+# MAGIC - `CREATE` permission on the schema (so participants can create their own Genie Spaces)
+
+# COMMAND ----------
+
+dbutils.widgets.text("participant_emails", "", "Participant emails (comma-separated)")
+raw_emails = dbutils.widgets.get("participant_emails")
+
+participants = [e.strip().lower() for e in raw_emails.split(",") if e.strip()]
+
+if not participants:
+    print("Enter participant emails in the widget above, then re-run this cell.")
+else:
+    print(f"Granting access to {len(participants)} participants:\n")
+
+    grants = [
+        f"GRANT USE CATALOG ON CATALOG {CATALOG} TO",
+        f"GRANT USE SCHEMA ON SCHEMA {CATALOG}.{SCHEMA} TO",
+        f"GRANT SELECT ON SCHEMA {CATALOG}.{SCHEMA} TO",
+        f"GRANT CREATE TABLE ON SCHEMA {CATALOG}.{SCHEMA} TO",  # needed to create Genie Space assets
+    ]
+
+    ok = err = 0
+    for email in participants:
+        for grant_prefix in grants:
+            stmt = f"{grant_prefix} `{email}`"
+            try:
+                spark.sql(stmt)
+                ok += 1
+            except Exception as e:
+                print(f"  ⚠️  {email}: {e}")
+                err += 1
+        print(f"  ✅ {email}")
+
+    print(f"\n{ok} grants applied ({err} errors)")
+    print()
+    print("Participants can now:")
+    print(f"  • Query all tables in {CATALOG}.{SCHEMA}")
+    print(f"  • Create Genie Spaces backed by those tables")
+    print(f"  • Run Lab 01–05")
+
+# COMMAND ----------
+
+# Verify grants were applied
+if participants:
+    print(f"Current grants on {CATALOG}.{SCHEMA}:")
+    display(spark.sql(f"SHOW GRANTS ON SCHEMA {CATALOG}.{SCHEMA}"))
+
