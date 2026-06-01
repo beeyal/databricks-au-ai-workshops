@@ -923,7 +923,7 @@ SELECT
     user_identity.email           AS user_email,
     service_name,
     action_name,
-    request_params.functionName   AS function_name,
+    request_params.toolName       AS tool_name,
     request_params.query          AS query_text
 FROM system.access.audit
 WHERE user_identity.email = '{ws.current_user.me().user_name}'
@@ -939,7 +939,7 @@ print(audit_sql)
 print("=" * 65)
 print("\nAudit trail columns for MCP calls:")
 print("  service_name = 'mcpServer'  for ALL MCP tool calls (UC Functions, Genie, Vector Search)")
-print("  action_name                 the specific tool called (top-level column)")
+print("  action_name = 'mcpToolsCall' fixed value for all MCP tool calls (filter value, not tool name)")
 print("  response.statusCode         200 = success, 4xx/5xx = error")
 print("\nThis is your compliance audit trail — required for AEMO and AER regulated workloads.")
 

@@ -147,7 +147,8 @@ COLUMN_COMMENTS = {
 results = []
 for table_fqn, columns in COLUMN_COMMENTS.items():
     for col, comment in columns.items():
-        sql = f"ALTER TABLE {table_fqn} ALTER COLUMN `{col}` COMMENT '{comment}'"
+        safe_comment = comment.replace("'", "\\'")
+        sql = f"ALTER TABLE {table_fqn} ALTER COLUMN `{col}` COMMENT '{safe_comment}'"
         try:
             spark.sql(sql)
             results.append(("✅", table_fqn.split(".")[-1], col))
@@ -234,7 +235,6 @@ if SPACE_ID:
     if resp.status_code == 200:
         s = resp.json()
         print(f"✅ Space: {s.get('title')}")
-        print(f"   Tables: {len(s.get('datasets', []))}")
         print(f"   URL: https://{HOST}/genie/spaces/{SPACE_ID}")
     else:
         print(f"❌ {resp.status_code}: {resp.text[:200]}")

@@ -43,9 +43,9 @@ SELECT
     DATE(event_time)                        AS date,
     user_identity.email                     AS user,
     COUNT(CASE WHEN action_name = 'genieCreateConversationMessage' THEN 1 END) AS questions_asked,
-    COUNT(CASE WHEN action_name = 'genieSendMessageFeedback'
+    COUNT(CASE WHEN action_name = 'updateConversationMessageFeedback'
                AND request_params.feedback_rating = 'POSITIVE' THEN 1 END)    AS thumbs_up,
-    COUNT(CASE WHEN action_name = 'genieSendMessageFeedback'
+    COUNT(CASE WHEN action_name = 'updateConversationMessageFeedback'
                AND request_params.feedback_rating = 'NEGATIVE' THEN 1 END)    AS thumbs_down
 FROM system.access.audit
 WHERE service_name = 'aibiGenie'
@@ -81,7 +81,7 @@ SELECT
     request_params.space_id                 AS space_id
 FROM system.access.audit
 WHERE service_name = 'aibiGenie'
-  AND action_name  = 'genieSendMessageFeedback'
+  AND action_name  = 'updateConversationMessageFeedback'
   AND event_time  >= CURRENT_TIMESTAMP - INTERVAL {LOOKBACK} DAYS
   {"AND request_params.space_id = '" + SPACE_ID + "'" if SPACE_ID else ""}
 ORDER BY event_time DESC
@@ -161,7 +161,7 @@ SELECT
     COLLECT_LIST(user_identity.email) AS users_who_gave_negative
 FROM system.access.audit
 WHERE service_name = 'aibiGenie'
-  AND action_name  = 'genieSendMessageFeedback'
+  AND action_name  = 'updateConversationMessageFeedback'
   AND request_params.feedback_rating = 'NEGATIVE'
   AND event_time  >= CURRENT_TIMESTAMP - INTERVAL 60 MINUTES
   {"AND request_params.space_id = '" + SPACE_ID + "'" if SPACE_ID else ""}
@@ -240,7 +240,7 @@ fb AS (
         SUM(CASE WHEN request_params.feedback_rating = 'NEGATIVE' THEN 1 ELSE 0 END) AS negative
     FROM system.access.audit
     WHERE service_name = 'aibiGenie'
-      AND action_name  = 'genieSendMessageFeedback'
+      AND action_name  = 'updateConversationMessageFeedback'
       AND event_time  >= CURRENT_TIMESTAMP - INTERVAL {LOOKBACK} DAYS
     GROUP BY date
 )

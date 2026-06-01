@@ -571,7 +571,9 @@ def call_gateway_with_tags(
     Uses the OpenAI Python SDK -- AI Gateway exposes an OpenAI-compatible /chat/completions interface.
     """
     # base_url must point to /serving-endpoints (NOT .../invocations).
-    # The OpenAI SDK appends /chat/completions internally; the model param routes to the endpoint.
+    # The OpenAI SDK calls {base_url}/chat/completions and sends model= as a field in the JSON body.
+    # Databricks reads the model field to route the request to the named AI Gateway endpoint.
+    # Final URL called: {workspace_url}/serving-endpoints/chat/completions (with model in body)
     client = openai.OpenAI(
         api_key=token,
         base_url=f"{workspace_url}/serving-endpoints",
@@ -580,7 +582,7 @@ def call_gateway_with_tags(
     tag_value = f"team={team};project={project};environment={environment}"
 
     completion = client.chat.completions.create(
-        model=endpoint_name,          # SDK uses this as the path component: /serving-endpoints/<endpoint_name>/invocations
+        model=endpoint_name,          # Databricks reads this from the JSON body to route to the named endpoint
         messages=[{"role": "user", "content": prompt}],
         extra_headers={"databricks-request-tag": tag_value},
         max_tokens=200,

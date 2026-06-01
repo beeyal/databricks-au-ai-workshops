@@ -96,7 +96,7 @@ description: Australian energy market metrics — SAIDI/SAIFI/CAIDI calculations
 ## Key Reliability Metrics
 
 ### SAIDI (System Average Interruption Duration Index)
-Formula: SAIDI = Σ(interruption_duration_min × affected_customers) / total_customers
+Formula: SAIDI = Σ(duration_minutes × affected_customers) / total_customers
 AER benchmark: typically < 25 minutes/year for urban networks; varies by network zone
 Interpretation: lower is better — represents minutes of outage per customer per year
 SQL pattern:

@@ -127,10 +127,10 @@ print("Token         : [loaded]")
 # MAGIC
 # MAGIC | Setting | API | Controls |
 # MAGIC |---|---|---|
-# MAGIC | `aibi_genie_space_enabled_ws_setting` | Typed Settings | Genie Spaces on/off |
+# MAGIC | `llm_proxy_partner_powered` | Typed Settings | Partner-Powered AI (Genie, AI/BI, AI Playground on/off) |
 # MAGIC | `restrict_workspace_admins` | Typed Settings | Non-admin restrictions |
-# MAGIC | `enableExportNotebook` | Legacy workspace-conf | Notebook source download |
-# MAGIC | `enableResultsDownloading` | Legacy workspace-conf | Query result CSV export |
+# MAGIC | `enableExportNotebook` | Typed Settings (`enable-export-notebook`) or workspace-conf (backward compat) | Notebook source download |
+# MAGIC | `enableResultsDownloading` | Typed Settings (`enable-results-downloading`) or workspace-conf (backward compat) | Query result CSV export |
 # MAGIC
 # MAGIC ---
 # MAGIC
@@ -143,14 +143,26 @@ print("Token         : [loaded]")
 
 # COMMAND ----------
 
-# NOTE: The typed Settings API only covers a subset of workspace controls.
-# Attempting typed API for legacy keys (enableExportNotebook etc.) returns 404.
+# Typed Settings API type names (verified against databricks-sdk):
+#   restrict_workspace_admins       -> /api/2.0/settings/types/restrict_workspace_admins/names/default
+#   llm_proxy_partner_powered       -> /api/2.0/settings/types/llm_proxy_partner_powered/names/default
+#     (this is the Partner-Powered AI master switch — controls Genie, Genie Code, AI/BI)
+#   enable-results-downloading      -> /api/2.0/settings/types/enable-results-downloading/names/default
+#   enable-export-notebook          -> /api/2.0/settings/types/enable-export-notebook/names/default
+#   enable-notebook-table-clipboard -> /api/2.0/settings/types/enable-notebook-table-clipboard/names/default
+#
+# NOTE: There is no 'aibi_genie_space_enabled_ws_setting' type in the API.
+# Genie on/off is controlled by the 'llm_proxy_partner_powered' setting.
+# enableResultsDownloading, enableExportNotebook, and enableNotebookTableClipboard
+# also have typed settings equivalents — the workspace-conf endpoint may still return
+# them for backward compatibility, but the canonical path is the typed settings API.
 AI_SETTING_TYPES = [
-    "aibi_genie_space_enabled_ws_setting",
+    "llm_proxy_partner_powered",   # Partner-Powered AI (master switch for Genie, AI/BI, AI Playground)
     "restrict_workspace_admins",
 ]
 
-# These must come from the legacy workspace-conf endpoint
+# These can also be fetched via the typed settings API, but workspace-conf remains
+# supported for backward compatibility and is simpler for a read-only inspection.
 WORKSPACE_CONF_KEYS = [
     "enableNotebookTableClipboard",
     "enableResultsDownloading",
@@ -264,12 +276,22 @@ ACCOUNT_ID = ACCOUNT_ID_W if ACCOUNT_ID_W != "<your-account-id>" else "<your-acc
 
 def get_enforce_geography_setting(account_id: str, headers: dict) -> dict:
     """
-    Check whether 'Enforce data processing within workspace Geography' is enabled.
+    Check whether the Compliance Security Profile (CSP) is enabled at the account level.
+    CSP is the prerequisite for the 'Enforce data processing within workspace Geography'
+    toggle in the Account Console.
+
+    API type name: shield_csp_enablement_ac
+    (SDK: CspEnablementAccountAPI, path: /api/2.0/accounts/{id}/settings/types/shield_csp_enablement_ac/names/default)
+
     Requires Account Admin permissions. Returns error dict on 403/404.
+
+    NOTE: The per-workspace Geography enforcement toggle (Account Console ->
+    Workspaces -> [workspace] -> Security and compliance) must be verified in the
+    Account Console UI — it is a workspace-level attribute, not a typed setting.
     """
     url = (
         f"https://accounts.azuredatabricks.net/api/2.0/accounts/{account_id}"
-        f"/settings/types/shield_csp_enforcement_account_setting/names/default"
+        f"/settings/types/shield_csp_enablement_ac/names/default"
     )
     response = requests.get(url, headers=headers, timeout=30)
     if response.status_code == 403:
@@ -295,24 +317,44 @@ print(json.dumps(geography_setting, indent=2))
 # COMMAND ----------
 
 def compliance_check_geography(setting_response: dict) -> None:
-    """Print a pass/fail compliance check for the geography enforcement setting."""
+    """
+    Print a pass/fail compliance check for the account-level CSP enablement setting.
+
+    Response schema (shield_csp_enablement_ac):
+      {
+        "csp_enablement_account": {
+          "is_enforced": true/false,
+          "compliance_standards": [...]
+        },
+        "etag": "...",
+        "setting_name": "default"
+      }
+
+    is_enforced=true means CSP is enforced at account level (cannot be overridden per workspace).
+    For SOCI Act / critical infrastructure workloads, also verify the per-workspace Geography
+    enforcement toggle in Account Console -> Workspaces -> [workspace] -> Security and compliance.
+    """
     if "error" in setting_response:
         print(f"CANNOT VERIFY — {setting_response['error']}")
         print(f"   Detail : {setting_response.get('detail', '')}")
         print(f"   Action : {setting_response.get('action', '')}")
         return
 
-    csp_block = setting_response.get("shield_csp_enforcement_account_setting", {})
-    csp_value = csp_block.get("csp", "")
+    csp_block = setting_response.get("csp_enablement_account", {})
+    is_enforced = csp_block.get("is_enforced", False)
+    standards = csp_block.get("compliance_standards", [])
 
     print("─" * 60)
-    if csp_value == "COMPLIANCE_SECURITY_PROFILE":
-        print("PASS — Enforce data processing within Geography: ENABLED")
-        print("    SOCI Act critical infrastructure data residency: MET")
+    if is_enforced:
+        print("PASS — Compliance Security Profile: ENFORCED at account level")
+        print(f"    Compliance standards : {standards or '(default)'}")
+        print("    Next: verify per-workspace Geography enforcement in Account Console.")
     else:
-        print("FAIL — Enforce data processing within Geography: NOT ENABLED")
-        print(f"    Current value : '{csp_value or '(not set)'}'")
-        print("    ACTION: Open the Account Console → Workspaces → [workspace] → Security and compliance tab and enable the toggle.")
+        print("INFO — Compliance Security Profile: NOT enforced at account level (is_enforced=false)")
+        print(f"    Compliance standards : {standards or '(none)'}")
+        print("    This setting controls whether CSP can be overridden per workspace.")
+        print("    ACTION: Verify the Geography enforcement toggle per workspace in Account Console")
+        print("    → Workspaces → [workspace] → Security and compliance tab.")
     print("─" * 60)
 
 
@@ -349,15 +391,15 @@ else:
 
 if isinstance(geography_setting, dict):
     if "error" in geography_setting:
-        checks.append(("Geography enforcement verified", False, geography_setting["error"]))
+        checks.append(("CSP account-level enforcement verified", False, geography_setting["error"]))
     else:
-        csp = geography_setting.get("shield_csp_enforcement_account_setting", {}).get("csp", "")
-        if csp == "COMPLIANCE_SECURITY_PROFILE":
-            checks.append(("Geography enforcement verified", True, "ENABLED — compliant"))
+        is_enforced = geography_setting.get("csp_enablement_account", {}).get("is_enforced", False)
+        if is_enforced:
+            checks.append(("CSP account-level enforcement verified", True, "is_enforced=true — CSP enforced at account level"))
         else:
-            checks.append(("Geography enforcement verified", False, f"NOT ENABLED — current: '{csp}'"))
+            checks.append(("CSP account-level enforcement verified", False, "is_enforced=false — verify per-workspace geography toggle in Account Console"))
 else:
-    checks.append(("Geography enforcement verified", False, "geography_setting not available"))
+    checks.append(("CSP account-level enforcement verified", False, "geography_setting not available"))
 
 for description, passed, detail in checks:
     icon = "✅" if passed else "❌"
@@ -383,7 +425,7 @@ else:
 # MAGIC |---|---|---|
 # MAGIC | Registered model | `EXECUTE` for inference | `ALL PRIVILEGES` from `account users` |
 # MAGIC | Model serving endpoint | `CAN_QUERY` for consumers | `CAN_MANAGE` from non-admins |
-# MAGIC | Genie Space | `CAN_USE` | `CAN_MANAGE` from non-admins |
+# MAGIC | Genie Space | `CAN_RUN` for consumers | `CAN_MANAGE` from non-admins |
 # MAGIC
 # MAGIC Navigate: Left sidebar → Catalog icon (stacked layers) → expand catalog → schema → asset → Permissions tab
 # MAGIC You should see: Current grants — the SQL GRANT statements below produce entries visible here.
@@ -501,8 +543,10 @@ print("SDK permission call is commented out — uncomment after setting variable
 # MAGIC %md
 # MAGIC ### 4c. Grant permissions on a Genie Space
 # MAGIC
-# MAGIC 🖱️ **UI:** Left sidebar → Genie → [Space name] → kebab menu (top-right) → Share or Permissions → add groups with CAN_USE / CAN_EDIT / CAN_MANAGE
+# MAGIC 🖱️ **UI:** Left sidebar → Genie → [Space name] → kebab menu (top-right) → Share or Permissions → add groups with CAN_VIEW / CAN_RUN / CAN_EDIT / CAN_MANAGE
 # MAGIC You should see: The Genie Space URL contains the space ID: `.../genie/spaces/<SPACE-ID>` — copy that ID for the API call below.
+# MAGIC
+# MAGIC > **Permissions API object type:** Genie Spaces use object type `genie` in the permissions API (`/api/2.0/permissions/genie/{space_id}`). Do not use `dashboards` — that is for AI/BI Lakeview dashboards, a different object type.
 # MAGIC
 # MAGIC ⚡ **Or run the cell below to read and set Genie Space permissions via the REST API (uncomment after setting GENIE_SPACE_ID):**
 
@@ -513,8 +557,15 @@ GENIE_SPACE_ID = "<your-genie-space-id>"  # TODO
 
 
 def get_genie_space_permissions(workspace_url: str, headers: dict, genie_space_id: str) -> dict:
-    """Fetch current permissions for a Genie Space via the dashboards permissions API."""
-    url = f"{workspace_url}/api/2.0/permissions/dashboards/{genie_space_id}"
+    """
+    Fetch current permissions for a Genie Space via the Genie permissions API.
+
+    Object type for Genie Spaces in the permissions API is 'genie' (not 'dashboards').
+    'dashboards' is for AI/BI Lakeview dashboards — a different object type.
+
+    Valid permission levels for Genie Spaces: CAN_VIEW, CAN_RUN, CAN_EDIT, CAN_MANAGE.
+    """
+    url = f"{workspace_url}/api/2.0/permissions/genie/{genie_space_id}"
     response = requests.get(url, headers=headers, timeout=15)
     if response.status_code == 404:
         return {"error": f"Space ID '{genie_space_id}' not found — verify the ID from the URL"}
@@ -527,10 +578,10 @@ def grant_genie_space_permission(
     headers: dict,
     genie_space_id: str,
     group_name: str,
-    permission_level: str,  # "CAN_USE", "CAN_EDIT", or "CAN_MANAGE"
+    permission_level: str,  # "CAN_VIEW", "CAN_RUN", "CAN_EDIT", or "CAN_MANAGE"
 ) -> dict:
     """Grant a group access to a Genie Space. PATCH is additive — safe to call multiple times."""
-    url = f"{workspace_url}/api/2.0/permissions/dashboards/{genie_space_id}"
+    url = f"{workspace_url}/api/2.0/permissions/genie/{genie_space_id}"
     payload = {
         "access_control_list": [
             {
@@ -652,7 +703,7 @@ print("SP group assignment is commented out — run after creating the service p
 # MAGIC - Groups sync automatically from Entra ID, including nested groups
 # MAGIC - Service Principals are also synced alongside human identities
 # MAGIC
-# MAGIC Configure at: Account Console → Settings → Identity and Access → Automatic identity management
+# MAGIC Configure at: Account Console → Security → User Provisioning → Automatic identity management
 # MAGIC
 # MAGIC **AEMO-specific:** AEMO is on Azure with Entra ID. AIM will be auto-enabled on your Azure Databricks account by **August 24, 2026** (Microsoft-driven rollout). Review your account cohort at the internal dashboard to check for any Entra ID mismatches to resolve before that date. Exception process: go/aim/file-exception
 # MAGIC
@@ -803,10 +854,10 @@ print("─" * 60)
 # MAGIC | Get typed workspace setting | GET | `/api/2.0/settings/types/{type}/names/default` |
 # MAGIC | Update typed workspace setting | PATCH | `/api/2.0/settings/types/{type}/names/default` |
 # MAGIC | Get legacy workspace conf keys | GET | `/api/2.0/workspace-conf?keys=key1,key2` |
-# MAGIC | Get account geography setting | GET | `accounts.azuredatabricks.net/api/2.0/accounts/{id}/settings/types/shield_csp_enforcement_account_setting/names/default` |
+# MAGIC | Get account CSP enablement setting | GET | `accounts.azuredatabricks.net/api/2.0/accounts/{id}/settings/types/shield_csp_enablement_ac/names/default` |
 # MAGIC | List serving endpoints | GET | `/api/2.0/serving-endpoints` |
 # MAGIC | Get endpoint permissions | GET | `/api/2.0/permissions/serving-endpoints/{name}` |
-# MAGIC | Get Genie Space permissions | GET | `/api/2.0/permissions/dashboards/{space-id}` |
-# MAGIC | Set Genie Space permissions | PATCH | `/api/2.0/permissions/dashboards/{space-id}` |
+# MAGIC | Get Genie Space permissions | GET | `/api/2.0/permissions/genie/{space-id}` |
+# MAGIC | Set Genie Space permissions | PATCH | `/api/2.0/permissions/genie/{space-id}` |
 # MAGIC | Create service principal | POST | `/api/2.0/preview/scim/v2/ServicePrincipals` | (or via AIM automatic sync — preferred) |
 # MAGIC | Create SP OAuth secret | POST | `/api/2.0/accounts/{id}/servicePrincipals/{sp-id}/credentials/secrets` |

@@ -114,6 +114,9 @@ else:
     check("Space ID provided", False, fix="Enter Space ID in widget above")
 
 # ── 3. Golden queries ────────────────────────────────────────────────────────
+# Note: /sql-queries, /benchmark-runs, and /instructions sub-paths are internal
+# Databricks endpoints not published in the public Genie API spec. They work in
+# practice but may change without notice. Failures are handled gracefully below.
 if SPACE_ID:
     qresp = requests.get(f"https://{HOST}/api/2.0/genie/spaces/{SPACE_ID}/sql-queries",
                          headers=HEADERS)
@@ -123,7 +126,8 @@ if SPACE_ID:
               detail=f"{n_queries} queries (target 10+, workshop minimum 5)",
               fix="Run Lab 02 Step 2 automated script")
     else:
-        check("Golden queries readable", False)
+        check("Golden queries readable", False,
+              detail=f"HTTP {qresp.status_code} — endpoint may not be available in this workspace")
 
 # ── 4. Benchmarks ────────────────────────────────────────────────────────────
 if SPACE_ID:
@@ -393,7 +397,7 @@ def grant_space_permissions(space_id, users_run, groups_run, editors):
         print("Add users/groups to the lists above, then re-run."); return
 
     resp = requests.patch(
-        f"https://{HOST}/api/2.0/permissions/dashboards/{space_id}",
+        f"https://{HOST}/api/2.0/permissions/genie/{space_id}",
         headers=HEADERS,
         json={"access_control_list": acl}
     )
@@ -412,7 +416,7 @@ grant_space_permissions(SPACE_ID, USERS_CAN_RUN, GROUPS_CAN_RUN, EDITORS)
 # Verify current permissions
 if SPACE_ID:
     resp = requests.get(
-        f"https://{HOST}/api/2.0/permissions/dashboards/{SPACE_ID}",
+        f"https://{HOST}/api/2.0/permissions/genie/{SPACE_ID}",
         headers=HEADERS
     )
     if resp.status_code == 200:
@@ -533,18 +537,13 @@ for setting_type, label in settings_to_check:
 
 # Check geography enforcement via API
 try:
-    resp = requests.get(
-        f"{WORKSPACE_URL}/api/2.0/settings/types/enforce_workspace_feature_on_network_setting/names/default",
-        headers=HEADERS
-    )
-    if resp.status_code == 200:
-        data = resp.json()
-        print("Geography enforcement setting:")
-        print(json.dumps(data, indent=2)[:400])
-    else:
-        print(f"Could not read setting via API (status {resp.status_code})")
-        print("→ Verify manually: Account Console → Workspaces → [workspace] → Security and compliance")
-        print("→ Toggle: 'Enforce data processing within workspace Geography' must be ON")
+    # Geography enforcement is an account-level setting — it lives at
+    # accounts.azuredatabricks.net, not the workspace URL.
+    # The workspace API does not expose this toggle.
+    # Verify and enable it manually in the Account Console.
+    print("Geography enforcement is an account-level setting — it cannot be read from the workspace API.")
+    print("→ Verify manually: Account Console → Workspaces → [workspace] → Security and compliance tab")
+    print("→ Toggle: 'Enforce data processing within workspace Geography for Designated Services' must be ON")
 except Exception as e:
     print(f"Note: {e}")
     print("→ Check manually in Account Console → Workspaces → Security and compliance tab")

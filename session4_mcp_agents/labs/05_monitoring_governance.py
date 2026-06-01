@@ -207,8 +207,8 @@ except Exception as e:
 # MAGIC ```
 # MAGIC AgentRun (2,341ms)
 # MAGIC  ├── LLMCall — tool selection (456ms)
-# MAGIC  │     Output: tool_call { name: "ask_genie", args: {...} }
-# MAGIC  ├── MCPToolCall — ask_genie (1,203ms)
+# MAGIC  │     Output: tool_call { name: "ask_aemo_nem_operations", args: {...} }
+# MAGIC  ├── MCPToolCall — ask_aemo_nem_operations (1,203ms)
 # MAGIC  │     Input:  { query: "average spot price VIC yesterday" }
 # MAGIC  │     Output: { sql: "...", result: [{"avg(RRP)": 142.50}] }
 # MAGIC  └── LLMCall — synthesise answer (682ms)
@@ -365,7 +365,7 @@ except Exception as e:
 # MAGIC | `event_time` | When the call happened |
 # MAGIC | `user_identity.email` | Who made the call (user or SP) |
 # MAGIC | `service_name` | `mcpServer` for all MCP calls |
-# MAGIC | `action_name` | The specific tool called (top-level column) |
+# MAGIC | `action_name` | Always `mcpToolsCall` for MCP tool invocations (use `request_params.toolName` for the specific tool name) |
 # MAGIC | `response.statusCode` | 200 = success, 4xx/5xx = error |
 
 # COMMAND ----------
@@ -399,8 +399,9 @@ except Exception as e:
 
 sql_asset_access = """
 -- Data asset access frequency via MCP — last 7 days
+-- request_params.toolName holds the specific MCP tool called (e.g. ask_aemo_nem_operations)
 SELECT
-  action_name                                        AS mcp_action,
+  request_params.toolName                            AS tool_name,
   user_identity.email                                AS accessed_by,
   COUNT(*)                                           AS call_count,
   SUM(CASE WHEN response.statusCode = 200 THEN 1 ELSE 0 END) AS success_count,
@@ -411,7 +412,7 @@ FROM system.access.audit
 WHERE service_name = 'mcpServer'
   AND action_name  = 'mcpToolsCall'
   AND event_time  >= CURRENT_TIMESTAMP - INTERVAL 7 DAYS
-GROUP BY 1, 2
+GROUP BY request_params.toolName, user_identity.email
 ORDER BY call_count DESC
 """
 print("Run this in a SQL cell or DBSQL editor to see data asset access by agent:\n")
@@ -443,7 +444,7 @@ print(sql_asset_access)
 try:
     df = spark.sql("""
         SELECT
-            action_name                                        AS tool_name,
+            request_params.toolName                            AS tool_name,
             COUNT(DISTINCT user_identity.email)                AS distinct_callers,
             COUNT(*)                                           AS total_calls,
             MIN(event_time)                                    AS first_call,
@@ -452,7 +453,7 @@ try:
         WHERE service_name = 'mcpServer'
           AND action_name  = 'mcpToolsCall'
           AND event_time  >= CURRENT_TIMESTAMP - INTERVAL 24 HOURS
-        GROUP BY tool_name
+        GROUP BY request_params.toolName
         ORDER BY total_calls DESC
     """)
 
@@ -480,7 +481,7 @@ sql_after_hours = """
 SELECT
   event_time,
   user_identity.email                          AS caller,
-  action_name                                  AS tool_called,
+  request_params.toolName                      AS tool_called,
   HOUR(CONVERT_TIMEZONE('UTC', 'Australia/Sydney', event_time)) AS hour_aest
 FROM system.access.audit
 WHERE service_name = 'mcpServer'

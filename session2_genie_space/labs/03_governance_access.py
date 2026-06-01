@@ -47,9 +47,9 @@ HEADERS  = {"Authorization": f"Bearer {TOKEN}", "Content-Type": "application/jso
 # MAGIC
 # MAGIC Watch the Evaluations tab:
 # MAGIC ```
-# MAGIC Green = Good (SQL matched or result set matched)
-# MAGIC Red   = Bad  (wrong answer, empty result, or query error)
-# MAGIC Orange = Manual review (automated comparison inconclusive)
+# MAGIC Green  = GOOD        (SQL matched or result set matched)
+# MAGIC Red    = BAD         (wrong answer, empty result, or query error)
+# MAGIC Orange = NEEDS_REVIEW (automated comparison inconclusive — requires manual check)
 # MAGIC
 # MAGIC Target before sharing with business users: > 80% Good
 # MAGIC ```
@@ -59,33 +59,67 @@ HEADERS  = {"Authorization": f"Bearer {TOKEN}", "Content-Type": "application/jso
 import requests, json
 
 if SPACE_ID:
-    resp = requests.get(
-        f"https://{HOST}/api/2.0/genie/spaces/{SPACE_ID}/benchmark-runs",
+    # Step A: list eval runs (the API term for "benchmark runs")
+    runs_resp = requests.get(
+        f"https://{HOST}/api/2.0/genie/spaces/{SPACE_ID}/eval-runs",
         headers=HEADERS
     )
-    if resp.status_code == 200:
-        runs = resp.json().get("benchmark_runs", [])
-        if runs:
-            latest = runs[0]
-            results = latest.get("benchmark_results", [])
-            good    = sum(1 for r in results if r.get("rating") == "GOOD")
-            bad     = sum(1 for r in results if r.get("rating") == "BAD")
-            manual  = sum(1 for r in results if r.get("rating") == "MANUAL")
-            total   = len(results)
-            pct     = int(good / total * 100) if total else 0
-            print(f"Latest run — {pct}% Good ({good}/{total})")
-            print(f"  ✅ Good:   {good}")
-            print(f"  ❌ Bad:    {bad}")
-            print(f"  ⚠️  Manual: {manual}")
-            if bad:
-                print(f"\nBad questions to investigate:")
-                for r in results:
-                    if r.get("rating") == "BAD":
-                        print(f"  → {r.get('question', 'unknown')[:80]}")
-        else:
-            print("No benchmark runs yet — run benchmarks in the UI first.")
+    if runs_resp.status_code != 200:
+        print(f"Error listing eval runs: {runs_resp.status_code}")
+        print(runs_resp.text[:200])
     else:
-        print(f"Error {resp.status_code}")
+        runs = runs_resp.json().get("eval_runs", [])
+        if not runs:
+            print("No benchmark runs yet — run benchmarks in the UI first (Configure → Benchmarks → Run benchmarks).")
+        else:
+            latest_run_id = runs[0].get("eval_run_id")
+            run_status    = runs[0].get("eval_run_status")
+            print(f"Latest eval run: {latest_run_id}  status: {run_status}")
+
+            if run_status != "DONE":
+                print("Run is still in progress — wait for it to complete, then re-run this cell.")
+            else:
+                # Step B: list results for the latest run
+                results_resp = requests.get(
+                    f"https://{HOST}/api/2.0/genie/spaces/{SPACE_ID}/eval-runs/{latest_run_id}/results",
+                    headers=HEADERS
+                )
+                if results_resp.status_code != 200:
+                    print(f"Error listing results: {results_resp.status_code}")
+                    print(results_resp.text[:200])
+                else:
+                    result_items = results_resp.json().get("eval_results", [])
+                    # Step C: fetch assessment (GOOD/BAD/NEEDS_REVIEW) for each result
+                    good = bad = needs_review = 0
+                    bad_questions = []
+                    for item in result_items:
+                        rid = item.get("result_id")
+                        detail_resp = requests.get(
+                            f"https://{HOST}/api/2.0/genie/spaces/{SPACE_ID}/eval-runs/{latest_run_id}/results/{rid}",
+                            headers=HEADERS
+                        )
+                        if detail_resp.status_code == 200:
+                            assessment = detail_resp.json().get("assessment", "NEEDS_REVIEW")
+                        else:
+                            assessment = "NEEDS_REVIEW"
+                        if assessment == "GOOD":
+                            good += 1
+                        elif assessment == "BAD":
+                            bad += 1
+                            bad_questions.append(item.get("question", "unknown"))
+                        else:
+                            needs_review += 1
+
+                    total = len(result_items)
+                    pct   = int(good / total * 100) if total else 0
+                    print(f"\nLatest run — {pct}% Good ({good}/{total})")
+                    print(f"  ✅ Good:         {good}")
+                    print(f"  ❌ Bad:          {bad}")
+                    print(f"  ⚠️  Needs review: {needs_review}")
+                    if bad_questions:
+                        print(f"\nBad questions to investigate:")
+                        for q in bad_questions:
+                            print(f"  → {q[:80]}")
 else:
     print("Enter Space ID in widget.")
 
@@ -208,7 +242,7 @@ To set up an alert:
 # Verify permissions via API
 if SPACE_ID:
     resp = requests.get(
-        f"https://{HOST}/api/2.0/permissions/dashboards/{SPACE_ID}",
+        f"https://{HOST}/api/2.0/permissions/genie/{SPACE_ID}",
         headers=HEADERS
     )
     if resp.status_code == 200:

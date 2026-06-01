@@ -16,8 +16,8 @@
 # MAGIC |---|---|---|
 # MAGIC | SOCI Act 2018 | Data processed in permitted jurisdictions | Geography enforcement API check |
 # MAGIC | SOCI Act 2018 | Access logs maintained for all information assets | Audit log query + evidence package |
-# MAGIC | Privacy Act 1988 | Operational risk controls documented and tested | Pre-flight checklist script |
-# MAGIC | Privacy Act 1988 | Personal information must not leave Australia | PII guardrail + geography enforcement |
+# MAGIC | Privacy Act 1988 | Security of personal information — reasonable steps under APP 11 | Pre-flight checklist script |
+# MAGIC | Privacy Act 1988 | Cross-border disclosure accountability — APP 8 requires reasonable steps before overseas transfer | PII guardrail + geography enforcement |
 # MAGIC
 # MAGIC ---
 # MAGIC
