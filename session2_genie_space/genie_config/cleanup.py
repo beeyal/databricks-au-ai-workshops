@@ -171,6 +171,7 @@ else:
         f"REVOKE SELECT ON SCHEMA {CATALOG}.{SCHEMA} FROM",
         f"REVOKE USE SCHEMA ON SCHEMA {CATALOG}.{SCHEMA} FROM",
         f"REVOKE CREATE TABLE ON SCHEMA {CATALOG}.{SCHEMA} FROM",
+        f"REVOKE USE CATALOG ON CATALOG {CATALOG} FROM",
     ]
     for email in revoke_list:
         for stmt_prefix in revoke_stmts:

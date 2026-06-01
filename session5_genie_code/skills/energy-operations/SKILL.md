@@ -51,7 +51,7 @@ NEM12 is the AEMO-defined file format for electricity meter interval data exchan
 Measures how many minutes of supply interruption an average customer experienced.
 
 ```
-SAIDI = Σ(interruption_duration_minutes × customers_affected) / total_customers_served
+SAIDI = Σ(interruption_duration_minutes × affected_customers) / total_customers_served
 ```
 
 - **Units:** minutes per customer per year (or reporting period)
@@ -63,7 +63,7 @@ SAIDI = Σ(interruption_duration_minutes × customers_affected) / total_customer
 Measures how many times an average customer lost supply.
 
 ```
-SAIFI = Σ(number_of_interruption_events × customers_affected) / total_customers_served
+SAIFI = Σ(number_of_interruption_events × affected_customers) / total_customers_served
 ```
 
 - **Units:** interruptions per customer per year

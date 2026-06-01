@@ -106,7 +106,7 @@ The five examples below are filled-in canvases from AEMO operational teams. Use 
 
 **Current Process:** Regulatory reporting produces the SAIDI figure annually from the outage management system, which requires a data extract, manual calculation in Excel, and sign-off by three managers. The process runs across two teams and takes approximately two weeks each year. Ad-hoc SAIDI queries during the year are not possible without running a partial version of the annual process.
 
-**Data Available:** SAIDI is derived from outage event data — `workshop_au.aemo.market_notices` contains planned and unplanned outage events with start time, end time, and customers affected. SAIDI formula: sum of (customers affected * outage duration in minutes) / total customers in the region.
+**Data Available:** SAIDI requires outage event data with start time, end time, and customers affected per event. `workshop_au.aemo.market_notices` contains NEM market and system notices (`notice_type`, `effective_date`, `issue_time`, `region_id`, `reason`) but does not include customers affected or outage duration fields. A separate outage management system extract with those columns would be needed. SAIDI formula: sum of (customers affected × outage duration in minutes) / total customers in the region.
 
 **Value if Automated:** Enables real-time SAIDI tracking throughout the year, not just at year-end. Allows operations managers to intervene earlier when SAIDI trends toward regulatory limits. Reduces annual reporting preparation time from 2 weeks to hours. Provides AER-ready numbers on demand for regulatory inquiries.
 

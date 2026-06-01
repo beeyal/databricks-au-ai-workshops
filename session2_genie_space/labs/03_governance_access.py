@@ -137,6 +137,10 @@ else:
 # MAGIC ## Step 4: Alert on user feedback (Slide 32)
 # MAGIC
 # MAGIC > *"The audit system table reflects all events within ~15 minutes. Query it and use in an alert."*
+# MAGIC
+# MAGIC **🖱️ UI:** SQL Editor → paste the query below → Save → Alerts → + Create alert → select query → set threshold: negative_count > 0 → Notify: your email
+# MAGIC
+# MAGIC **⚡ Automated:** run the cell below to query the audit table directly and see negative feedback now.
 
 # COMMAND ----------
 

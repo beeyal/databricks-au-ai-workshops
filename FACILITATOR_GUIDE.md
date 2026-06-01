@@ -8,7 +8,7 @@ This guide is for the person running the enablement sessions. Participants do no
 
 1. [Pre-Workshop Setup (All Sessions)](#1-pre-workshop-setup-all-sessions)
 2. [Session 1: Platform Administrators (2 hours)](#2-session-1--platform-administrators-2-hours)
-3. [Session 2: Building Your Genie Space (1.5 hours)](#3-session-2--building-your-genie-space-15-hours)
+3. [Session 2: Building Your Genie Space (2.5 hours)](#3-session-2--building-your-genie-space-25-hours)
 4. [Session 3: LDT Line-of-Business Training](#4-session-3--ldt-line-of-business-training)
 5. [Session 4: Building Agents, MCPs and Apps (Half day, optional)](#5-session-4--building-agents-mcps-and-apps-half-day-optional)
 6. [Session 5: Extending Genie Code (1 hour, optional)](#6-session-5--extending-genie-code-1-hour-optional)
@@ -124,7 +124,7 @@ Save the dashboard build and export cells for participants who want to self-comp
 
 ---
 
-## 3. Session 2 — Building Your Genie Space (1.5 hours)
+## 3. Session 2 — Building Your Genie Space (2.5 hours)
 
 **Audience:** Data analysts, reporting leads, business intelligence teams  
 **Goal:** Participants leave with a working Genie Space connected to energy data and a production readiness checklist they can take back to their team  
@@ -145,10 +145,10 @@ Save the dashboard build and export cells for participants who want to self-comp
 | Time | Activity |
 |------|----------|
 | 0:00–0:05 | Intro — what participants will build and why |
-| 0:05–0:30 | Lab 01 — Genie Space setup (25 min) |
-| 0:30–0:55 | Lab 02 — User workflows (25 min) |
-| 0:55–1:20 | Lab 03 — Controls and governance (25 min) |
-| 1:20–1:30 | Wrap-up and production readiness checklist |
+| 0:05–0:50 | Lab 01 — Genie Space setup (40 min) |
+| 0:50–1:25 | Lab 02 — User workflows (35 min) |
+| 1:25–2:00 | Lab 03 — Controls and governance (30 min) |
+| 2:00–2:30 | Wrap-up and production readiness checklist (30 min) |
 
 ### Key facilitation notes for Session 2
 
@@ -224,9 +224,9 @@ If you are the LDT facilitator and are reading this guide, contact the Databrick
 ### Pre-session setup (facilitator only)
 
 - [ ] Confirm participants have CAN_USE on the `databricks-claude-haiku-4-5` endpoint
-- [ ] Run `session4_agents/setup/session4_setup.py` — this creates the agent catalog and scaffolding notebooks
-- [ ] Test the sample agent by running `session4_agents/example_agent/run_test.py` and confirming a response is returned
-- [ ] If using the MCP integration labs: confirm the MCP server defined in `session4_agents/mcp/server_config.json` is reachable from the workspace
+- [ ] Run `session4_mcp_agents/setup/setup.py` — this creates the agent catalog and scaffolding notebooks
+- [ ] Test the sample agent by running the first cell of `session4_mcp_agents/labs/01_agent_architecture_mcp.py` and confirming a response is returned
+- [ ] If using the MCP integration labs: confirm the MCP servers listed in `session4_mcp_agents/labs/02_connecting_mcp_servers.py` are reachable from the workspace
 - [ ] Confirm Databricks Apps is enabled on the workspace (Workspace Settings → Apps → Enabled)
 
 ### Timing guide

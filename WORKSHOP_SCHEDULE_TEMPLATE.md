@@ -18,7 +18,7 @@ The following must be confirmed at least **3 business days before the first work
 - [ ] `setup/00_workspace_setup.py` executed successfully by a workspace admin — verify by checking that the `workshop_au` catalog and sample tables exist
 - [ ] Notebook Assistant (Genie Code) enabled in Workspace Settings → AI features
 - [ ] `Workshop — Energy Analytics` Genie Space created and sample NEM12 data connected
-- [ ] AI Gateway endpoint (`workshop-pt-endpoint`) configured pointing to a Provisioned Throughput FMAPI endpoint in Australia East
+- [ ] AI Gateway endpoint (`databricks-claude-haiku-4-5`) configured pointing to a Provisioned Throughput FMAPI endpoint in Australia East
 - [ ] Sample data loaded — confirm row counts in `workshop_au.default.nem12_interval_reads` and `workshop_au.default.nmi_registry`
 
 ### Participant Access

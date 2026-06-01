@@ -424,8 +424,8 @@ print(sql_asset_access)
 # MAGIC
 # MAGIC The SOCI Act 2018 and Privacy Act 1988 require audit trails for critical infrastructure data access, including access by automated systems. The controls in this workshop provide the following compliance evidence:
 # MAGIC
-# MAGIC | CPS 234 requirement | Control | Evidence location |
-# MAGIC |--------------------|---------|-------------------|
+# MAGIC | SOCI Act 2018 requirement | Control | Evidence location |
+# MAGIC |--------------------------|---------|-------------------|
 # MAGIC | Asset access is logged | Every MCP call → `system.access.audit` | `WHERE service_name='mcpServer' AND action_name='mcpToolsCall'` |
 # MAGIC | Access attributed to an identity | App runs as named SP; notebook calls use user email | `user_identity.email` column |
 # MAGIC | Access controls are enforced | UC function permissions control which tools the agent can call | UC audit + function GRANT history |
@@ -514,7 +514,7 @@ print(sql_after_hours)
 # MAGIC   → [Create Alert]
 # MAGIC ```
 # MAGIC
-# MAGIC Results remain in `system.access.audit` — no extra data movement required. Roll out-of-hours call detection as a standard Databricks Job to close the CPS 234 continuous monitoring loop.
+# MAGIC Results remain in `system.access.audit` — no extra data movement required. Roll out-of-hours call detection as a standard Databricks Job to close the SOCI Act 2018 continuous monitoring loop.
 
 # COMMAND ----------
 

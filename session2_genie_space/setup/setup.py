@@ -52,6 +52,7 @@ TABLES = {
     "market_notices":         ("market_notices.csv",          []),
     "generator_registration": ("generator_registration.csv",  ["region_id"]),
     "settlement_amounts":     ("settlement_amounts.csv",       ["run_type"]),
+    "constraint_sets":        ("constraint_sets.csv",           ["region_affected"]),
 }
 
 results = []
@@ -125,9 +126,20 @@ COLUMN_COMMENTS = {
         "region_id":              "NEM region where registered.",
         "fuel_type":              "Generation technology: solar, wind, coal, gas, hydro, battery.",
         "registered_capacity_mw": "Maximum registered capacity in MW.",
+        "connection_point_id":    "NEM connection point identifier for the unit.",
         "dispatch_type":          "GENERATOR, LOAD, or BIDIRECTIONAL.",
         "max_ramp_rate":          "Maximum ramp rate in MW per minute.",
         "min_load":               "Minimum stable load in MW.",
+    },
+    f"{CATALOG}.{SCHEMA}.constraint_sets": {
+        "constraint_id":         "Unique constraint identifier e.g. S_RADIAL_SA_1.",
+        "constraint_type":       "Type of constraint: thermal, voltage, stability.",
+        "activated_datetime":    "When the constraint became active.",
+        "deactivated_datetime":  "When the constraint was lifted. NULL if still active.",
+        "reason":                "Free-text description of why the constraint was activated.",
+        "rhs_value":             "Right-hand side MW limit of the constraint equation.",
+        "region_affected":       "NEM region impacted by this constraint.",
+        "interconnector":        "True if this constraint involves an interconnector flow.",
     },
     f"{CATALOG}.{SCHEMA}.settlement_amounts": {
         "settlement_date":            "Settlement week end date.",
@@ -166,6 +178,7 @@ TABLE_DESCRIPTIONS = {
     f"{CATALOG}.{SCHEMA}.market_notices":         "AEMO market and system notices including LOR events. Filter: WHERE notice_type LIKE 'LOR%' for LOR events. LOR1/LOR2/LOR3 = escalating reserve severity.",
     f"{CATALOG}.{SCHEMA}.generator_registration": "NEM registered generator details. Join to dispatch_intervals on duid to get station_name and fuel_type.",
     f"{CATALOG}.{SCHEMA}.settlement_amounts":     "Weekly NEM settlement amounts by participant. run_type: FINAL = confirmed, PRELIMINARY = estimate. total_aud = net amount.",
+    f"{CATALOG}.{SCHEMA}.constraint_sets":        "NEM network and system constraints. Activated when a network element is at risk. rhs_value = MW limit. Join region_affected to spot_prices.region_id.",
 }
 
 for fqn, desc in TABLE_DESCRIPTIONS.items():
@@ -190,6 +203,7 @@ expected = {
     "market_notices":           100,
     "generator_registration":    50,
     "settlement_amounts":        100,
+    "constraint_sets":         1_000,
 }
 for tbl, min_rows in expected.items():
     try:

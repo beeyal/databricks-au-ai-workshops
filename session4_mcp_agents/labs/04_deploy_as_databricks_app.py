@@ -279,7 +279,7 @@ async def build_agent():
         "All data is from Australia East — data residency is maintained."
     )
 
-    return create_react_agent(llm, tools, state_modifier=system_prompt)
+    return create_react_agent(model=llm, tools=tools, prompt=system_prompt)
 
 
 # ---------------------------------------------------------------------------

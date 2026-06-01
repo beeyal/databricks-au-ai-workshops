@@ -143,6 +143,7 @@ else:
         f"REVOKE SELECT       ON SCHEMA  {CATALOG}.{SCHEMA_GOV} FROM",
         f"REVOKE USE SCHEMA   ON SCHEMA  {CATALOG}.{SCHEMA_GOV} FROM",
         f"REVOKE CREATE TABLE ON SCHEMA  {CATALOG}.{SCHEMA_GOV} FROM",
+        f"REVOKE USE CATALOG  ON CATALOG {CATALOG}              FROM",
     ]
 
     for email in revoke_list:

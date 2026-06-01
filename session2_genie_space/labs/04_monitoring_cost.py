@@ -113,7 +113,7 @@ except Exception as e:
 cost_sql = f"""
 SELECT
     DATE(usage_date)                        AS date,
-    usage_metadata.endpoint_name            AS warehouse,
+    usage_metadata.warehouse_id             AS warehouse,
     SUM(usage_quantity)                     AS serverless_dbus,
     ROUND(SUM(usage_quantity) * 0.70, 2)   AS est_cost_usd
 FROM system.billing.usage

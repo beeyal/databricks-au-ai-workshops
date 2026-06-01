@@ -87,17 +87,17 @@ Participants need to query system tables, browse audit logs, and understand Unit
 | Vector Search endpoint | `CAN_QUERY` | Via UI: Vector Search → Endpoint → Permissions |
 | Genie Space | `CAN_USE` | Via UI: Genie → Space Settings → Permissions |
 
-### Workshop 2a (Genie Code Track)
+### Session 5 (Genie Code Track)
 
-Participants query tables using Genie + AI/BI Dashboards. Same as Workshop 1 but also need dashboard creation rights.
+Participants query tables using Genie + AI/BI Dashboards. Same as Session 1 but also need dashboard creation rights.
 
 | Object | Permission required | Grant statement |
 |---|---|---|
-| All of Workshop 1 permissions | — | As above |
+| All of Session 1 permissions | — | As above |
 | AI/BI Dashboards | `CAN_EDIT` on the workspace folder | Workspace Admin → Permissions |
 | Genie Space | `CAN_MANAGE` (to create their own questions/threads) | Via UI: Genie → Space Settings → Permissions |
 
-### Workshop 2b (Genie Spaces Track)
+### Session 2 (Genie Spaces Track)
 
 Participants create their own Genie Spaces. They need catalog-level and Genie management permissions.
 
@@ -402,7 +402,7 @@ _Replace `XXXX` with the actual workspace ID when confirmed. Do not store PATs o
 
 ### AusNet-specific notes
 
-- Dan (AusNet) prefers L100-level content for non-technical stakeholders. If running Workshop 2b (Genie Spaces) with AusNet, tailor the Genie Space demo to AusNet's meter data and asset management vocabulary.
+- Dan (AusNet) prefers L100-level content for non-technical stakeholders. If running Session 2 (Genie Spaces) with AusNet, tailor the Genie Space demo to AusNet's meter data and asset management vocabulary.
 - Lisa Byrne (Data Governance Manager) is interested in Unity Catalog certification and lineage. Workshop 1 Labs 1–3 are highly relevant.
 - Use catalog name `workshop_ausnet` and confirm with Bingi that catalog creation has been pre-approved through AusNet's data governance process.
 

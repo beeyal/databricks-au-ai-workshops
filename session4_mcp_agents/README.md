@@ -1,4 +1,4 @@
-# Workshop 2c: Building Production AI Agents with MCP on Databricks
+# Session 4: Building Production AI Agents with MCP on Databricks
 
 **Track:** Developer / Agent Builder
 **Duration:** 3 hours
@@ -46,7 +46,7 @@ All five Databricks MCP server types are confirmed available in the **Australia 
 | Databricks Apps | In-region (AU East) | OAuth is handled within AU East |
 | MLflow tracing | In-region (AU East) | Traces stored in workspace-local MLflow |
 
-> The PT endpoint (`au_east_llm_inregion` or equivalent) must be deployed and in `READY` state before this workshop begins. Pay-Per-Token models are cross-geo and must not be used as the agent's LLM backend.
+> The PT endpoint (`databricks-claude-haiku-4-5` or equivalent) must be deployed and in `READY` state before this workshop begins. Pay-Per-Token models are cross-geo and must not be used as the agent's LLM backend.
 
 ---
 
@@ -56,11 +56,11 @@ Complete the following before attending this workshop. Ask your facilitator if y
 
 | Prerequisite | Where to find it | Required for |
 |-------------|-----------------|--------------|
-| Workshop 2a Labs 01–04 completed (or equivalent Genie Code familiarity) | `workshop2a_genie_code/labs/` | Lab 01 concepts build on Genie Code knowledge |
-| UC Functions created in the workshop catalog | `workshop2a_genie_code/labs/03_uc_functions.py` | Lab 02 (UC Functions MCP discovery) |
-| PT endpoint running (`au_east_llm_inregion` or name from your facilitator) | Machine Learning > Serving | All agent labs |
+| Session 5 Labs 01–03 completed (or equivalent Genie Code familiarity) | `session5_genie_code/labs/` | Lab 01 concepts build on Genie Code knowledge |
+| UC Functions created in the workshop catalog | `session5_genie_code/labs/03_mcp_intro.py` | Lab 02 (UC Functions MCP discovery) |
+| PT endpoint running (`databricks-claude-haiku-4-5` or name from your facilitator) | Machine Learning > Serving | All agent labs |
 | AEMO data loaded | `setup/00_workspace_setup.py` with the AEMO section run | Labs 02–04 |
-| Genie Space created and verified | `session3_business/genie_config/aemo_genie_space_setup.py` | Lab 02 (Genie MCP) |
+| Genie Space created and verified | `session3_lob/genie_config/aemo_genie_space_setup.py` | Lab 02 (Genie MCP) |
 | `SELECT` on `workshop_au.aemo.*` | Granted by facilitator during setup | Labs 02–05 |
 
 **Your device needs no local installs.** All labs run in Databricks notebooks or the Databricks Apps environment. The only exception is Lab 04, which uses the Databricks CLI for app deployment — the CLI is pre-installed in the workshop environment.
@@ -92,7 +92,6 @@ pip install databricks-mcp databricks-langchain databricks-openai langgraph grad
 
 | Lab | Title | Duration | Focus |
 |-----|-------|----------|-------|
-| 00 | MCP & Skills Reference | — | Cheat sheet — keep open throughout the workshop |
 | 01 | Agent Architecture & MCP Ecosystem | 30 min | Concepts, UI exploration, tool discovery |
 | 02 | Connecting to Databricks MCP Servers | 40 min | Tool discovery with all three server types |
 | 03 | Building a Multi-Tool ReAct Agent | 45 min | LangGraph + MCP integration, MLflow traces |
@@ -104,22 +103,6 @@ pip install databricks-mcp databricks-langchain databricks-openai langgraph grad
 ---
 
 ## Lab Detail
-
-### Lab 00 — MCP & Skills Reference
-
-**File:** `labs/00_mcp_skills_reference.py`
-**Duration:** Reference only — keep open throughout the workshop
-
-This notebook is your cheat sheet. It contains the MCP tool schemas for all three server types used in this workshop, common LangGraph patterns, the MLflow tracing API quick reference, and the UC Functions available in the workshop catalog. You do not "complete" Lab 00 — you refer back to it throughout the other labs.
-
-Key contents:
-- MCP server connection strings for the workshop environment
-- Tool schemas: `genie_query`, `vector_search_query`, `execute_function`
-- LangGraph ReAct agent boilerplate
-- MLflow autolog and manual span reference
-- Common errors and fixes (MCP connection timeout, UC Function permission denied, Genie rate limit)
-
----
 
 ### Lab 01 — Agent Architecture & the MCP Ecosystem
 
@@ -141,7 +124,7 @@ No agent code in this lab — the goal is to build the mental model before the i
 
 ### Lab 02 — Connecting to Databricks MCP Servers
 
-**File:** `labs/02_mcp_connections.py`
+**File:** `labs/02_connecting_mcp_servers.py`
 **Duration:** 40 minutes
 **Difficulty:** Intermediate
 
@@ -195,7 +178,7 @@ The lab covers both the Python application structure (`app.py`) and the Databric
 Key exercises:
 - Structure `app.py`: Gradio `ChatInterface` wrapping the LangGraph agent, streaming responses enabled, session state for multi-turn conversation
 - Write `app.yaml`: resource declarations for the PT endpoint and UC Functions the app needs, compute size (1 CPU recommended for this workload)
-- Deploy via the Databricks Apps UI: navigate to Compute > Apps, create a new app, point at the `workshop2c_mcp_agents/app/` directory
+- Deploy via the Databricks Apps UI: navigate to Compute > Apps, create a new app, point at the `session4_mcp_agents/app/` directory
 - Verify deployment: open the app URL, ask a test question, confirm the MLflow trace appears in the MLflow UI
 - Access control: understand how the app inherits Databricks workspace permissions — participants with `CAN_USE` on the app can access it; the app's service principal handles MCP server calls
 
@@ -235,7 +218,7 @@ By the end of this workshop, you will have:
 - AI Gateway governance on the agent's LLM calls — rate limits, usage metrics, and cross-geo blocking in place
 - An `app.py` + `app.yaml` pattern you can adapt for other domains and other MCP tool combinations
 
-The AEMO Operations Agent code lives in `workshop2c_mcp_agents/app/` and is ready to be copied to your organisation's repository as a starting point for a real deployment.
+The AEMO Operations Agent code lives in `session4_mcp_agents/app/` and is ready to be copied to your organisation's repository as a starting point for a real deployment.
 
 ---
 

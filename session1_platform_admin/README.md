@@ -1,7 +1,7 @@
-# Workshop 1: Governing Databricks AI Features in Australian Regulated Industries
+# Session 1: Governing Databricks AI Features in Australian Regulated Industries
 
 **Track:** Platform Admin / Security  
-**Duration:** 4 hours  
+**Duration:** 2 hours  
 **Audience:** Workspace admins, security architects, platform engineers, cloud infrastructure leads
 
 ---
@@ -14,7 +14,7 @@ The workshop takes a controls-first approach: every AI feature introduced is acc
 
 ### Why this matters for regulated industries
 
-Australian regulators — Australian regulators expect organisations to maintain active oversight of AI systems that access or process regulated data. That means:
+Australian regulators expect organisations to maintain active oversight of AI systems that access or process regulated data. That means:
 
 - Knowing exactly which AI features are enabled in each workspace
 - Being able to prove that regulated data does not leave the Australian jurisdiction
@@ -76,9 +76,9 @@ Key topics: AI Gateway endpoint creation, routing rules, rate limits, guardrail 
 
 ---
 
-### Lab 03 — Audit Logging for AI Actions
+### Lab 03 — Rate Limits and Guardrails
 
-**File:** `labs/03_audit_logging.py`  
+**File:** `labs/03_rate_limits_guardrails.py`  
 **Duration:** 35–40 minutes  
 **Difficulty:** Intermediate
 
@@ -88,9 +88,9 @@ Key topics: `system.access.audit` schema, AI event types (`genieQuery`, `serveMo
 
 ---
 
-### Lab 04 — Unity Catalog Governance for AI Assets
+### Lab 04 — Usage Tracking
 
-**File:** `labs/04_uc_governance_ai.py`  
+**File:** `labs/04_usage_tracking.py`  
 **Duration:** 30–35 minutes  
 **Difficulty:** Intermediate
 
@@ -134,4 +134,4 @@ The table below is your quick reference for labs and discussions. It reflects th
 - Run the same preflight and settings checks on your production workspace
 - Review your organisation's AI feature request process against the controls covered today
 - Schedule a follow-up session with your Databricks SA to review your specific SOCI Act and Privacy Act obligations and the Databricks shared responsibility model
-- Consider whether Workshop 2a (Genie Code) or Workshop 2b (Genie Spaces) is the right next step for your technical teams
+- Consider whether Session 5 (Genie Code) or Session 2 (Building Your Genie Space) is the right next step for your technical teams

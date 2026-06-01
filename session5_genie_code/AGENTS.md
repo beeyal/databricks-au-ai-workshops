@@ -1,4 +1,4 @@
-# Databricks AU AI Workshop 2a — Project Context
+# Databricks AU AI Workshop — Session 5 Project Context
 
 This is a hands-on workshop on Genie Code, Skills, and MCP for Australian regulated industries.
 Auto-discovered by Genie Code when working in any notebook within this directory.
@@ -61,7 +61,6 @@ These are callable by Genie Code agent mode and via MCP:
 ## Domain Knowledge
 
 - See `@energy-operations` skill for NEM12 quality flags, SAIDI/SAIFI formulas, AER regulatory context, asset terminology, and SQL patterns
-- See `@apra-compliance` skill for data residency classification, CPS 230/234 audit evidence requirements, and approved/rejected AI feature patterns for regulated data
 
 ## Lab Navigation
 

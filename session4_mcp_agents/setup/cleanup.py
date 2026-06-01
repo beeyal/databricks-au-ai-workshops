@@ -168,6 +168,9 @@ else:
         f"REVOKE SELECT ON SCHEMA {CATALOG}.{SCHEMA} FROM",
         f"REVOKE CREATE TABLE ON SCHEMA {CATALOG}.{SCHEMA} FROM",
         f"REVOKE USE SCHEMA ON SCHEMA {CATALOG}.{SCHEMA} FROM",
+        # NOTE: Only revoke USE CATALOG if no other sessions are still active
+        # for the same participant (sessions 1–5 all share workshop_au catalog).
+        f"REVOKE USE CATALOG ON CATALOG {CATALOG} FROM",
     ]
     for email in revoke_list:
         for stmt_prefix in revoke_stmts:

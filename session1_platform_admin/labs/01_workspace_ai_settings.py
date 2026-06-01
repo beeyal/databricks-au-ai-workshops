@@ -447,8 +447,10 @@ print("spark.sql calls are commented out — uncomment after updating the TODO v
 # MAGIC %md
 # MAGIC ### 4b. Grant permissions on a model serving endpoint
 # MAGIC
-# MAGIC Navigate: Workspace sidebar → Serving
-# MAGIC You should see: List of endpoints. Click an endpoint → Permissions tab to view current CAN_QUERY / CAN_MANAGE assignments.
+# MAGIC 🖱️ **UI:** Left sidebar → Serving → click an endpoint name → Permissions tab
+# MAGIC You should see: Current CAN_QUERY / CAN_MANAGE assignments for that endpoint. Click Grant to add a principal.
+# MAGIC
+# MAGIC ⚡ **Or run the cell below to generate the GRANT SQL and SDK call:**
 
 # COMMAND ----------
 
@@ -498,10 +500,10 @@ print("SDK permission call is commented out — uncomment after setting variable
 # MAGIC %md
 # MAGIC ### 4c. Grant permissions on a Genie Space
 # MAGIC
-# MAGIC Navigate: Workspace sidebar → Genie → [Space name]
-# MAGIC You should see: The Genie Space URL contains the space ID: `.../genie/spaces/<SPACE-ID>` — copy that ID.
+# MAGIC 🖱️ **UI:** Left sidebar → Genie → [Space name] → kebab menu (top-right) → Share or Permissions → add groups with CAN_USE / CAN_EDIT / CAN_MANAGE
+# MAGIC You should see: The Genie Space URL contains the space ID: `.../genie/spaces/<SPACE-ID>` — copy that ID for the API call below.
 # MAGIC
-# MAGIC To set permissions via UI: open the Genie Space → kebab menu (top-right) → Share or Permissions → add groups with CAN_USE / CAN_EDIT / CAN_MANAGE.
+# MAGIC ⚡ **Or run the cell below to read and set Genie Space permissions via the REST API (uncomment after setting GENIE_SPACE_ID):**
 
 # COMMAND ----------
 

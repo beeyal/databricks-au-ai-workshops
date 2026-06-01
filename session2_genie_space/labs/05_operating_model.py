@@ -251,7 +251,7 @@ if SPACE_ID:
             '{OWNER}'          AS owner_email,
             '{status}'         AS status,
             '{tables_list}'    AS tables,
-            {score or 'NULL'}  AS benchmark_score,
+            {score if score is not None else 'NULL'}  AS benchmark_score,
             {n_queries}        AS golden_queries,
             {'CURRENT_TIMESTAMP()' if status == 'CERTIFIED' else 'NULL'} AS certified_at,
             CURRENT_TIMESTAMP() AS last_reviewed,

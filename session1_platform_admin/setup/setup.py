@@ -120,7 +120,7 @@ COLUMN_COMMENTS = {
         "nmi":              "National Metering Identifier. Primary key for a customer connection point. Join to energy_assets on asset_id.",
         "reading_datetime": "Interval end timestamp. 30-minute intervals. AEST/AEDT timezone.",
         "interval_kwh":     "Energy consumed in this 30-minute interval in kWh. Multiply by 2 for kW average.",
-        "quality_flag":     "Data quality indicator: A = Actual, E = Estimated, S = Substituted. Filter to quality_flag = 'A' for clean data.",
+        "quality_flag":     "Data quality indicator: A = Actual, E = Estimated, S = Substituted. Filter to quality_flag = ''A'' for clean data.",
     },
     f"{CATALOG}.{SCHEMA_E}.maintenance_work_orders": {
         "work_order_id": "Primary key. Unique identifier for the work order.",

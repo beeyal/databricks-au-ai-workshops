@@ -937,10 +937,10 @@ print("Run this SQL in a SQL cell or Databricks SQL editor to see your audit tra
 print("=" * 65)
 print(audit_sql)
 print("=" * 65)
-print("\nservice_name values for MCP calls:")
-print("  unityCatalog  → UC Function tool calls")
-print("  genie         → Genie Space NL-to-SQL calls")
-print("  vectorSearch  → Vector Search similarity queries")
+print("\nAudit trail columns for MCP calls:")
+print("  service_name = 'mcpServer'  for ALL MCP tool calls (UC Functions, Genie, Vector Search)")
+print("  action_name                 the specific tool called (top-level column)")
+print("  response.statusCode         200 = success, 4xx/5xx = error")
 print("\nThis is your compliance audit trail — required for AEMO and AER regulated workloads.")
 
 # COMMAND ----------

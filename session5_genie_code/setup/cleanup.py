@@ -77,6 +77,9 @@ else:
         f"REVOKE USE SCHEMA ON SCHEMA {CATALOG}.{SCHEMA} FROM",
         f"REVOKE SELECT ON SCHEMA {CATALOG}.audit FROM",
         f"REVOKE USE SCHEMA ON SCHEMA {CATALOG}.audit FROM",
+        # NOTE: Only revoke USE CATALOG if no other sessions are still active
+        # for the same participant (sessions 1–5 all share workshop_au catalog).
+        f"REVOKE USE CATALOG ON CATALOG {CATALOG} FROM",
     ]
 
     for email in revoke_list:

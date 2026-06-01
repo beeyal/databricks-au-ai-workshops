@@ -28,6 +28,8 @@
 
 # COMMAND ----------
 
+spark.sql("USE CATALOG workshop_au")
+
 user = spark.sql("SELECT current_user() AS me").collect()[0]["me"]
 print(f"Connected as: {user}")
 print(f"Spark version: {spark.version}")

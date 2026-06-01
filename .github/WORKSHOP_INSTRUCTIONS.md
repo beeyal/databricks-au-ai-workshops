@@ -65,9 +65,11 @@ You should now see the `databricks-au-ai-workshops` folder in your Repos view. C
 databricks-au-ai-workshops/
 ├── data/
 ├── setup/
-├── workshop1_admin/
-├── workshop2a_genie_code/
-├── workshop2b_genie_spaces/
+├── session1_platform_admin/
+├── session2_genie_space/
+├── session4_mcp_agents/
+├── session5_genie_code/
+├── session6_ideation/
 └── .github/
 ```
 
@@ -80,15 +82,16 @@ The repository may require authentication. Ask your facilitator whether you need
 
 ## Step 3 — Navigate to your workshop folder
 
-Navigate to the folder for your workshop:
+Navigate to the folder for your session:
 
-| Workshop | Folder to open |
-|----------|---------------|
-| Workshop 1 (Admin) | `workshop1_admin/labs/` |
-| Workshop 2a (Genie Code) | `workshop2a_genie_code/labs/` |
-| Workshop 2b (Genie Spaces) | `workshop2b_genie_spaces/labs/` |
+| Session | Folder to open |
+|---------|---------------|
+| Session 1 (Platform Admin) | `session1_platform_admin/labs/` |
+| Session 2 (Genie Space) | `session2_genie_space/labs/` |
+| Session 4 (MCP Agents) | `session4_mcp_agents/labs/` |
+| Session 5 (Genie Code) | `session5_genie_code/labs/` |
 
-Start with the first file in numerical order, e.g. `01_workspace_ai_settings.py` for Workshop 1.
+Start with the first file in numerical order, e.g. `01_workspace_ai_settings.py` for Session 1.
 
 Do not run notebooks out of order — later labs sometimes depend on objects created in earlier ones.
 
@@ -231,7 +234,7 @@ Then re-run the failing cell.
 
 ### "ai_query() failed: external model endpoint requires model serving to be enabled"
 
-**Cause:** Lab 4 in Workshop 2b requires the Provisioned Throughput endpoint (`workshop-pt-endpoint`) to be running.
+**Cause:** Lab 4 in Session 4 requires the Provisioned Throughput endpoint (`databricks-claude-haiku-4-5`) to be running.
 
 **Fix:** Ask your facilitator to verify the endpoint status in Serving. If it is in "Updating" state, wait 5 minutes and retry. If it is not created, your facilitator needs to provision it — this takes 15–30 minutes.
 
