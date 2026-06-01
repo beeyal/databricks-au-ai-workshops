@@ -3,7 +3,7 @@
 **Audience:** Data engineers, analysts, power users who will build and maintain Genie Spaces
 **Duration:** 1.5 hours
 **Format:** Workshop — slides + hands-on labs (UI-first throughout)
-**Slide deck:** [Building the Best Genie Space](https://docs.google.com/presentation/d/1Kw-mwE8kVvc-j70mXzFOVnUAURVoYBaoDKIVF6MKFoU/edit)
+**Slide deck:** (content pulled from official Databricks AI/BI deck, slides 55-87, with AEMO additions) [Building the Best Genie Space — AEMO Edition](https://docs.google.com/presentation/d/1Kw-mwE8kVvc-j70mXzFOVnUAURVoYBaoDKIVF6MKFoU/edit)
 
 ---
 
