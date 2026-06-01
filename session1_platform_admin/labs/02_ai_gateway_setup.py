@@ -26,7 +26,7 @@
 # MAGIC | Version | Path | Guardrails | Used in this lab |
 # MAGIC |---|---|---|---|
 # MAGIC | V1 (GA) | Left sidebar → Serving → AI Gateway tab | Yes | **Yes** |
-# MAGIC | V2 (Beta) | Left sidebar → AI Gateway (top-level, only visible if enabled via Account Console → Previews) | No | No — lacks guardrails |
+# MAGIC | V2 (Beta) | Left sidebar → AI Gateway (standalone item) | Endpoint-level guardrails only (not centralised policy) | No — lacks guardrails |
 # MAGIC
 # MAGIC > **V2 Beta does not yet have centralised guardrail policy (PII blocking, safety filter at endpoint level only). Use V1 for all regulated workloads.** Until V2 reaches GA with full guardrail parity, V2 endpoints should not be used for data classified above Public.
 
@@ -135,14 +135,15 @@ print(f"Auth : {w.config.auth_type}")
 # MAGIC > - If geography enforcement is **OFF**: cross-geo models appear and are selectable, but routing traffic to them violates data residency requirements — do not use them for data classified above Public.
 # MAGIC > - For this lab, always use `databricks-claude-haiku-4-5` (PT, AU East, in-region). Do NOT use `databricks-meta-llama-*` — Llama has no committed AU East date.
 # MAGIC
-# MAGIC **Option A — V1 (GA, has full guardrails — use this for regulated workloads):**
-# MAGIC Navigate: Left sidebar → Serving → click the **AI Gateway** tab at the top of the Serving page → click **+ Create**
+# MAGIC **Option A — V1 (legacy, if available):**
+# MAGIC Navigate: Left sidebar → Serving → look for an **AI Gateway** tab at the top of the Serving page (only exists in some workspace versions)
+# MAGIC > Note: Newer workspaces may only have V2. If you don't see AI Gateway in Serving, use Option B.
 # MAGIC
 # MAGIC **Option B — V2 / Unity AI Gateway (Beta, newer UI):**
 # MAGIC Navigate: Left sidebar → **AI Gateway** (appears as a standalone item if V2 is enabled via Account Console → Previews → AI Gateway V2) → click **Create Unity AI Gateway Endpoint**
 # MAGIC
 # MAGIC Either path creates a gateway endpoint. **Use V1 for this lab** — V2 is Beta and centralised guardrail policy is not yet GA.
-# MAGIC You should see: Provider selection → choose "Databricks Foundation Models" → select `databricks-claude-haiku-4-5`.
+# MAGIC You should see: **+ AI Gateway endpoint** → enter **Name** (permanent, choose carefully) → **Provider** (Databricks hosted OR External provider) → **Destination** → select Provisioned throughput or Pay-per-token. To use your own PT endpoint, select Provisioned throughput → Create new serving endpoint.
 
 # COMMAND ----------
 

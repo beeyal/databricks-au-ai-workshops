@@ -198,8 +198,8 @@ for tier, config in ENDPOINT_TIERS.items():
 # MAGIC
 # MAGIC Requests within the limit return `200 OK`. Requests exceeding the limit return `429 Too Many Requests` with a `Retry-After` header.
 # MAGIC
-# MAGIC 🖱️ **UI:** Left sidebar → Serving → AI Gateway tab → [your endpoint] → Usage & Logs tab → filter by status 429
-# MAGIC You should see: Rate-limited requests highlighted in the log with a 429 status. The "Rate limited" metric counter also appears in the summary cards at the top of the Usage & Logs tab.
+# MAGIC 🖱️ **UI:** AI Gateway → [your endpoint] → **Metrics tab** (shows request counts, latency, error rates) → filter by status 429
+# MAGIC You should see: Rate-limited requests in the Metrics tab. The 429 count appears in the error metrics.
 # MAGIC
 # MAGIC ⚡ **Or run the cell below to send a burst of concurrent requests and observe 429 responses in the output (uncomment `burst_test_rate_limit`):**
 
@@ -352,8 +352,8 @@ print("Safety tests are commented out — safe to run after endpoint is availabl
 # MAGIC | ACN (Australian Company Number) | 123 456 789 |
 # MAGIC | Email | john.citizen@example.com.au |
 # MAGIC
-# MAGIC 🖱️ **UI:** Left sidebar → Serving → AI Gateway tab → [your endpoint] → Playground tab → type a prompt containing "My TFN is 123 456 789"
-# MAGIC You should see: A guardrail error response (not a model answer) confirming PII blocking is active. The Usage & Logs tab will record this as a 400 status_code row.
+# MAGIC 🖱️ **UI:** Left sidebar → **AI Playground** (separate item in the left sidebar, not inside the AI Gateway endpoint) → type a prompt containing "My TFN is 123 456 789"
+# MAGIC You should see: A guardrail error response (not a model answer) confirming PII blocking is active.
 # MAGIC
 # MAGIC ⚡ **Or run the cell below to test all 9 AU PII patterns at once and print a pass/fail table (uncomment `run_au_pii_tests`):**
 

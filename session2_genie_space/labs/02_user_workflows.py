@@ -47,7 +47,7 @@ print(f"Space: {SPACE_ID}")
 # MAGIC 2. Parse and update the relevant section of the JSON
 # MAGIC 3. `PATCH /api/2.0/genie/spaces/{id}` — write it back
 # MAGIC
-# MAGIC **🖱️ UI:** Benchmarks tab (top-level tab in the space, alongside Configure) → + Add benchmark → paste title → add expected SQL
+# MAGIC **🖱️ UI:** **Benchmarks** tab (top-level, alongside About/Data/Instructions) → **+ Add benchmark** → paste title → add expected SQL
 # MAGIC
 # MAGIC **⚡ Automated:** run the cell below to replace the benchmark question set in one go.
 
@@ -255,7 +255,7 @@ else:
 # MAGIC ---
 # MAGIC ## Step 3: Text Instructions — last resort only
 # MAGIC
-# MAGIC **🖱️ UI:** Configure → Instructions → Text → + Add
+# MAGIC **🖱️ UI:** Configure → Instructions → **Text** → type in the text box → **Save** (there is no + Add button, just a text field and Save)
 # MAGIC
 # MAGIC **⚡ Automated:** replaces the text instructions array in one PATCH call.
 

@@ -79,7 +79,7 @@ else:
 # MAGIC ---
 # MAGIC ## Step 1: UC Column Comments
 # MAGIC
-# MAGIC **🖱️ UI:** Catalog → workshop_au → aemo → [table] → Columns tab → pencil icon on each column
+# MAGIC **🖱️ UI:** Catalog → workshop_au → aemo → [table] → **Overview tab** (not Columns tab) → hover over a column → click **Add comment** button that appears
 # MAGIC
 # MAGIC **⚡ Or run the cell below to automate all columns at once.**
 # MAGIC The script uses `ALTER TABLE … ALTER COLUMN … COMMENT` — which replaces any existing comment.
@@ -212,7 +212,7 @@ for table_fqn, desc in TABLE_DESCRIPTIONS.items():
 # MAGIC ---
 # MAGIC ## Step 3: Create the Space
 # MAGIC
-# MAGIC **🖱️ UI (do this first):** Left sidebar → Genie → + New Space
+# MAGIC **🖱️ UI (do this first):** Left sidebar → **Genie Spaces** → click **- New** (the button is labelled "- New", not "+ New Space")
 # MAGIC ```
 # MAGIC Title:       AEMO NEM Operations
 # MAGIC Description: Natural language access to NEM spot prices, dispatch data,
@@ -247,9 +247,9 @@ else:
 # MAGIC ---
 # MAGIC ## Step 4: Knowledge Store — synonyms, entity matching, joins
 # MAGIC
-# MAGIC **🖱️ UI for synonyms:** Configure → Data → [table] → column → Synonyms tab
-# MAGIC **🖱️ UI for entity matching:** Configure → Data → [table] → column → Format assistance → enable
-# MAGIC **🖱️ UI for joins:** Configure → Joins (top-level section in Configure, may be separate from Instructions depending on workspace version) → + Add
+# MAGIC **🖱️ UI for synonyms:** Configure → Data → [table] → click **pen icon** next to column → **Synonyms** tab → Save
+# MAGIC **🖱️ UI for entity matching:** Configure → Data → [table] → click **pen icon** next to column → **Advanced** → **Format assistance** → enable
+# MAGIC **🖱️ UI for joins:** Configure → Instructions → **Joins** → + Add
 # MAGIC
 # MAGIC Synonyms and entity matching are set in the space UI — do these manually in the Configure tab.
 # MAGIC The join relationship can also be set via the space settings API:
@@ -280,7 +280,7 @@ else:
     else:
         # Falls back to showing the manual UI steps
         print(f"API returned {resp.status_code} — add the join manually in the UI:")
-        print("  Configure → Joins (top-level section in Configure, may be separate from Instructions depending on workspace version) → + Add")
+        print("  Configure → Instructions → **Joins** → + Add")
         print("  Left: dispatch_intervals  |  Right: generator_registration")
         print("  Condition: dispatch_intervals.duid = generator_registration.duid")
         print("  Relationship: Many-to-one")

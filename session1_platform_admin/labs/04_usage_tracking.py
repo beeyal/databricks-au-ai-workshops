@@ -32,7 +32,7 @@
 # MAGIC
 # MAGIC **AI Gateway usage dashboard:**
 # MAGIC ```
-# MAGIC Navigate: Left sidebar → Serving → AI Gateway tab → [your endpoint] → Usage & Logs tab
+# MAGIC Navigate: AI Gateway → [your endpoint] → **Metrics tab**
 # MAGIC You should see: token consumption chart, request latency, error rates, and a per-request log with user, token count, and status.
 # MAGIC ```
 
@@ -88,7 +88,7 @@ for table in SYSTEM_TABLES:
 # MAGIC
 # MAGIC Each row in `system.ai_gateway.usage` represents one request routed through an AI Gateway endpoint. The table has ~15 minute latency — data from Labs 02/03 may already be visible.
 # MAGIC
-# MAGIC 🖱️ **UI:** Left sidebar → Serving → AI Gateway tab → [your endpoint] → Usage & Logs tab
+# MAGIC 🖱️ **UI:** AI Gateway → [your endpoint] → **Metrics tab**
 # MAGIC You should see: Token consumption chart, request latency, error rates (200/400/429 breakdown), and a per-request log with user, token count, and status. This is the visual summary of the same data queried below.
 # MAGIC
 # MAGIC ⚡ **Or run the cells below to query `system.ai_gateway.usage` directly for custom aggregations and cost attribution:**

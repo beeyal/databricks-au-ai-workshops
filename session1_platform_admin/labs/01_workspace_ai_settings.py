@@ -136,7 +136,7 @@ print("Token         : [loaded]")
 # MAGIC
 # MAGIC ---
 # MAGIC
-# MAGIC 🖱️ **UI:** Click username (top-right) → Settings → look for AI / Machine Learning or Previews section
+# MAGIC 🖱️ **UI:** There is no standard Settings → AI features path. Use the API check below — or ask your workspace admin to verify the feature is enabled via the Account Console.
 # MAGIC You should see: toggles for Genie Spaces, AI/BI Dashboards, AI Playground. Exact section name varies by workspace version. Export/download toggles may be under Settings → Workspace settings → Advanced.
 # MAGIC
 # MAGIC > **Geography enforcement interaction:** When the geography enforcement toggle is ON, cross-geo models (e.g. FMAPI Pay-Per-Token) are hidden from the AI Playground model picker. If users report missing models in the Playground, verify geography enforcement status before troubleshooting anything else.
@@ -617,7 +617,7 @@ print("Genie Space permission calls are commented out — uncomment after settin
 # MAGIC
 # MAGIC Automated AI workloads (scheduled inference jobs, embedding pipelines) should run as service principals — not personal accounts. This prevents workload failure when staff leave, provides a clean audit trail in `system.access.audit`, and enables least-privilege access.
 # MAGIC
-# MAGIC 🖱️ **UI:** accounts.cloud.databricks.com → User management → Service principals tab → Add service principal
+# MAGIC 🖱️ **UI:** Settings (top-right username) → Identity and Access → Service principals → Add service principal
 # MAGIC You should see: A name field — enter `svc-<workload>` format. After creation, go to the SP detail page → Secrets tab → Generate secret (save the secret immediately — it is shown once only).
 # MAGIC
 # MAGIC ⚡ **Or run the cell below to create the service principal via the SDK (uncomment the call):**
@@ -718,7 +718,7 @@ print("SP group assignment is commented out — run after creating the service p
 # MAGIC | `grp_ai_admins` | CAN_MANAGE | CAN_MANAGE | Yes |
 # MAGIC | `grp_data_science` | CAN_USE (dev) | CAN_MANAGE | Yes |
 # MAGIC
-# MAGIC 🖱️ **UI:** accounts.cloud.databricks.com → User management → Groups tab → Add group
+# MAGIC 🖱️ **UI:** Settings (top-right username) → Identity and Access → Groups → Add group
 # MAGIC You should see: A name field. Enter the group name, then add members and assign workspace access from the group detail page.
 # MAGIC
 # MAGIC ⚡ **Or run the cell below to create all four governance groups in one pass (uncomment to execute):**
