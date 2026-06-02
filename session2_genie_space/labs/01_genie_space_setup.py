@@ -22,6 +22,16 @@
 # MAGIC > ⚠️ **Prerequisite:** Both workspace settings must be ON before Genie works:
 # MAGIC > Geography enforcement (Account Console → Security and compliance) + Partner-Powered AI Features (workspace settings). Never disable Partner-Powered — it kills Genie entirely.
 # MAGIC
+# MAGIC ## Genie Space structure (verified in UI)
+
+# MAGIC ```
+# MAGIC Top-level tabs: Chat | Monitor | Benchmark | Configure | Share
+# MAGIC
+# MAGIC Configure sub-tabs: About | Data | Instructions
+# MAGIC
+# MAGIC Instructions sub-tabs: Text | Joins | SQL Expressions | SQL Queries
+# MAGIC ```
+# MAGIC
 # MAGIC ## Priority stack
 # MAGIC
 # MAGIC | Priority | Method | Why |
