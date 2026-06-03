@@ -591,7 +591,7 @@ for prompt in KEYWORD_TEST_CASES:
 # MAGIC <h2 style="color: #1B3139; margin: 0">Section 6: Full Guardrail Verification Report</h2>
 # MAGIC </div>
 # MAGIC
-# MAGIC The function below produces a structured verification report suitable for inclusion in an SOCI Act + Privacy Act compliance evidence package. It checks config via API, then runs live functional tests for PII blocking and safety filtering.
+# MAGIC The function below produces a structured verification report suitable for inclusion in an regulatory compliance evidence package. It checks config via API, then runs live functional tests for PII blocking and safety filtering.
 # MAGIC
 # MAGIC 🖱️ **UI:** Left sidebar → Serving → AI Gateway tab → [your endpoint] → Overview tab → scroll to Guardrails section
 # MAGIC You should see: PII and safety guardrail status for both input and output. Copy a screenshot of this page as the visual evidence artefact for your audit package.

@@ -31,7 +31,7 @@
 # MAGIC **Task 1 — Geography Enforcement toggle (Account Console only)**
 # MAGIC
 # MAGIC Navigate: accounts.cloud.databricks.com → Workspaces → [your workspace name] → Security and compliance tab
-# MAGIC You should see: Toggle labelled "Enforce data processing within workspace Geography for Designated Services" — it must be ON for SOCI Act / critical infrastructure regulated workloads.
+# MAGIC You should see: Toggle labelled "Enforce data processing within workspace Geography for Designated Services" — it must be ON for regulated workloads.
 # MAGIC
 # MAGIC > This setting is NOT in the workspace admin console. It lives on the workspace detail page inside the Account Console.
 # MAGIC
@@ -215,7 +215,7 @@ for key in WORKSPACE_CONF_KEYS:
 
 # MAGIC %md
 # MAGIC ---
-# MAGIC **General workspace security settings worth reviewing (not specific to SOCI Act — check with your CISO):**
+# MAGIC **General workspace security settings worth reviewing (not specific to Australian regulatory requirements — check with your CISO):**
 # MAGIC
 # MAGIC | Key | Common secure value | What it controls |
 # MAGIC |---|---|---|
@@ -260,7 +260,7 @@ print("Genie Space toggle: commented out for safety. Uncomment to make a change.
 # MAGIC %md
 # MAGIC ## Section 3: Verify "Enforce Data Processing Within Geography"
 # MAGIC
-# MAGIC This is the single most important compliance setting for SOCI Act / critical infrastructure regulated entities. When enabled, it prevents Databricks features from routing data outside the workspace region (AU East).
+# MAGIC This is the single most important compliance setting for regulated entities. When enabled, it prevents Databricks features from routing data outside the workspace region (AU East).
 # MAGIC
 # MAGIC **Who can change it:** Account Admins only. Workspace-only Admins will receive a 403 — expected.
 # MAGIC
@@ -333,7 +333,7 @@ def compliance_check_geography(setting_response: dict) -> None:
       }
 
     is_enforced=true means CSP is enforced at account level (cannot be overridden per workspace).
-    For SOCI Act / critical infrastructure workloads, also verify the per-workspace Geography
+    For Australian data residency workloads, also verify the per-workspace Geography
     enforcement toggle in Account Console -> Workspaces -> [workspace] -> Security and compliance.
     """
     if "error" in setting_response:

@@ -274,7 +274,7 @@ display(playground_usage)
 
 # COMMAND ----------
 
-# AI Gateway configuration changes — change management audit evidence (SOCI Act 2018)
+# AI Gateway configuration changes — change management audit evidence (Australian data residency requirements)
 gateway_changes = spark.sql("""
   SELECT
     event_time,
