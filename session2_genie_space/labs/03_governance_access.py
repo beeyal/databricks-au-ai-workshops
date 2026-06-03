@@ -129,22 +129,92 @@ else:
 # MAGIC ---
 # MAGIC ## Step 2: Diagnose and Fix Failures
 # MAGIC
-# MAGIC For each "Bad" benchmark — click to expand and read the generated SQL.
+# MAGIC For each "Bad" or "Needs Review" benchmark — click to expand and read the generated SQL.
+# MAGIC The Benchmark tab shows three assessment codes. Each has a specific fix path.
 # MAGIC
-# MAGIC **AEMO-specific debugging (Slide 36 — Iteration rule):**
+# MAGIC ---
 # MAGIC
-# MAGIC | Symptom | Likely cause | Fix |
+# MAGIC ### Assessment code reference
+# MAGIC
+# MAGIC #### 🔴 `EMPTY_RESULT`
+# MAGIC Genie's SQL executed successfully but returned 0 rows.
+# MAGIC
+# MAGIC **Most common cause in this workshop:** the benchmark expected SQL uses `CURRENT_DATE - 1`,
+# MAGIC `CURRENT_DATE - INTERVAL 7 DAYS`, or `DATE_TRUNC('month', CURRENT_DATE)` — but the synthetic
+# MAGIC training data ends at **2025-12-31**. Any date filter referencing today (2026) returns zero rows,
+# MAGIC so the LLM judge marks it BAD because it cannot compare result sets.
+# MAGIC
+# MAGIC **Fix:** Update the benchmark's expected SQL to use a hardcoded date within the data range:
+# MAGIC
+# MAGIC | Original filter | Replace with |
+# MAGIC |---|---|
+# MAGIC | `DATE(settlement_date) = CURRENT_DATE - 1` | `DATE(settlement_date) = '2025-12-31'` |
+# MAGIC | `settlement_date >= CURRENT_DATE - INTERVAL 7 DAYS` | `settlement_date >= '2025-12-25'` |
+# MAGIC | `settlement_date >= DATE_TRUNC('month', CURRENT_DATE)` | `settlement_date >= '2025-12-01'` |
+# MAGIC | `issue_time >= CURRENT_TIMESTAMP - INTERVAL 30 DAYS` | `issue_time >= '2025-12-01'` |
+# MAGIC
+# MAGIC In production (with live data), these filters are correct — update them back before go-live.
+# MAGIC
+# MAGIC 🖱️ **UI:** Benchmark tab → click the failing benchmark → Edit → update the Expected SQL → Save
+# MAGIC
+# MAGIC ---
+# MAGIC
+# MAGIC #### 🟡 `LLM_JUDGE_MISSING_OR_INCORRECT_FILTER`
+# MAGIC Genie's SQL ran and returned data, but the LLM judge detected a missing or wrong filter
+# MAGIC compared to what the benchmark expected.
+# MAGIC
+# MAGIC **Common causes and fixes:**
+# MAGIC
+# MAGIC | What you see in Genie's SQL | Cause | Fix |
 # MAGIC |---|---|---|
-# MAGIC | Used `region_id = 'NSW'` instead of `'NSW1'` | Entity matching not enabled | Enable entity matching for region_id |
-# MAGIC | Used `notice_type = 'LOR'` instead of `LIKE 'LOR%'` | No entity matching for notice_type | Enable entity matching for notice_type; add usage guidance to LOR golden query |
-# MAGIC | Didn't join to generator_registration | Join relationship not configured | Add join in Configure → Instructions → Joins |
-# MAGIC | Wrong column name for price | Synonym not set | Add 'price', 'spot price' as synonyms for rrp |
-# MAGIC | Wrong date filter | No guidance on date column | Add column description for settlement_date |
+# MAGIC | Genie added extra columns (`interval_count`, `max_price`, `min_settlement_date`) | Genie being "helpful" — not wrong, just unexpected | Either accept it (update benchmark expected SQL to allow extra cols) or add a golden query that returns exactly the columns you want |
+# MAGIC | Date filter is missing or broadened (shows all dates instead of last 7 days) | Date column description doesn't make the range requirement clear | Strengthen the `settlement_date` column description, or add a golden query with an explicit date parameter |
+# MAGIC | Region filter dropped (`WHERE region_id = 'QLD1'` missing) | Ambiguous question phrasing | Rephrase the benchmark question to be more explicit, e.g. "in QLD1" not "in QLD" |
+# MAGIC | `ROUND(SUM(dispatch_mw)/12, 1)` changed to `SUM(dispatch_mw)/12` | Column description doesn't specify rounding | Add rounding to the column description for `dispatch_mw` |
 # MAGIC
-# MAGIC **After fixing → re-run the specific failing benchmark:**
+# MAGIC **Quick check:** open the benchmark detail, compare Genie's SQL to the expected SQL side by side.
+# MAGIC If the logic is correct and only column names differ → update the benchmark.
+# MAGIC If the logic is wrong → add a golden query to override Genie's generation for this pattern.
+# MAGIC
+# MAGIC ---
+# MAGIC
+# MAGIC #### 🔴 `RESULT_MISSING_COLUMNS`
+# MAGIC Genie's result has different columns from what the benchmark expected.
+# MAGIC
+# MAGIC **Common causes and fixes:**
+# MAGIC
+# MAGIC | What you see | Cause | Fix |
+# MAGIC |---|---|---|
+# MAGIC | `avg_spot_price` instead of `avg_price_mwh` | Genie chose a different alias | Add `avg_price_mwh` as a synonym for `rrp` so Genie learns the preferred naming convention |
+# MAGIC | Genie returned `date, num_intervals, avg_spot_price` instead of `region_id, avg_price_mwh` | No data for the expected date range → Genie rewrote the query to show available dates | First fix the `EMPTY_RESULT` root cause (update benchmark dates), then re-run |
+# MAGIC | Extra columns added | Genie is being helpful | Add a golden query with the exact column list you want |
+# MAGIC
+# MAGIC **Rule of thumb:** `RESULT_MISSING_COLUMNS` on its own → fix with a golden query.
+# MAGIC `RESULT_MISSING_COLUMNS` + `LLM_JUDGE_MISSING_OR_INCORRECT_FILTER` together → start by fixing the date/filter issue first, then see if columns self-correct.
+# MAGIC
+# MAGIC ---
+# MAGIC
+# MAGIC ### AEMO-specific symptom → fix table
+# MAGIC
+# MAGIC | Symptom in generated SQL | Likely cause | Fix |
+# MAGIC |---|---|---|
+# MAGIC | `region_id = 'NSW'` instead of `'NSW1'` | Entity matching not enabled | Configure → Data → spot_prices → region_id → Format assistance → enable |
+# MAGIC | `notice_type = 'LOR'` instead of `LIKE 'LOR%'` | No entity matching for notice_type | Enable entity matching for notice_type; the LOR golden query already uses `LIKE 'LOR%'` |
+# MAGIC | No join to `generator_registration` | Join not configured | Configure → Instructions → Joins — verify the join is listed |
+# MAGIC | `rrp` called `spot_price` or `price` | Synonym for rrp not set | Configure → Data → spot_prices → rrp → Synonyms → add "price", "spot price" |
+# MAGIC | Date filter missing entirely | No data for queried range, Genie adapted | Update benchmark to use historical date (see EMPTY_RESULT fix above) |
+# MAGIC | Genie says "no data available for yesterday" | Data ends 2025-12-31 | Update benchmark expected SQL to use `'2025-12-31'` |
+# MAGIC | `SUM(dispatch_mw)/12` not divided | `dispatch_mw` description doesn't mention MWh conversion | Column description for `dispatch_mw` already says "divide by 12 for MWh" — check it's saved |
+# MAGIC | Renewable defined as solar+wind+hydro+battery | Genie included hydro/battery in "renewable" | Add a text instruction: "Renewable generation = solar and wind only. Hydro and battery are separate categories." |
+# MAGIC
+# MAGIC ---
+# MAGIC
+# MAGIC **After fixing → re-run just the failing benchmark:**
 # MAGIC ```
-# MAGIC Benchmark tab (top-level) → select failing question → Run selected
+# MAGIC Benchmark tab → click the failing question → Run selected
 # MAGIC ```
+# MAGIC Do not re-run all benchmarks after every change — it's slow and wastes quota.
+# MAGIC Re-run the full set only when you want to measure overall progress.
 
 # COMMAND ----------
 
