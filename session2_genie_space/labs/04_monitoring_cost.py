@@ -9,7 +9,7 @@
 # MAGIC |---|---|
 # MAGIC | ⏱️ **Duration** | 25 minutes |
 # MAGIC | **Prerequisites** | Lab 03 complete — benchmarks run, at least one iteration done |
-# MAGIC | **Covers** | Slides 24–25 — Audit Logging, Monitor Budgets, cost tracking |
+# MAGIC | **Covers** | Slides 19, 32 — Audit logging, feedback alerts, cost tracking |
 # MAGIC
 # MAGIC > *"Genie logs each event with user identity, timestamp, and workspace — done through System Tables."*
 # MAGIC > *(Slide 19 — Audit Logging)*

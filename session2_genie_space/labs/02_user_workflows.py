@@ -9,7 +9,7 @@
 # MAGIC |---|---|
 # MAGIC | ⏱️ **Duration** | 35 minutes |
 # MAGIC | **Prerequisites** | Lab 01 complete — Genie Space created, Space ID pasted in widget |
-# MAGIC | **Covers** | Slides 12–15 — Benchmarks, Golden Queries, Text Instructions |
+# MAGIC | **Covers** | Slides 25, 28–29 — Benchmarks first, then Example SQL, then Text |
 # MAGIC
 # MAGIC > *"Create benchmarks before you iterate on instructions. Run them as a regression test with every change."*
 

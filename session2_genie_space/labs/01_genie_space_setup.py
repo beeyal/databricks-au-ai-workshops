@@ -9,7 +9,7 @@
 # MAGIC |---|---|
 # MAGIC | ⏱️ **Duration** | 40 minutes |
 # MAGIC | **Prerequisites** | AEMO tables loaded — run `session2_genie_space/setup/setup.py` first if not done by facilitator |
-# MAGIC | **Covers** | Slides 6–10 — Mental model, topic selection, UC Metadata, Knowledge Store |
+# MAGIC | **Covers** | Slides 9, 23–27 — Setup, UC Metadata, Knowledge Store |
 # MAGIC
 # MAGIC > **Before running any code cell:** confirm `workshop_au.aemo` tables exist — run the verify cell below. If tables are missing, ask your facilitator to run `session2_genie_space/setup/setup.py`.
 # MAGIC
