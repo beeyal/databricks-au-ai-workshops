@@ -9,7 +9,7 @@
 # MAGIC |---|---|
 # MAGIC | ⏱️ **Duration** | 30 minutes |
 # MAGIC | **Prerequisites** | Lab 02 complete — benchmarks uploaded and baseline score noted |
-# MAGIC | **Covers** | Slides 13, 16, 31–32 — Feedback, Benchmarks, Rollout, Alerts |
+# MAGIC | **Covers** | Slides 17–20 — Learning, User Feedback, Rollout, Alerts |
 # MAGIC
 # MAGIC ---
 # MAGIC
