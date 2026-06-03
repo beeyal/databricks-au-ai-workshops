@@ -41,11 +41,11 @@ Following the official Databricks Genie best practices (docs + internal field gu
 
 | Lab | Title | Duration | Focus |
 |---|---|---|---|
-| 01 | Designing and Setting Up Your Genie Space | 40 min | Design principles, UC metadata, create via UI |
-| 02 | The Instruction Hierarchy | 35 min | SQL Expressions, golden queries, joins, text instructions |
-| 03 | Benchmarks, Monitoring & Iteration | 30 min |
-| 04 | Monitoring Usage, Cost & Feedback | 25 min |
-| 05 | Operating Model — Exploratory vs Certified | 20 min | Benchmark loop, Monitor tab, feedback alerts, rollout |
+| 01 | Create Your Genie Space | 40 min | UC metadata, create via UI, synonyms, entity matching, joins |
+| 02 | Benchmarks, Golden Queries & Instructions | 35 min | Benchmarks first, golden queries, text instructions |
+| 03 | Benchmark, Monitor & Rollout | 30 min | Run benchmark loop, Monitor tab, feedback alerts, rollout phases |
+| 04 | Monitoring Usage, Cost & Feedback | 25 min | Audit system tables, cost tracking, feedback alert, dashboard |
+| 05 | The Operating Model | 20 min | Exploratory vs Certified, certification checklist, space registry, permissions |
 
 ---
 
@@ -61,10 +61,10 @@ Following the official Databricks Genie best practices (docs + internal field gu
 ## Facilitator setup (run before session)
 
 ```
-session2_genie_space/genie_config/aemo_space_config.py
+session2_genie_space/setup/setup.py
 ```
 
-Runs in ~5 minutes. Creates and validates a reference AEMO Genie Space so the facilitator can demonstrate a complete, well-configured space.
+Runs in ~5 minutes. Loads all 6 AEMO Delta tables into `workshop_au.aemo`, sets column comments and table descriptions, and grants participant access. Run this before the session so participants can start Lab 01 immediately.
 
 ---
 

@@ -15,7 +15,7 @@
 
 dbutils.widgets.text("catalog",      "workshop_au",             "Catalog")
 dbutils.widgets.text("schema",       "aemo",                    "Schema")
-dbutils.widgets.text("data_path",    "dbfs:/tmp/au_workshop/sample_data/aemo", "DBFS path to AEMO CSVs")
+dbutils.widgets.text("data_path",    "dbfs:/tmp/au_workshop/sample_data/aemo", "Path to AEMO CSVs (DBFS or /Workspace/...)")
 
 CATALOG   = dbutils.widgets.get("catalog")
 SCHEMA    = dbutils.widgets.get("schema")
@@ -24,8 +24,14 @@ DATA_PATH = dbutils.widgets.get("data_path")
 print(f"Catalog : {CATALOG}.{SCHEMA}")
 print(f"Data    : {DATA_PATH}")
 print()
-print("Upload CSVs first if not already on DBFS:")
+print("Upload CSVs to the data path before running.")
+print()
+print("Option A — DBFS (standard workspaces):")
 print(f"  databricks fs cp -r ./data/sample_data/aemo/ {DATA_PATH}/")
+print()
+print("Option B — Workspace files (FEVM / DBFS disabled):")
+print("  Change data_path widget to /Workspace/Repos/<your-repo>/data/sample_data/aemo")
+print("  (FEVM and some hardened workspaces disable DBFS — use /Workspace/Repos/... instead)")
 
 # COMMAND ----------
 

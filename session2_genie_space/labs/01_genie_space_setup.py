@@ -64,6 +64,7 @@ REQUIRED_TABLES = [
     f"{CATALOG}.{SCHEMA}.market_notices",
     f"{CATALOG}.{SCHEMA}.generator_registration",
     f"{CATALOG}.{SCHEMA}.settlement_amounts",
+    f"{CATALOG}.{SCHEMA}.constraint_sets",
 ]
 
 missing = []
@@ -152,6 +153,16 @@ COLUMN_COMMENTS = {
         "total_aud":                    "Net settlement amount in AUD.",
         "settlement_status":            "FINAL, PENDING, or DISPUTED.",
     },
+    f"{CATALOG}.{SCHEMA}.constraint_sets": {
+        "constraint_id":         "Unique constraint identifier e.g. S_RADIAL_SA_1.",
+        "constraint_type":       "Type of constraint: thermal, voltage, stability.",
+        "activated_datetime":    "When the constraint became active.",
+        "deactivated_datetime":  "When the constraint was lifted. NULL if still active.",
+        "reason":                "Free-text description of why the constraint was activated.",
+        "rhs_value":             "Right-hand side MW limit of the constraint equation.",
+        "region_affected":       "NEM region impacted by this constraint.",
+        "interconnector":        "True if this constraint involves an interconnector flow.",
+    },
 }
 
 results = []
@@ -206,6 +217,10 @@ TABLE_DESCRIPTIONS = {
         "run_type: FINAL = confirmed, PRELIMINARY = estimate. "
         "total_aud = net settlement amount in AUD."
     ),
+    f"{CATALOG}.{SCHEMA}.constraint_sets": (
+        "NEM network and system constraints. Activated when a network element is at risk. "
+        "rhs_value = MW limit. Join region_affected to spot_prices.region_id."
+    ),
 }
 
 for table_fqn, desc in TABLE_DESCRIPTIONS.items():
@@ -245,7 +260,7 @@ if SPACE_ID:
     if resp.status_code == 200:
         s = resp.json()
         print(f"✅ Space: {s.get('title')}")
-        print(f"   URL: https://{HOST}/genie/spaces/{SPACE_ID}")
+        print(f"   URL: https://{HOST}/genie/rooms/{SPACE_ID}")
     else:
         print(f"❌ {resp.status_code}: {resp.text[:200]}")
 else:
@@ -324,7 +339,7 @@ else:
 # MAGIC ## ✅ Lab 01 Checkpoint
 # MAGIC - [ ] Column comments set (automated ✅)
 # MAGIC - [ ] Table descriptions set (automated ✅)
-# MAGIC - [ ] Space created with 3 tables, Space ID in widget
+# MAGIC - [ ] Space created with 4 tables, Space ID in widget
 # MAGIC - [ ] Synonyms added for region_id and rrp (UI)
 # MAGIC - [ ] Entity matching enabled for region_id and notice_type (UI)
 # MAGIC - [ ] Join configured (API or UI)

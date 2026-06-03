@@ -102,7 +102,7 @@ import requests
 if not SPACE_IDS:
     print("No Space IDs provided — skipping Genie Space deletion.")
     print("To delete spaces, enter their IDs in the 'space_ids' widget (comma-separated).")
-    print("Find Space IDs in the browser URL when you open a space: .../genie/spaces/{id}")
+    print("Find Space IDs in the browser URL when you open a space: .../genie/rooms/{id}")
 else:
     for sid in SPACE_IDS:
         # First get the space name so we know what we're deleting
@@ -111,12 +111,12 @@ else:
 
         if DRY_RUN:
             print(f"  [DRY RUN] Would delete Genie Space: '{name}' ({sid})")
+            print(f"           Note: Genie Spaces must be deleted manually in the UI.")
         else:
-            resp = requests.delete(f"https://{HOST}/api/2.0/genie/spaces/{sid}", headers=HEADERS)
-            if resp.status_code in (200, 204):
-                print(f"  ✅ Deleted Genie Space: '{name}' ({sid})")
-            else:
-                print(f"  ⚠️  Could not delete '{name}' ({sid}): {resp.status_code} {resp.text[:100]}")
+            # The Genie API does not expose a DELETE endpoint for spaces.
+            # Spaces must be deleted manually in the UI.
+            print(f"  ⚠️  '{name}' ({sid}) — no DELETE API available.")
+            print(f"      Delete manually: open the space → ⋮ menu → Delete")
 
 # COMMAND ----------
 

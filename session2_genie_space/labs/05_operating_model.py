@@ -113,51 +113,62 @@ if SPACE_ID:
 else:
     check("Space ID provided", False, fix="Enter Space ID in widget above")
 
-# ── 3. Golden queries ────────────────────────────────────────────────────────
-# Note: /sql-queries, /benchmark-runs, and /instructions sub-paths are internal
-# Databricks endpoints not published in the public Genie API spec. They work in
-# practice but may change without notice. Failures are handled gracefully below.
+# ── 3. Golden queries + instructions (via serialized_space) ──────────────────
+# /sql-queries and /instructions do NOT exist as public sub-endpoints.
+# All space config is read via ?include_serialized_space=true on the GET endpoint.
 if SPACE_ID:
-    qresp = requests.get(f"https://{HOST}/api/2.0/genie/spaces/{SPACE_ID}/sql-queries",
-                         headers=HEADERS)
-    if qresp.status_code == 200:
-        n_queries = len(qresp.json().get("sql_queries", []))
-        check("10+ golden queries", n_queries >= 5,
+    cfg_resp = requests.get(
+        f"https://{HOST}/api/2.0/genie/spaces/{SPACE_ID}",
+        params={"include_serialized_space": "true"},
+        headers=HEADERS
+    )
+    if cfg_resp.status_code == 200:
+        import json as _json
+        raw = cfg_resp.json().get("serialized_space") or "{}"
+        cfg = _json.loads(raw)
+
+        n_queries = len(cfg.get("sql_queries", []))
+        check("5+ golden queries", n_queries >= 5,
               detail=f"{n_queries} queries (target 10+, workshop minimum 5)",
               fix="Run Lab 02 Step 2 automated script")
-    else:
-        check("Golden queries readable", False,
-              detail=f"HTTP {qresp.status_code} — endpoint may not be available in this workspace")
 
-# ── 4. Benchmarks ────────────────────────────────────────────────────────────
-if SPACE_ID:
-    bresp = requests.get(f"https://{HOST}/api/2.0/genie/spaces/{SPACE_ID}/benchmark-runs",
-                         headers=HEADERS)
-    if bresp.status_code == 200:
-        runs = bresp.json().get("benchmark_runs", [])
-        if runs:
-            latest  = runs[0]
-            results = latest.get("benchmark_results", [])
-            good    = sum(1 for r in results if r.get("rating") == "GOOD")
-            total   = len(results)
-            score   = round(good * 100 / total) if total else 0
-            check("Benchmark score ≥80%", score >= 80,
-                  detail=f"{score}% ({good}/{total} Good)",
-                  fix="Run Lab 03 — identify failures, add golden queries, re-run")
-        else:
-            check("Benchmarks run at least once", False, fix="Run Lab 03 Step 1")
-    else:
-        check("Benchmarks accessible", False)
-
-# ── 5. Instructions ──────────────────────────────────────────────────────────
-if SPACE_ID:
-    iresp = requests.get(f"https://{HOST}/api/2.0/genie/spaces/{SPACE_ID}/instructions",
-                         headers=HEADERS)
-    if iresp.status_code == 200:
-        n_instr = len(iresp.json().get("instructions", []))
+        n_instr = len(cfg.get("text_instructions", []))
         check("Text instructions present", n_instr >= 1,
               detail=f"{n_instr} instructions",
               fix="Run Lab 02 Step 3 automated script")
+    else:
+        check("Space config readable", False,
+              detail=f"HTTP {cfg_resp.status_code} — verify SPACE_ID widget")
+
+# ── 4. Benchmarks (via eval-runs endpoint) ───────────────────────────────────
+if SPACE_ID:
+    bresp = requests.get(f"https://{HOST}/api/2.0/genie/spaces/{SPACE_ID}/eval-runs",
+                         headers=HEADERS)
+    if bresp.status_code == 200:
+        runs = bresp.json().get("eval_runs", [])
+        if runs:
+            latest_run_id = runs[0].get("eval_run_id")
+            # Fetch results for the latest run
+            rresp = requests.get(
+                f"https://{HOST}/api/2.0/genie/spaces/{SPACE_ID}/eval-runs/{latest_run_id}/results",
+                headers=HEADERS
+            )
+            if rresp.status_code == 200:
+                result_items = rresp.json().get("eval_results", [])
+                good  = sum(1 for r in result_items if r.get("assessment") == "GOOD")
+                total = len(result_items)
+                score = round(good * 100 / total) if total else 0
+                check("Benchmark score ≥80%", score >= 80,
+                      detail=f"{score}% ({good}/{total} Good)",
+                      fix="Run Lab 03 — identify failures, add golden queries, re-run")
+            else:
+                check("Benchmark results readable", False,
+                      detail=f"HTTP {rresp.status_code}")
+        else:
+            check("Benchmarks run at least once", False, fix="Run Lab 03 Step 1")
+    else:
+        check("Benchmarks accessible (eval-runs)", False,
+              detail=f"HTTP {bresp.status_code}")
 
 # ── 6. Owner set ─────────────────────────────────────────────────────────────
 check("Named space owner provided", bool(OWNER),
@@ -222,20 +233,34 @@ if SPACE_ID:
     tables_list = ""
 
     try:
-        bresp = requests.get(f"https://{HOST}/api/2.0/genie/spaces/{SPACE_ID}/benchmark-runs",
+        # Benchmark score from eval-runs endpoint
+        bresp = requests.get(f"https://{HOST}/api/2.0/genie/spaces/{SPACE_ID}/eval-runs",
                              headers=HEADERS)
         if bresp.status_code == 200:
-            runs = bresp.json().get("benchmark_runs", [])
+            runs = bresp.json().get("eval_runs", [])
             if runs:
-                results = runs[0].get("benchmark_results", [])
-                good = sum(1 for r in results if r.get("rating") == "GOOD")
-                total_r = len(results)
-                score = round(good * 100 / total_r) if total_r else 0
+                latest_run_id = runs[0].get("eval_run_id")
+                rresp = requests.get(
+                    f"https://{HOST}/api/2.0/genie/spaces/{SPACE_ID}/eval-runs/{latest_run_id}/results",
+                    headers=HEADERS
+                )
+                if rresp.status_code == 200:
+                    result_items = rresp.json().get("eval_results", [])
+                    good = sum(1 for r in result_items if r.get("assessment") == "GOOD")
+                    total_r = len(result_items)
+                    score = round(good * 100 / total_r) if total_r else 0
 
-        qresp = requests.get(f"https://{HOST}/api/2.0/genie/spaces/{SPACE_ID}/sql-queries",
-                             headers=HEADERS)
-        if qresp.status_code == 200:
-            n_queries = len(qresp.json().get("sql_queries", []))
+        # Golden query count from serialized_space
+        cfg_resp = requests.get(
+            f"https://{HOST}/api/2.0/genie/spaces/{SPACE_ID}",
+            params={"include_serialized_space": "true"},
+            headers=HEADERS
+        )
+        if cfg_resp.status_code == 200:
+            import json as _json
+            raw = cfg_resp.json().get("serialized_space") or "{}"
+            cfg = _json.loads(raw)
+            n_queries = len(cfg.get("sql_queries", []))
 
         sresp = requests.get(f"https://{HOST}/api/2.0/genie/spaces/{SPACE_ID}",
                              headers=HEADERS)
