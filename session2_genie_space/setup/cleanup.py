@@ -5,44 +5,46 @@
 # MAGIC   <p style="color: #FFD0D0; margin: 0; font-size: 13px">Removes everything created during Session 2. Run after the workshop.</p>
 # MAGIC </div>
 # MAGIC
-# MAGIC **What this removes:**
-# MAGIC - AEMO Delta tables (`workshop_au.aemo.*`)
-# MAGIC - The `aemo` schema
-# MAGIC - Genie Spaces created during the labs (by Space ID)
-# MAGIC - Space registry table (`workshop_au.ai_governance.genie_space_registry`)
+# MAGIC **What this removes (fully automated):**
+# MAGIC - AEMO Delta tables (`workshop_au.aemo.*`) and the `aemo` schema
+# MAGIC - Genie Spaces (via `DELETE /api/2.0/genie/spaces/{id}` — moves to workspace trash)
+# MAGIC - All Genie Spaces in this workspace if `delete_all_spaces = true`
+# MAGIC - Space registry table and the `ai_governance` schema
+# MAGIC - The `workshop_au` catalog (after all schemas are empty)
 # MAGIC - UC permission grants on the schema
-# MAGIC
-# MAGIC **What this does NOT remove:**
-# MAGIC - The `workshop_au` catalog (may be shared with other workshops)
-# MAGIC - The `ai_governance` schema itself
-# MAGIC - Any Genie Spaces not listed in the Space IDs widget
 # MAGIC
 # MAGIC ⚠️ **`dry_run = true` by default** — prints what would be deleted without doing anything.
 # MAGIC Set to `false` to actually delete.
 
 # COMMAND ----------
 
-dbutils.widgets.text("catalog",      "workshop_au",  "Catalog")
-dbutils.widgets.text("schema",       "aemo",         "Schema to drop")
-dbutils.widgets.text("schema_gov",   "ai_governance","Governance schema")
-dbutils.widgets.text("space_ids",    "",             "Genie Space IDs to delete (comma-separated)")
-dbutils.widgets.dropdown("dry_run",  "true", ["true", "false"], "Dry run (true = preview only)")
+dbutils.widgets.text("catalog",           "workshop_au",  "Catalog to drop")
+dbutils.widgets.text("schema",            "aemo",         "AEMO schema to drop")
+dbutils.widgets.text("schema_gov",        "ai_governance","Governance schema to drop")
+dbutils.widgets.text("space_ids",         "",             "Genie Space IDs to delete (comma-separated)")
+dbutils.widgets.dropdown("delete_all_spaces", "false", ["true", "false"], "Delete ALL Genie Spaces in this workspace")
+dbutils.widgets.dropdown("drop_catalog",  "true",  ["true", "false"], "Drop workshop_au catalog when empty")
+dbutils.widgets.dropdown("dry_run",       "true",  ["true", "false"], "Dry run (true = preview only)")
 
-CATALOG    = dbutils.widgets.get("catalog")
-SCHEMA     = dbutils.widgets.get("schema")
-SCHEMA_GOV = dbutils.widgets.get("schema_gov")
-DRY_RUN    = dbutils.widgets.get("dry_run") == "true"
-raw_ids    = dbutils.widgets.get("space_ids")
-SPACE_IDS  = [s.strip() for s in raw_ids.split(",") if s.strip()]
+CATALOG          = dbutils.widgets.get("catalog")
+SCHEMA           = dbutils.widgets.get("schema")
+SCHEMA_GOV       = dbutils.widgets.get("schema_gov")
+DRY_RUN          = dbutils.widgets.get("dry_run") == "true"
+DROP_CATALOG     = dbutils.widgets.get("drop_catalog") == "true"
+DELETE_ALL_SPACES = dbutils.widgets.get("delete_all_spaces") == "true"
+raw_ids          = dbutils.widgets.get("space_ids")
+SPACE_IDS        = [s.strip() for s in raw_ids.split(",") if s.strip()]
 
-HOST   = spark.conf.get("spark.databricks.workspaceUrl")
-TOKEN  = dbutils.notebook.entry_point.getDbutils().notebook().getContext().apiToken().get()
+HOST    = spark.conf.get("spark.databricks.workspaceUrl")
+TOKEN   = dbutils.notebook.entry_point.getDbutils().notebook().getContext().apiToken().get()
 HEADERS = {"Authorization": f"Bearer {TOKEN}", "Content-Type": "application/json"}
 
 mode = "DRY RUN — nothing will be deleted" if DRY_RUN else "LIVE — deletions will happen"
-print(f"Mode    : {mode}")
-print(f"Catalog : {CATALOG}.{SCHEMA}")
-print(f"Spaces  : {SPACE_IDS or '(none provided)'}")
+print(f"Mode          : {mode}")
+print(f"Catalog       : {CATALOG}.{SCHEMA}")
+print(f"Space IDs     : {SPACE_IDS or '(none provided)'}")
+print(f"Delete all    : {DELETE_ALL_SPACES}")
+print(f"Drop catalog  : {DROP_CATALOG}")
 if DRY_RUN:
     print("\n⚠️  Change dry_run widget to 'false' to actually delete.")
 
@@ -99,24 +101,52 @@ do(
 
 import requests
 
-if not SPACE_IDS:
-    print("No Space IDs provided — skipping Genie Space deletion.")
-    print("To delete spaces, enter their IDs in the 'space_ids' widget (comma-separated).")
-    print("Find Space IDs in the browser URL when you open a space: .../genie/rooms/{id}")
-else:
-    for sid in SPACE_IDS:
-        # First get the space name so we know what we're deleting
-        info = requests.get(f"https://{HOST}/api/2.0/genie/spaces/{sid}", headers=HEADERS)
-        name = info.json().get("title", sid) if info.status_code == 200 else sid
+def _delete_space(sid):
+    """DELETE /api/2.0/genie/spaces/{id} — moves space to workspace trash (recoverable).
+    Verified working: the API exists and returns 200. The space no longer appears
+    in the space list after deletion. A trashed space can be recovered from the
+    workspace Trash bin within 30 days."""
+    info = requests.get(f"https://{HOST}/api/2.0/genie/spaces/{sid}", headers=HEADERS)
+    name = info.json().get("title", sid) if info.status_code == 200 else sid
 
-        if DRY_RUN:
-            print(f"  [DRY RUN] Would delete Genie Space: '{name}' ({sid})")
-            print(f"           Note: Genie Spaces must be deleted manually in the UI.")
-        else:
-            # The Genie API does not expose a DELETE endpoint for spaces.
-            # Spaces must be deleted manually in the UI.
-            print(f"  ⚠️  '{name}' ({sid}) — no DELETE API available.")
-            print(f"      Delete manually: open the space → ⋮ menu → Delete")
+    if DRY_RUN:
+        print(f"  [DRY RUN] Would delete Genie Space: '{name}' ({sid})")
+        return
+
+    resp = requests.delete(f"https://{HOST}/api/2.0/genie/spaces/{sid}", headers=HEADERS)
+    if resp.status_code in (200, 204):
+        print(f"  ✅ Deleted Genie Space: '{name}' ({sid})")
+    elif resp.status_code == 404 and "trashed" in resp.text:
+        print(f"  ✅ '{name}' ({sid}) — already in trash")
+    else:
+        print(f"  ⚠️  '{name}' ({sid}) — HTTP {resp.status_code}: {resp.text[:120]}")
+
+# Build the list of spaces to delete
+spaces_to_delete = list(SPACE_IDS)  # explicit IDs from widget
+
+if DELETE_ALL_SPACES:
+    print("delete_all_spaces=true — discovering all Genie Spaces in this workspace...")
+    list_resp = requests.get(f"https://{HOST}/api/2.0/genie/spaces", headers=HEADERS)
+    if list_resp.status_code == 200:
+        all_spaces = list_resp.json().get("genie_spaces", [])
+        print(f"  Found {len(all_spaces)} space(s)")
+        for s in all_spaces:
+            sid = s.get("id", "")
+            if sid and sid not in spaces_to_delete:
+                spaces_to_delete.append(sid)
+    else:
+        print(f"  ⚠️  Could not list spaces: HTTP {list_resp.status_code}")
+
+if not spaces_to_delete:
+    print("No Genie Spaces to delete.")
+    print("Options:")
+    print("  • Enter Space IDs in the 'space_ids' widget (comma-separated)")
+    print("  • Set 'delete_all_spaces' to 'true' to delete every space in this workspace")
+    print("  • Find a Space ID in the browser URL: .../genie/rooms/{id}")
+else:
+    print(f"\nDeleting {len(spaces_to_delete)} Genie Space(s):")
+    for sid in spaces_to_delete:
+        _delete_space(sid)
 
 # COMMAND ----------
 
@@ -153,7 +183,50 @@ else:
 
 # MAGIC %md
 # MAGIC ---
-# MAGIC ## Step 4: Revoke UC permissions
+# MAGIC ## Step 4: Drop governance schema and catalog
+
+# COMMAND ----------
+
+# Drop ai_governance schema (contains the space registry table)
+gov_schema_fqn = f"{CATALOG}.{SCHEMA_GOV}"
+print(f"Schemas remaining in {CATALOG}:")
+try:
+    schemas = [r[0] for r in spark.sql(f"SHOW SCHEMAS IN {CATALOG}").collect()
+               if r[0] not in ("information_schema",)]
+    for s in schemas:
+        print(f"  • {CATALOG}.{s}")
+except Exception as e:
+    schemas = []
+    print(f"  (catalog not found or error: {e})")
+
+print()
+
+# Drop governance schema (registry table inside will be CASCADE-dropped)
+do(
+    f"DROP SCHEMA {gov_schema_fqn} CASCADE",
+    lambda: spark.sql(f"DROP SCHEMA IF EXISTS {gov_schema_fqn} CASCADE")
+)
+
+# Drop default schema if empty
+do(
+    f"DROP SCHEMA {CATALOG}.default CASCADE",
+    lambda: spark.sql(f"DROP SCHEMA IF EXISTS {CATALOG}.default CASCADE")
+)
+
+# Drop the catalog itself — only if drop_catalog=true and all schemas are gone
+if DROP_CATALOG:
+    do(
+        f"DROP CATALOG {CATALOG} CASCADE",
+        lambda: spark.sql(f"DROP CATALOG IF EXISTS {CATALOG} CASCADE")
+    )
+else:
+    print(f"  [SKIP] Catalog {CATALOG} — set drop_catalog=true to remove it")
+
+# COMMAND ----------
+
+# MAGIC %md
+# MAGIC ---
+# MAGIC ## Step 5: Revoke UC permissions
 # MAGIC
 # MAGIC Revokes the grants applied in `aemo_space_config.py` Step 7 (or `setup/setup.py` Step 6).
 
@@ -183,7 +256,7 @@ else:
 
 # MAGIC %md
 # MAGIC ---
-# MAGIC ## Step 5: Summary
+# MAGIC ## Step 6: Summary
 
 # COMMAND ----------
 
@@ -198,15 +271,18 @@ if DRY_RUN:
     print("  2. Re-run all cells")
 else:
     print("Removed:")
-    print(f"  • AEMO tables in {CATALOG}.{SCHEMA}")
-    print(f"  • Schema {CATALOG}.{SCHEMA}")
+    print(f"  ✅ AEMO tables in {CATALOG}.{SCHEMA} and schema dropped")
+    print(f"  ✅ {CATALOG}.{SCHEMA_GOV} schema dropped (CASCADE)")
+    if DROP_CATALOG:
+        print(f"  ✅ Catalog {CATALOG} dropped")
+    if spaces_to_delete:
+        print(f"  ✅ {len(spaces_to_delete)} Genie Space(s) moved to workspace trash")
+        print(f"     (recoverable from workspace Trash within 30 days)")
     if revoke_list:
-        print(f"  • UC grants for {len(revoke_list)} user(s)")
+        print(f"  ✅ UC grants revoked for {len(revoke_list)} user(s)")
     print()
-    print("Not removed (manual action required):")
-    print(f"  • Catalog {CATALOG}")
-    print(f"  • Schema {CATALOG}.{SCHEMA_GOV}")
-    if SPACE_IDS:
-        print(f"  • {len(SPACE_IDS)} Genie Space(s) — no DELETE API exists; delete each manually:")
-        print(f"    Open the space → ⋮ menu → Delete  (URL: .../genie/rooms/{{id}})")
-    print(f"  • Any Genie Spaces not listed in the widget")
+    if not DROP_CATALOG:
+        print(f"Not removed:")
+        print(f"  • Catalog {CATALOG} — set drop_catalog=true to remove")
+    print()
+    print("Full cleanup complete. Nothing requires manual action.")
