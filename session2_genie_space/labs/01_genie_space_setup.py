@@ -139,31 +139,15 @@ COLUMN_COMMENTS = {
         "region_id":              "NEM region where registered.",
         "fuel_type":              "Generation technology: solar, wind, coal, gas, hydro, battery.",
         "registered_capacity_mw": "Maximum registered capacity in MW.",
+        "connection_point_id":    "NEM connection point identifier for the unit.",
         "dispatch_type":          "GENERATOR, LOAD, or BIDIRECTIONAL.",
         "max_ramp_rate":          "Maximum ramp rate in MW per minute.",
         "min_load":               "Minimum stable load in MW.",
     },
-    f"{CATALOG}.{SCHEMA}.settlement_amounts": {
-        "settlement_date":              "Settlement week end date.",
-        "participant_id":               "Market participant code.",
-        "run_type":                     "FINAL, REVISED, or PRELIMINARY.",
-        "energy_amount_aud":            "Energy component of settlement in AUD.",
-        "fcas_amount_aud":              "FCAS (ancillary services) component in AUD.",
-        "interconnector_residue_aud":   "Interconnector residue component in AUD.",
-        "total_aud":                    "Net settlement amount in AUD.",
-        "settlement_status":            "FINAL, PENDING, or DISPUTED.",
-    },
-    f"{CATALOG}.{SCHEMA}.constraint_sets": {
-        "constraint_id":         "Unique constraint identifier e.g. S_RADIAL_SA_1.",
-        "constraint_type":       "Type of constraint: thermal, voltage, stability.",
-        "activated_datetime":    "When the constraint became active.",
-        "deactivated_datetime":  "When the constraint was lifted. NULL if still active.",
-        "reason":                "Free-text description of why the constraint was activated.",
-        "rhs_value":             "Right-hand side MW limit of the constraint equation.",
-        "region_affected":       "NEM region impacted by this constraint.",
-        "interconnector":        "True if this constraint involves an interconnector flow.",
-    },
 }
+# settlement_amounts and constraint_sets: column comments are added in Lab 02
+# alongside the Example SQL and Text Instructions steps.
+# All other columns above match setup.py.
 
 results = []
 for table_fqn, columns in COLUMN_COMMENTS.items():
@@ -179,6 +163,26 @@ for table_fqn, columns in COLUMN_COMMENTS.items():
 print(f"Set {sum(1 for r in results if r[0]=='✅')} column comments")
 for icon, tbl, col in results:
     print(f"  {icon} {tbl}.{col}")
+
+# COMMAND ----------
+
+# Verify column comments landed — query system.information_schema.columns
+# Shows all columns with a non-null comment in the 4 core Lab 01 tables.
+
+VERIFY_TABLES = ["spot_prices", "dispatch_intervals", "market_notices", "generator_registration"]
+
+verify_sql = f"""
+SELECT table_name, column_name, comment
+FROM   {CATALOG}.information_schema.columns
+WHERE  table_schema = '{SCHEMA}'
+  AND  table_name   IN ({', '.join(f"'{t}'" for t in VERIFY_TABLES)})
+  AND  comment      IS NOT NULL
+ORDER BY table_name, ordinal_position
+"""
+
+result_df = spark.sql(verify_sql)
+print(f"Columns with comments: {result_df.count()}")
+result_df.show(truncate=80)
 
 # COMMAND ----------
 
@@ -237,16 +241,18 @@ for table_fqn, desc in TABLE_DESCRIPTIONS.items():
 # MAGIC ---
 # MAGIC ## Step 3: Create the Space
 # MAGIC
-# MAGIC **🖱️ UI (do this first):** Left sidebar → **Genie Spaces** → click **- New** (the button is labelled "- New", not "+ New Space")
+# MAGIC **🖱️ UI (do this first):** Left sidebar → **Genie Spaces** → click **+ New** (the button may be labelled "+ New" or "New Genie Space" depending on your workspace version)
 # MAGIC ```
-# MAGIC Title:       AEMO NEM Operations
-# MAGIC Description: Natural language access to NEM spot prices, dispatch data,
-# MAGIC              and market notices for the Market Operations team.
-# MAGIC Warehouse:   select your serverless warehouse
-# MAGIC → Create → Add tables: spot_prices, dispatch_intervals, market_notices, generator_registration
-# MAGIC   (generator_registration is required for the duid join configured in Step 4)
-# MAGIC → Copy the Space ID from the browser URL bar
-# MAGIC → Paste into the widget at the top of this notebook
+# MAGIC 1. Pick tables: spot_prices, dispatch_intervals, market_notices, generator_registration
+# MAGIC    (generator_registration is required for the duid join configured in Step 4)
+# MAGIC 2. Click Create
+# MAGIC 3. Configure → About tab → set Title and Description:
+# MAGIC    Title:       AEMO NEM Operations
+# MAGIC    Description: Natural language access to NEM spot prices, dispatch data,
+# MAGIC                 and market notices for the Market Operations team.
+# MAGIC 4. Configure → About tab → set Warehouse: select your serverless warehouse
+# MAGIC 5. Copy the Space ID from the browser URL bar  (…/genie/rooms/<SPACE_ID>)
+# MAGIC 6. Paste into the widget at the top of this notebook
 # MAGIC ```
 # MAGIC
 # MAGIC **⚡ Verify the space is live:**
@@ -273,7 +279,7 @@ else:
 # MAGIC ## Step 4: Knowledge Store — synonyms, entity matching, joins
 # MAGIC
 # MAGIC **🖱️ UI for synonyms:** Configure → Data → [table] → click **pen icon** next to column → **Synonyms** tab → Save
-# MAGIC **🖱️ UI for entity matching:** Configure → Data → [table] → click **pen icon** next to column → **Advanced** → **Format assistance** → enable
+# MAGIC **🖱️ UI for entity matching:** Configure → Data → [table] → click **pen icon** next to column → **Advanced** → **Entity matching** → enable
 # MAGIC **🖱️ UI for joins:** Configure → Instructions → **Joins** → + Add
 # MAGIC
 # MAGIC Synonyms and entity matching are set in the space UI — do these manually in the Configure tab.
@@ -281,34 +287,91 @@ else:
 
 # COMMAND ----------
 
-# Automated: add the join relationship via API
+# Automated: add the join relationship via serialized_space PATCH
+# Joins live inside serialized_space under instructions.join_specs (same as benchmarks/golden
+# queries/text instructions in Lab 02).
+# There is NO separate /joins sub-endpoint — sending a top-level {"joins":[...]} payload is
+# accepted (HTTP 200) but has no effect on the join_specs. Sending "join_instructions" as a
+# top-level key in serialized_space returns HTTP 400 "Unknown field 'join_instructions'".
+# The correct pattern: GET with include_serialized_space=true, merge the join entry into
+# config["instructions"]["join_specs"] using the internal join_spec object format, then
+# PATCH {"serialized_space": json.dumps(config)}.
 # (Synonyms and entity matching must be done in the UI — Configure → Data tab)
+
+import uuid
 
 if not SPACE_ID:
     print("Enter Space ID in widget first.")
 else:
-    join_payload = {
-        "joins": [{
-            "left_table":   f"{CATALOG}.{SCHEMA}.dispatch_intervals",
-            "right_table":  f"{CATALOG}.{SCHEMA}.generator_registration",
-            "join_condition": "dispatch_intervals.duid = generator_registration.duid",
-            "relationship_type": "MANY_TO_ONE"
-        }]
-    }
-    resp = requests.patch(
+    # Step 1: read current serialized_space config
+    get_resp = requests.get(
         f"https://{HOST}/api/2.0/genie/spaces/{SPACE_ID}",
         headers=HEADERS,
-        json=join_payload
+        params={"include_serialized_space": "true"},
     )
-    if resp.status_code in (200, 204):
-        print("✅ Join configured: dispatch_intervals ↔ generator_registration on duid")
-    else:
-        # Falls back to showing the manual UI steps
-        print(f"API returned {resp.status_code} — add the join manually in the UI:")
-        print("  Configure → Instructions → **Joins** → + Add")
+    if get_resp.status_code != 200:
+        print(f"❌ Could not read space config: {get_resp.status_code} {get_resp.text[:200]}")
+        print("Add the join manually in the UI:")
+        print("  Configure → Instructions → Joins → + Add")
         print("  Left: dispatch_intervals  |  Right: generator_registration")
         print("  Condition: dispatch_intervals.duid = generator_registration.duid")
         print("  Relationship: Many-to-one")
+    else:
+        import json as _json
+        _decoder = _json.JSONDecoder(strict=False)
+        space = get_resp.json()
+        etag  = space.get("etag")
+        raw   = space.get("serialized_space") or "{}"
+        # Use strict=False to handle embedded newlines in content strings
+        config, _ = _decoder.raw_decode(raw)
+
+        # Step 2: merge the join entry into instructions.join_specs
+        # The join_spec object format (verified against Genie API v2):
+        #   id, left (identifier + alias), right (identifier + alias),
+        #   sql: ["<condition>", "--rt=FROM_RELATIONSHIP_TYPE_MANY_TO_ONE--"]
+        instructions = config.setdefault("instructions", {})
+        existing_specs = instructions.setdefault("join_specs", [])
+        left_id  = f"{CATALOG}.{SCHEMA}.dispatch_intervals"
+        right_id = f"{CATALOG}.{SCHEMA}.generator_registration"
+        # De-duplicate: only add if this join pair is not already present
+        already_present = any(
+            j.get("left", {}).get("identifier") == left_id and
+            j.get("right", {}).get("identifier") == right_id
+            for j in existing_specs
+        )
+        if not already_present:
+            existing_specs.append({
+                "id": uuid.uuid4().hex,
+                "left":  {"identifier": left_id,  "alias": "di"},
+                "right": {"identifier": right_id, "alias": "gr"},
+                "sql": [
+                    "`di`.`duid` = `gr`.`duid`",
+                    "--rt=FROM_RELATIONSHIP_TYPE_MANY_TO_ONE--",
+                ],
+            })
+            print(f"Adding join: {left_id} → {right_id}")
+        else:
+            print("Join already present — skipping duplicate.")
+
+        # Step 3: PATCH the updated serialized_space back
+        body = {"serialized_space": _json.dumps(config)}
+        if etag:
+            body["etag"] = etag
+        patch_resp = requests.patch(
+            f"https://{HOST}/api/2.0/genie/spaces/{SPACE_ID}",
+            headers=HEADERS,
+            json=body,
+        )
+        if patch_resp.status_code in (200, 204):
+            print("✅ Join configured: dispatch_intervals ↔ generator_registration on duid")
+        else:
+            # Falls back to showing the manual UI steps
+            print(f"API returned {patch_resp.status_code}: {patch_resp.text[:300]}")
+            print("Add the join manually in the UI:")
+            print("  Configure → Instructions → Joins → + Add")
+            print("  Left: dispatch_intervals  |  Right: generator_registration")
+            print("  Condition: dispatch_intervals.duid = generator_registration.duid")
+            print("  Relationship: Many-to-one")
 
 # COMMAND ----------
 
@@ -324,7 +387,7 @@ else:
 # MAGIC | dispatch_intervals | `fuel_type` | fuel, energy type, generation type |
 # MAGIC | market_notices | `notice_type` | notice category, type |
 # MAGIC
-# MAGIC ### Entity matching to enable (Configure → Data → [table] → column → Format assistance → toggle on)
+# MAGIC ### Entity matching to enable (Configure → Data → [table] → column → Advanced → **Entity matching** → toggle on)
 # MAGIC
 # MAGIC | Column | Maps |
 # MAGIC |---|---|
@@ -341,7 +404,7 @@ else:
 # MAGIC - [ ] Table descriptions set (automated ✅)
 # MAGIC - [ ] Space created with 4 tables, Space ID in widget
 # MAGIC - [ ] Synonyms added for region_id and rrp (UI)
-# MAGIC - [ ] Entity matching enabled for region_id and notice_type (UI)
+# MAGIC - [ ] Entity matching enabled for region_id, notice_type, and fuel_type (UI — Advanced → Entity matching → toggle on)
 # MAGIC - [ ] Join configured (API or UI)
 # MAGIC
 # MAGIC **→ Next: Lab 02 — Benchmarks, Golden Queries & Instructions**

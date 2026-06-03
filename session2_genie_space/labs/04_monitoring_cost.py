@@ -42,16 +42,16 @@ usage_sql = f"""
 SELECT
     DATE(event_time)                        AS date,
     user_identity.email                     AS user,
-    COUNT(CASE WHEN action_name = 'genieCreateConversationMessage' THEN 1 END) AS questions_asked,
+    COUNT(CASE WHEN action_name IN ('genieCreateConversationMessage','genieStartConversationMessage') THEN 1 END) AS questions_asked,
     COUNT(CASE WHEN action_name = 'updateConversationMessageFeedback'
-               AND request_params.feedback_rating = 'POSITIVE' THEN 1 END)    AS thumbs_up,
+               AND request_params.feedback_rating = 'THUMBS_UP' THEN 1 END)   AS thumbs_up,
     COUNT(CASE WHEN action_name = 'updateConversationMessageFeedback'
-               AND request_params.feedback_rating = 'NEGATIVE' THEN 1 END)    AS thumbs_down
+               AND request_params.feedback_rating = 'THUMBS_DOWN' THEN 1 END) AS thumbs_down
 FROM system.access.audit
 WHERE service_name = 'aibiGenie'
   AND event_time  >= CURRENT_TIMESTAMP - INTERVAL {LOOKBACK} DAYS
   {"AND request_params.space_id = '" + SPACE_ID + "'" if SPACE_ID else ""}
-GROUP BY date, user
+GROUP BY DATE(event_time), user_identity.email
 ORDER BY date DESC, questions_asked DESC
 """
 
@@ -89,8 +89,8 @@ ORDER BY event_time DESC
 
 try:
     feedback = spark.sql(feedback_sql)
-    pos  = feedback.filter("rating = 'POSITIVE'").count()
-    neg  = feedback.filter("rating = 'NEGATIVE'").count()
+    pos  = feedback.filter("rating = 'THUMBS_UP'").count()
+    neg  = feedback.filter("rating = 'THUMBS_DOWN'").count()
     total = pos + neg
     score = round(pos * 100 / total, 1) if total else None
     print(f"Feedback score: {score}% positive ({pos} 👍 / {neg} 👎) — last {LOOKBACK} days")
@@ -162,7 +162,7 @@ SELECT
 FROM system.access.audit
 WHERE service_name = 'aibiGenie'
   AND action_name  = 'updateConversationMessageFeedback'
-  AND request_params.feedback_rating = 'NEGATIVE'
+  AND request_params.feedback_rating = 'THUMBS_DOWN'
   AND event_time  >= CURRENT_TIMESTAMP - INTERVAL 60 MINUTES
   {"AND request_params.space_id = '" + SPACE_ID + "'" if SPACE_ID else ""}
 """
@@ -228,21 +228,21 @@ questions AS (
         COUNT(*)                   AS total_questions
     FROM system.access.audit
     WHERE service_name = 'aibiGenie'
-      AND action_name  = 'genieCreateConversationMessage'
+      AND action_name  IN ('genieCreateConversationMessage','genieStartConversationMessage')
       AND event_time  >= CURRENT_TIMESTAMP - INTERVAL {LOOKBACK} DAYS
       {"AND request_params.space_id = '" + SPACE_ID + "'" if SPACE_ID else ""}
-    GROUP BY date
+    GROUP BY DATE(event_time)
 ),
 fb AS (
     SELECT
         DATE(event_time) AS date,
-        SUM(CASE WHEN request_params.feedback_rating = 'POSITIVE' THEN 1 ELSE 0 END) AS positive,
-        SUM(CASE WHEN request_params.feedback_rating = 'NEGATIVE' THEN 1 ELSE 0 END) AS negative
+        SUM(CASE WHEN request_params.feedback_rating = 'THUMBS_UP' THEN 1 ELSE 0 END)   AS positive,
+        SUM(CASE WHEN request_params.feedback_rating = 'THUMBS_DOWN' THEN 1 ELSE 0 END) AS negative
     FROM system.access.audit
     WHERE service_name = 'aibiGenie'
       AND action_name  = 'updateConversationMessageFeedback'
       AND event_time  >= CURRENT_TIMESTAMP - INTERVAL {LOOKBACK} DAYS
-    GROUP BY date
+    GROUP BY DATE(event_time)
 )
 SELECT
     q.date,

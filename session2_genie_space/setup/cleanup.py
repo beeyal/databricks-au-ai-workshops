@@ -200,12 +200,13 @@ else:
     print("Removed:")
     print(f"  • AEMO tables in {CATALOG}.{SCHEMA}")
     print(f"  • Schema {CATALOG}.{SCHEMA}")
-    if SPACE_IDS:
-        print(f"  • {len(SPACE_IDS)} Genie Space(s)")
     if revoke_list:
         print(f"  • UC grants for {len(revoke_list)} user(s)")
     print()
-    print("Not removed (shared resources):")
+    print("Not removed (manual action required):")
     print(f"  • Catalog {CATALOG}")
     print(f"  • Schema {CATALOG}.{SCHEMA_GOV}")
+    if SPACE_IDS:
+        print(f"  • {len(SPACE_IDS)} Genie Space(s) — no DELETE API exists; delete each manually:")
+        print(f"    Open the space → ⋮ menu → Delete  (URL: .../genie/rooms/{{id}})")
     print(f"  • Any Genie Spaces not listed in the widget")

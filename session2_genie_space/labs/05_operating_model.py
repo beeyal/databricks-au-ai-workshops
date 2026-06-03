@@ -43,6 +43,7 @@ SPACE_ID   = dbutils.widgets.get("genie_space_id")
 SPACE_NAME = dbutils.widgets.get("space_name") or "AEMO NEM Operations"
 OWNER      = dbutils.widgets.get("space_owner")
 CATALOG    = "workshop_au"
+SCHEMA     = "aemo"
 SCHEMA_GOV = "ai_governance"
 HOST       = spark.conf.get("spark.databricks.workspaceUrl")
 TOKEN      = dbutils.notebook.entry_point.getDbutils().notebook().getContext().apiToken().get()
@@ -85,7 +86,7 @@ for tbl, cols in key_cols.items():
     rows = spark.sql(f"""
         SELECT column_name, comment
         FROM system.information_schema.columns
-        WHERE table_catalog='{CATALOG}' AND table_schema='aemo'
+        WHERE table_catalog='{CATALOG}' AND table_schema='{SCHEMA}'
           AND table_name='{tbl}' AND column_name IN ({','.join("'" + c + "'" for c in cols)})
     """).collect()
     for r in rows:
@@ -100,22 +101,25 @@ check(
 )
 
 # ── 2. Space exists and has tables ──────────────────────────────────────────
+# The GET /genie/spaces/{id} endpoint does NOT return a "datasets" key.
+# Table list lives inside serialized_space["data_sources"]["tables"].
+# We fetch it below in the same serialized_space call (check 3) to avoid
+# a second HTTP round-trip.  Here we just confirm the space is reachable.
 if SPACE_ID:
     resp = requests.get(f"https://{HOST}/api/2.0/genie/spaces/{SPACE_ID}", headers=HEADERS)
-    if resp.status_code == 200:
-        s      = resp.json()
-        tables = len(s.get("datasets", []))
-        check("Space accessible with tables added", tables >= 3,
-              detail=f"{tables} tables", fix="Add tables in Configure → Data")
-    else:
-        check("Space accessible", False, detail=f"HTTP {resp.status_code}",
-              fix="Verify SPACE_ID in widget")
+    check("Space accessible", resp.status_code == 200,
+          detail=f"HTTP {resp.status_code}" if resp.status_code != 200 else "Space found",
+          fix="Verify SPACE_ID in widget")
 else:
     check("Space ID provided", False, fix="Enter Space ID in widget above")
 
-# ── 3. Golden queries + instructions (via serialized_space) ──────────────────
-# /sql-queries and /instructions do NOT exist as public sub-endpoints.
-# All space config is read via ?include_serialized_space=true on the GET endpoint.
+# ── 3. Golden queries + tables (via serialized_space) ────────────────────────
+# serialized_space JSON structure (version 2):
+#   data_sources.tables[]          → list of {"identifier": "catalog.schema.table"}
+#   benchmarks.questions[]         → golden benchmark questions (one per entry)
+#   instructions.text_instructions → free-text guidance added via UI
+#   config.sample_questions        → suggested starter questions (not golden queries)
+# NOTE: "sql_queries" key does NOT appear — golden queries live in benchmarks.questions[].
 if SPACE_ID:
     cfg_resp = requests.get(
         f"https://{HOST}/api/2.0/genie/spaces/{SPACE_ID}",
@@ -125,45 +129,57 @@ if SPACE_ID:
     if cfg_resp.status_code == 200:
         import json as _json
         raw = cfg_resp.json().get("serialized_space") or "{}"
-        cfg = _json.loads(raw)
+        cfg = _json.loads(raw, strict=False)  # strict=False handles embedded newlines
 
-        n_queries = len(cfg.get("sql_queries", []))
+        # Golden queries: benchmarks.questions
+        n_queries = len(cfg.get("benchmarks", {}).get("questions", []))
         check("5+ golden queries", n_queries >= 5,
-              detail=f"{n_queries} queries (target 10+, workshop minimum 5)",
+              detail=f"{n_queries} benchmark questions (target 10+, workshop minimum 5)",
               fix="Run Lab 02 Step 2 automated script")
 
-        n_instr = len(cfg.get("text_instructions", []))
+        # Tables from data_sources (used in check 2 and the registry upsert below)
+        _ds_tables = cfg.get("data_sources", {}).get("tables", [])
+        _tables_from_ss = [t.get("identifier", "").split(".")[-1] for t in _ds_tables]
+
+        # ── 4. Text instructions (same serialized_space call) ─────────────────
+        n_instr = len(cfg.get("instructions", {}).get("text_instructions", []))
         check("Text instructions present", n_instr >= 1,
-              detail=f"{n_instr} instructions",
+              detail=f"{n_instr} text instructions",
               fix="Run Lab 02 Step 3 automated script")
+
+        # ── 4b. Tables count (from data_sources, not the base GET) ────────────
+        n_tables = len(_ds_tables)
+        check("3+ tables added to space", n_tables >= 3,
+              detail=f"{n_tables} tables: {', '.join(_tables_from_ss)}",
+              fix="Add tables in Configure → Data")
     else:
+        _tables_from_ss = []
         check("Space config readable", False,
               detail=f"HTTP {cfg_resp.status_code} — verify SPACE_ID widget")
+else:
+    _tables_from_ss = []
 
-# ── 4. Benchmarks (via eval-runs endpoint) ───────────────────────────────────
+# ── 5. Benchmarks (via eval-runs endpoint) ───────────────────────────────────
+# The LIST endpoint (GET /eval-runs) returns aggregate counts directly:
+#   num_correct, num_needs_review, num_questions, eval_run_status
+# The DETAIL endpoint (GET /eval-runs/{id}) adds num_done.
+# The RESULTS endpoint (GET /eval-runs/{id}/results) returns per-question items
+#   with fields: result_id, question, benchmark_answer, status, space_id
+#   "status" values observed: "DONE" (evaluated) | "EVALUATION_FAILED"
+#   There is NO "assessment" field. Use num_correct from the list endpoint for score.
 if SPACE_ID:
     bresp = requests.get(f"https://{HOST}/api/2.0/genie/spaces/{SPACE_ID}/eval-runs",
                          headers=HEADERS)
     if bresp.status_code == 200:
         runs = bresp.json().get("eval_runs", [])
         if runs:
-            latest_run_id = runs[0].get("eval_run_id")
-            # Fetch results for the latest run
-            rresp = requests.get(
-                f"https://{HOST}/api/2.0/genie/spaces/{SPACE_ID}/eval-runs/{latest_run_id}/results",
-                headers=HEADERS
-            )
-            if rresp.status_code == 200:
-                result_items = rresp.json().get("eval_results", [])
-                good  = sum(1 for r in result_items if r.get("assessment") == "GOOD")
-                total = len(result_items)
-                score = round(good * 100 / total) if total else 0
-                check("Benchmark score ≥80%", score >= 80,
-                      detail=f"{score}% ({good}/{total} Good)",
-                      fix="Run Lab 03 — identify failures, add golden queries, re-run")
-            else:
-                check("Benchmark results readable", False,
-                      detail=f"HTTP {rresp.status_code}")
+            latest = runs[0]
+            num_correct = latest.get("num_correct", 0)
+            num_questions = latest.get("num_questions", 0)
+            score = round(num_correct * 100 / num_questions) if num_questions else 0
+            check("Benchmark score ≥80%", score >= 80,
+                  detail=f"{score}% ({num_correct}/{num_questions} correct)",
+                  fix="Run Lab 03 — identify failures, add golden queries, re-run")
         else:
             check("Benchmarks run at least once", False, fix="Run Lab 03 Step 1")
     else:
@@ -175,7 +191,7 @@ check("Named space owner provided", bool(OWNER),
       detail=OWNER or "(not set)",
       fix="Enter owner email in widget above")
 
-# ── 7. Feedback alert ────────────────────────────────────────────────────────
+# ── 7. Feedback alert (manual) ───────────────────────────────────────────────
 # We can't check if an alert exists via API easily — ask the user
 print("\n  ⚠️  MANUAL: Feedback alert configured?")
 print("         Check: Alerts → search 'Genie Negative Feedback'")
@@ -233,24 +249,22 @@ if SPACE_ID:
     tables_list = ""
 
     try:
-        # Benchmark score from eval-runs endpoint
+        # Benchmark score: use num_correct/num_questions from the list endpoint
         bresp = requests.get(f"https://{HOST}/api/2.0/genie/spaces/{SPACE_ID}/eval-runs",
                              headers=HEADERS)
         if bresp.status_code == 200:
             runs = bresp.json().get("eval_runs", [])
             if runs:
-                latest_run_id = runs[0].get("eval_run_id")
-                rresp = requests.get(
-                    f"https://{HOST}/api/2.0/genie/spaces/{SPACE_ID}/eval-runs/{latest_run_id}/results",
-                    headers=HEADERS
-                )
-                if rresp.status_code == 200:
-                    result_items = rresp.json().get("eval_results", [])
-                    good = sum(1 for r in result_items if r.get("assessment") == "GOOD")
-                    total_r = len(result_items)
-                    score = round(good * 100 / total_r) if total_r else 0
+                latest = runs[0]
+                num_correct   = latest.get("num_correct", 0)
+                num_questions = latest.get("num_questions", 0)
+                score = round(num_correct * 100 / num_questions) if num_questions else 0
 
-        # Golden query count from serialized_space
+        # Golden query count + table list from serialized_space.
+        # serialized_space structure (v2):
+        #   benchmarks.questions[]        → golden benchmark questions (n_queries)
+        #   data_sources.tables[]         → {"identifier": "catalog.schema.table"}
+        # NOTE: "sql_queries" key does not exist at this level.
         cfg_resp = requests.get(
             f"https://{HOST}/api/2.0/genie/spaces/{SPACE_ID}",
             params={"include_serialized_space": "true"},
@@ -259,14 +273,10 @@ if SPACE_ID:
         if cfg_resp.status_code == 200:
             import json as _json
             raw = cfg_resp.json().get("serialized_space") or "{}"
-            cfg = _json.loads(raw)
-            n_queries = len(cfg.get("sql_queries", []))
-
-        sresp = requests.get(f"https://{HOST}/api/2.0/genie/spaces/{SPACE_ID}",
-                             headers=HEADERS)
-        if sresp.status_code == 200:
-            datasets = sresp.json().get("datasets", [])
-            tables_list = ", ".join(d.get("table_name", "") for d in datasets)
+            cfg = _json.loads(raw, strict=False)
+            n_queries = len(cfg.get("benchmarks", {}).get("questions", []))
+            ds_tables = cfg.get("data_sources", {}).get("tables", [])
+            tables_list = ", ".join(t.get("identifier", "").split(".")[-1] for t in ds_tables)
     except:
         pass
 
@@ -339,6 +349,7 @@ def promote_to_certified(space_id, space_name, owner_email, notes=""):
         UPDATE {CATALOG}.{SCHEMA_GOV}.genie_space_registry
         SET
             status       = 'CERTIFIED',
+            owner_email  = '{owner_email}',
             certified_at = CURRENT_TIMESTAMP(),
             last_reviewed = CURRENT_TIMESTAMP(),
             notes        = '{notes}'
@@ -376,7 +387,7 @@ print("Review the checklist above, then uncomment promote_to_certified() to cert
 # MAGIC | 02 | Benchmarks + golden queries + text instructions | 35 min |
 # MAGIC | 03 | Run benchmarks + Monitor tab + rollout | 30 min |
 # MAGIC | 04 | Monitoring + cost + feedback alert + dashboard | 25 min |
-# MAGIC | 05 | Operating model — Exploratory vs Certified | 20 min |
+# MAGIC | 05 | Operating model + permissions + admin settings | 20 min |
 # MAGIC | | **Total** | **~2.5 hours** |
 
 # COMMAND ----------
@@ -439,6 +450,9 @@ grant_space_permissions(SPACE_ID, USERS_CAN_RUN, GROUPS_CAN_RUN, EDITORS)
 # COMMAND ----------
 
 # Verify current permissions
+# The GET /permissions/genie/{id} response structure:
+#   access_control_list[]: {user_name|group_name, all_permissions: [{permission_level, inherited}]}
+# The highest non-inherited permission_level is the effective permission.
 if SPACE_ID:
     resp = requests.get(
         f"https://{HOST}/api/2.0/permissions/genie/{SPACE_ID}",
@@ -449,7 +463,11 @@ if SPACE_ID:
         print(f"Current permissions ({len(acl)} entries):")
         for entry in acl:
             p = entry.get("user_name") or entry.get("group_name") or "unknown"
-            print(f"  {entry.get('permission_level'):12s} {p}")
+            # all_permissions is a list; find the highest non-inherited level
+            all_perms = entry.get("all_permissions", [])
+            direct = [x["permission_level"] for x in all_perms if not x.get("inherited")]
+            level = direct[0] if direct else (all_perms[0]["permission_level"] if all_perms else "unknown")
+            print(f"  {level:12s} {p}")
 
 # COMMAND ----------
 
@@ -467,8 +485,8 @@ if SPACE_ID:
 # COMMAND ----------
 
 # Check what UC permissions are set on the AEMO schema
-uc_grants = spark.sql(f"SHOW GRANTS ON SCHEMA {CATALOG}.aemo")
-print(f"Current grants on {CATALOG}.aemo:")
+uc_grants = spark.sql(f"SHOW GRANTS ON SCHEMA {CATALOG}.{SCHEMA}")
+print(f"Current grants on {CATALOG}.{SCHEMA}:")
 display(uc_grants)
 
 # COMMAND ----------
@@ -481,21 +499,26 @@ display(uc_grants)
 # COMMAND ----------
 
 # Grant read access on AEMO schema to a UC group
-# Edit GROUP_NAME before running
+# IMPORTANT: UC GRANT requires an account-level group, not a workspace-local group.
+# Workspace-local groups ("admins", "users") are NOT visible to Unity Catalog
+# and will return PRINCIPAL_DOES_NOT_EXIST.
+# Check available account-level groups in:
+#   Account Console → User management → Groups
+# OR via API: GET /api/2.0/account/scim/v2/Groups
 
-GROUP_NAME = "workshop_participants"  # change to your UC group
+GROUP_NAME = "workshop_participants"  # change to your UC account-level group
 
 grants_to_apply = [
     f"GRANT USE CATALOG ON CATALOG {CATALOG} TO `{GROUP_NAME}`",
-    f"GRANT USE SCHEMA ON SCHEMA {CATALOG}.aemo TO `{GROUP_NAME}`",
-    f"GRANT SELECT ON SCHEMA {CATALOG}.aemo TO `{GROUP_NAME}`",
+    f"GRANT USE SCHEMA ON SCHEMA {CATALOG}.{SCHEMA} TO `{GROUP_NAME}`",
+    f"GRANT SELECT ON SCHEMA {CATALOG}.{SCHEMA} TO `{GROUP_NAME}`",
 ]
 
 print(f"Grants to apply for group '{GROUP_NAME}':\n")
 for stmt in grants_to_apply:
     print(f"  {stmt}")
 
-print("\nUncomment and run to apply:")
+print("\nUncomment and run to apply (ensure GROUP_NAME is an account-level UC group):")
 # for stmt in grants_to_apply:
 #     spark.sql(stmt)
 #     print(f"✅ {stmt[:80]}")
@@ -516,36 +539,58 @@ import requests
 
 WORKSPACE_URL = f"https://{HOST}"
 
-settings_to_check = [
-    ("aibi_genie_space_enabled_ws_setting",  "Genie Spaces"),
-    ("notebook_ml_assistant_enabled_setting", "Notebook AI Assistant"),
-]
+# The workspace settings API supports only specific setting types.
+# Verified working (returns HTTP 200) on this workspace tier:
+#   - llm_proxy_partner_powered   → boolean_val.value (True/False)
+#     This is the critical setting that enables Genie and all partner-powered AI features.
+#     Never disable it — it kills Genie entirely.
+#   - aibi_dash_embed_ws_acc_policy → aibi_dashboard_embedding_access_policy.access_policy_type
+#
+# The following setting type names return HTTP 404 on this workspace tier and must be
+# verified manually in the UI instead:
+#   - aibi_genie_space_enabled_ws_setting  (404 — not exposed via API)
+#   - notebook_ml_assistant_enabled_setting (404 — not exposed via API)
+#
+# The full list of 13 supported workspace setting types is documented in the Databricks
+# Python SDK: aibi_dash_embed_ws_acc_policy, aibi_dash_embed_ws_apprvd_domains,
+# automatic_cluster_update, shield_csp_enablement_ws_db, dashboard_email_subscriptions,
+# default_namespace_ws, default_warehouse_id, disable_legacy_access, disable_legacy_dbfs,
+# shield_esm_enablement_ws_db, llm_proxy_partner_powered, restrict_workspace_admins,
+# sql_results_download.
 
 print("Checking workspace AI feature settings:\n")
-for setting_type, label in settings_to_check:
-    try:
-        resp = requests.get(
-            f"{WORKSPACE_URL}/api/2.0/settings/types/{setting_type}/names/default",
-            headers=HEADERS
-        )
-        if resp.status_code == 200:
-            data = resp.json()
-            # Navigate nested structure
-            enabled = None
-            for key, val in data.items():
-                if isinstance(val, dict) and "enabled" in val:
-                    enabled = val["enabled"]
-                    break
-            if enabled is True:
-                print(f"  ✅ {label}: ENABLED")
-            elif enabled is False:
-                print(f"  ❌ {label}: DISABLED — enable in Workspace Settings → AI features")
-            else:
-                print(f"  ⚠️  {label}: status unknown (check UI)")
+
+# Check 1: Partner-Powered AI (the critical Genie prerequisite)
+# Response structure: {etag, setting_name, boolean_val: {value: true|false}}
+try:
+    resp = requests.get(
+        f"{WORKSPACE_URL}/api/2.0/settings/types/llm_proxy_partner_powered/names/default",
+        headers=HEADERS
+    )
+    if resp.status_code == 200:
+        data = resp.json()
+        enabled = data.get("boolean_val", {}).get("value")
+        if enabled is True:
+            print(f"  ✅ Partner-Powered AI Features: ENABLED (Genie is active)")
+        elif enabled is False:
+            print(f"  ❌ Partner-Powered AI Features: DISABLED — this kills Genie entirely!")
+            print(f"     Enable: Workspace Settings → AI + Machine Learning → Partner-Powered AI Features → ON")
         else:
-            print(f"  ⚠️  {label}: could not verify ({resp.status_code})")
-    except Exception as e:
-        print(f"  ⚠️  {label}: {e}")
+            print(f"  ⚠️  Partner-Powered AI Features: status unknown — check Workspace Settings")
+    elif resp.status_code == 404:
+        print(f"  ⚠️  Partner-Powered AI Features: API check not available — verify manually in Workspace Settings")
+    else:
+        print(f"  ⚠️  Partner-Powered AI Features: could not verify ({resp.status_code})")
+except Exception as e:
+    print(f"  ⚠️  Partner-Powered AI Features: {e}")
+
+# Check 2: Genie Spaces feature flag — API returns 404, must be verified manually
+print(f"  ⚠️  Genie Spaces enabled: API check not available on this tier — verify manually:")
+print(f"     Workspace Settings → AI + Machine Learning → Genie Spaces → Enable")
+
+# Check 3: Notebook AI Assistant — API returns 404, must be verified manually
+print(f"  ⚠️  Notebook AI Assistant: API check not available on this tier — verify manually:")
+print(f"     Workspace Settings → AI + Machine Learning → AI-assisted features → Enable")
 
 # COMMAND ----------
 

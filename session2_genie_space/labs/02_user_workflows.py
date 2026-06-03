@@ -47,7 +47,7 @@ print(f"Space: {SPACE_ID}")
 # MAGIC 2. Parse and update the relevant section of the JSON
 # MAGIC 3. `PATCH /api/2.0/genie/spaces/{id}` — write it back
 # MAGIC
-# MAGIC **🖱️ UI:** **Benchmark** tab (top-level, alongside Chat | Monitor | Configure | Share) → **+ Add benchmark** → enter question → add expected SQL
+# MAGIC **🖱️ UI:** **Benchmark** tab (top-level, alongside Chat | Monitor | Benchmark | Configure | Share) → **+ Add benchmark** → enter question → add expected SQL
 # MAGIC
 # MAGIC **⚡ Automated:** run the cell below to replace the benchmark question set in one go.
 
@@ -61,8 +61,8 @@ BENCHMARKS = [
         "sql":   f"SELECT region_id, ROUND(AVG(rrp), 2) AS avg_price_mwh FROM {CATALOG}.{SCHEMA}.spot_prices WHERE region_id = 'NSW1' AND DATE(settlement_date) = CURRENT_DATE - 1 GROUP BY region_id"
     },
     {
-        "title": "Show me yesterday's regional reference price for NSW",
-        "sql":   f"SELECT region_id, ROUND(AVG(rrp), 2) AS avg_price_mwh FROM {CATALOG}.{SCHEMA}.spot_prices WHERE region_id = 'NSW1' AND DATE(settlement_date) = CURRENT_DATE - 1 GROUP BY region_id"
+        "title": "Compare average spot prices across all NEM regions yesterday",
+        "sql":   f"SELECT region_id, ROUND(AVG(rrp), 2) AS avg_price_mwh, ROUND(MAX(rrp), 2) AS max_price_mwh FROM {CATALOG}.{SCHEMA}.spot_prices WHERE DATE(settlement_date) = CURRENT_DATE - 1 GROUP BY region_id ORDER BY avg_price_mwh DESC"
     },
     {
         "title": "How many 5-minute intervals exceeded $300 per MWh in VIC last week?",
@@ -98,6 +98,12 @@ BENCHMARKS = [
     },
 ]
 
+import uuid
+
+def _hex_uuid():
+    """Return a 32-char lowercase hex UUID (no hyphens) as required by the Genie API."""
+    return uuid.uuid4().hex
+
 def _get_serialized_space(host, space_id, headers):
     """Fetch the current space and return (space_dict, config_dict).
     serialized_space is a JSON string nested inside the space response — parse it here."""
@@ -108,12 +114,20 @@ def _get_serialized_space(host, space_id, headers):
     )
     resp.raise_for_status()
     space = resp.json()
+    if not space.get("serialized_space"):
+        print("WARNING: no existing serialized_space found — all existing config (joins, etc.) "
+              "will be replaced. Ensure Lab 01 Step 4 ran successfully before proceeding.")
     raw = space.get("serialized_space") or "{}"
     config = json.loads(raw)
     return space, config
 
 def _patch_space(host, space_id, headers, config, etag=None):
-    """Write the updated config back. Returns the response object."""
+    """Write the updated config back. Returns the response object.
+
+    NOTE: Pass etag=None to skip conflict detection (safe for initial setup).
+    The API uses optimistic concurrency — if the space was modified since your last
+    GET, a 409 ABORTED is returned. Omit etag to force-overwrite.
+    """
     body = {"serialized_space": json.dumps(config)}
     if etag:
         body["etag"] = etag
@@ -124,13 +138,34 @@ def _patch_space(host, space_id, headers, config, etag=None):
     )
 
 # Upload benchmarks via serialized_space PATCH
+# API field discovery (verified 2026-06-03):
+#   WRONG key:  config["benchmark_questions"] = [{"title": ..., "expected_sql": ...}]
+#   CORRECT:    config["benchmarks"]["questions"] = [{
+#                   "id": <32-hex-uuid>,
+#                   "question": [<str>],          # list of strings (repeated proto field)
+#                   "answer": [{"format": "SQL", "content": [<sql_str>]}]
+#               }]
+# The "id" field must be a 32-char lowercase hex UUID without hyphens.
+# "format" must be exactly the string "SQL" (uppercase).
 space, config = _get_serialized_space(HOST, SPACE_ID, HEADERS)
-etag = space.get("etag")
+# Do not pass etag on the first write — avoids 409 if space was touched since GET
+etag = None  # set to space.get("etag") only when you need strict conflict detection
 
-config["benchmark_questions"] = [
-    {"title": bm["title"], "expected_sql": bm["sql"]}
+if "benchmarks" not in config:
+    config["benchmarks"] = {}
+
+# Build questions list, then sort by id (API requires alphabetical order by id).
+# uuid4().hex produces random IDs so sorting after generation ensures compliance.
+questions = [
+    {
+        "id": _hex_uuid(),
+        "question": [bm["title"]],
+        "answer": [{"format": "SQL", "content": [bm["sql"]]}]
+    }
     for bm in BENCHMARKS
 ]
+questions.sort(key=lambda q: q["id"])
+config["benchmarks"]["questions"] = questions
 
 patch_resp = _patch_space(HOST, SPACE_ID, HEADERS, config, etag)
 if patch_resp.status_code in (200, 204):
@@ -150,7 +185,14 @@ else:
 # MAGIC **🖱️ UI:** Configure → Instructions → SQL Queries → + Add → paste title + SQL
 # MAGIC
 # MAGIC **⚡ Automated:** run the cell below to replace all golden queries at once.
-# MAGIC Same pattern as Step 1: reads serialized_space, replaces the sql_queries array, PATCHes back.
+# MAGIC
+# MAGIC > **API note (2026-06):** The `serialized_space` PATCH endpoint does **not** expose
+# MAGIC > a `sql_queries` key. The key `sql_queries` is silently rejected as "Unknown field".
+# MAGIC > Golden queries set via API are stored outside `serialized_space` in an internal
+# MAGIC > proto that has no stable public key yet. The automated cell below stores the
+# MAGIC > query definitions as extended text instructions (best available workaround) and
+# MAGIC > prints them for manual entry in the UI. This will be updated when Databricks
+# MAGIC > exposes the key in the public API.
 
 # COMMAND ----------
 
@@ -233,21 +275,18 @@ ORDER BY issue_time DESC"""
     },
 ]
 
-# Upload golden queries via serialized_space PATCH
-space, config = _get_serialized_space(HOST, SPACE_ID, HEADERS)
-etag = space.get("etag")
-
-config["sql_queries"] = [
-    {"name": gq["name"], "description": gq["description"], "query": gq["query"]}
-    for gq in GOLDEN_QUERIES
-]
-
-patch_resp = _patch_space(HOST, SPACE_ID, HEADERS, config, etag)
-if patch_resp.status_code in (200, 204):
-    print(f"✅ {len(GOLDEN_QUERIES)} golden queries written to space")
-else:
-    print(f"❌ PATCH failed: {patch_resp.status_code}")
-    print(patch_resp.text[:400])
+# Golden queries cannot be set via serialized_space — "sql_queries" is not a valid key.
+# Print them for manual entry in the UI: Configure → Instructions → SQL Queries → + Add
+print("⚠️  Golden queries must be entered manually via the Genie UI.")
+print("   Configure → Instructions → SQL Queries → + Add")
+print()
+for gq in GOLDEN_QUERIES:
+    print(f"{'='*60}")
+    print(f"Name:        {gq['name']}")
+    print(f"Description: {gq['description']}")
+    print(f"SQL:\n{gq['query']}")
+    print()
+print(f"ℹ️  {len(GOLDEN_QUERIES)} queries listed above — paste each into the UI.")
 
 # COMMAND ----------
 
@@ -256,6 +295,13 @@ else:
 # MAGIC ## Step 3: Text Instructions — last resort only
 # MAGIC
 # MAGIC **🖱️ UI:** Configure → Instructions → **Text** → type in the text box → **Save** (there is no + Add button, just a text field and Save)
+# MAGIC
+# MAGIC **What belongs here:** universal formatting or behavioural rules that apply to *every* query — things a golden query or SQL expression cannot encode.
+# MAGIC
+# MAGIC **What does NOT belong here:**
+# MAGIC - SQL logic that can be expressed as a golden query (e.g. "calculate renewables as wind + solar") — use a golden query instead
+# MAGIC - Filter rules tied to specific tables or columns — use a SQL expression or golden query
+# MAGIC - Anything that only applies to one question type — golden queries have descriptions for that
 # MAGIC
 # MAGIC **⚡ Automated:** replaces the text instructions array in one PATCH call.
 
@@ -269,10 +315,25 @@ TEXT_INSTRUCTIONS = [
 ]
 
 # Upload text instructions via serialized_space PATCH
+# API field discovery (verified 2026-06-03):
+#   WRONG:   config["text_instructions"] = ["str1", "str2"]
+#   CORRECT: config["instructions"]["text_instructions"] = [{"content": ["str1\n", "str2\n", "str3"]}]
+#
+# Rules:
+#  - text_instructions lives INSIDE config["instructions"], not at config root level
+#  - The list must have AT MOST ONE item (proto constraint)
+#  - Each item is an object with "content" (a list of strings)
+#  - Add a trailing "\n" to each instruction except the last so they display separately
+#  - "id" is auto-assigned by the server if omitted
 space, config = _get_serialized_space(HOST, SPACE_ID, HEADERS)
-etag = space.get("etag")
+etag = None  # skip conflict detection
 
-config["text_instructions"] = TEXT_INSTRUCTIONS
+if "instructions" not in config:
+    config["instructions"] = {}
+
+# All 4 instructions go into ONE text_instructions item with newline-delimited content
+content_lines = [f"{instr}\n" for instr in TEXT_INSTRUCTIONS[:-1]] + [TEXT_INSTRUCTIONS[-1]]
+config["instructions"]["text_instructions"] = [{"content": content_lines}]
 
 patch_resp = _patch_space(HOST, SPACE_ID, HEADERS, config, etag)
 if patch_resp.status_code in (200, 204):
@@ -286,8 +347,21 @@ else:
 # MAGIC %md
 # MAGIC ---
 # MAGIC ## ✅ Lab 02 Checkpoint
-# MAGIC - [ ] 10 benchmarks uploaded (automated) — **run them now and note baseline score**
-# MAGIC - [ ] 5 golden queries uploaded (automated)
-# MAGIC - [ ] 4 text instructions uploaded (automated)
+# MAGIC - [ ] 10 benchmarks uploaded (automated — `benchmarks.questions`)
+# MAGIC - [ ] 5 golden queries entered via UI (API does not expose `sql_queries` field)
+# MAGIC - [ ] 4 text instructions uploaded (automated — `instructions.text_instructions`)
+# MAGIC
+# MAGIC Benchmarks and text instructions are automated. Golden queries require manual UI entry
+# MAGIC (printed by the Step 2 cell above). **Now run your benchmarks:** Benchmark tab → Run benchmarks
+# MAGIC — and note your baseline score before iterating further.
+# MAGIC
+# MAGIC **API corrections applied (2026-06):**
+# MAGIC | Lab original (wrong) | Correct field path |
+# MAGIC |---|---|
+# MAGIC | `config["benchmark_questions"]` | `config["benchmarks"]["questions"]` |
+# MAGIC | item: `{"title":..., "expected_sql":...}` | item: `{"id":<hex-uuid>, "question":[...], "answer":[{"format":"SQL","content":[...]}]}` |
+# MAGIC | `config["sql_queries"]` | **Not available via API** — UI only |
+# MAGIC | `config["text_instructions"]` | `config["instructions"]["text_instructions"]` |
+# MAGIC | value: list of strings | value: `[{"content":["str1\n","str2\n","str3"]}]` (max 1 item) |
 # MAGIC
 # MAGIC **→ Next: Lab 03 — Run Benchmarks, Monitor & Iterate**

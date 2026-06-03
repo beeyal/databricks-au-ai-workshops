@@ -43,7 +43,7 @@ HEADERS  = {"Authorization": f"Bearer {TOKEN}", "Content-Type": "application/jso
 # MAGIC
 # MAGIC > *"Benchmarks detect drift or inconsistencies over time. They surface regressions or bugs early and before org-wide adoption."*
 # MAGIC
-# MAGIC **🖱️ Navigate: **Benchmark** tab (top-level) → **Run benchmarks****
+# MAGIC 🖱️ Navigate: **Benchmark** tab (top-level) → **Run benchmarks**
 # MAGIC
 # MAGIC Watch the Evaluations tab:
 # MAGIC ```
@@ -197,11 +197,12 @@ feedback_sql = """
 try:
     feedback = spark.sql(feedback_sql)
     total    = feedback.count()
-    negative = feedback.filter("rating = 'NEGATIVE'").count()
-    print(f"Last 30 days: {total} feedback events, {negative} negative")
+    # Actual audit table values are THUMBS_DOWN / THUMBS_UP (not NEGATIVE / POSITIVE)
+    negative = feedback.filter("rating = 'THUMBS_DOWN'").count()
+    print(f"Last 30 days: {total} feedback events, {negative} negative (THUMBS_DOWN)")
     if negative:
         print("\nNegative feedback — investigate these in the Monitor tab:")
-        display(feedback.filter("rating = 'NEGATIVE'").limit(10))
+        display(feedback.filter("rating = 'THUMBS_DOWN'").limit(10))
 except Exception as e:
     print(f"Note: {e}")
     print("system.access.audit populates once users start using the space.")
@@ -250,7 +251,9 @@ if SPACE_ID:
         print("Current space permissions:")
         for entry in acl:
             p = entry.get("user_name") or entry.get("group_name") or "unknown"
-            level = entry.get("permission_level", "unknown")
+            # permission_level is nested under all_permissions[0]
+            perms = entry.get("all_permissions", [])
+            level = perms[0].get("permission_level", "unknown") if perms else "unknown"
             print(f"  {level}: {p}")
     else:
         print(f"Error {resp.status_code}: {resp.text[:200]}")
