@@ -1,6 +1,6 @@
 # Workshop Schedule Template
 
-**Databricks AU AI Workshops — Australian Regulated Industries**  
+**Databricks AU AI Workshops — Australian Regulated Industries** 
 Version 1.0 | Facilitator Reference
 
 Use this template as a starting point. Adjust times based on group experience level, Q&A engagement, and whether the environment setup experienced any delays.
@@ -40,14 +40,14 @@ The following must be confirmed at least **3 business days before the first work
 
 ## Option A: Half-Day (4 Hours) — Admin Track Only
 
-**Audience:** Workspace admins, security architects, platform engineers, cloud infrastructure leads  
-**Workshop:** Session 1 — Governing Databricks AI Features in Australian Regulated Industries  
-**Room opens:** 8:15 AM (participants arrive, facilitator assists stragglers with workspace login)  
-**Start:** 8:30 AM  
+**Audience:** Workspace admins, security architects, platform engineers, cloud infrastructure leads 
+**Workshop:** Session 1 — Governing Databricks AI Features in Australian Regulated Industries 
+**Room opens:** 8:15 AM (participants arrive, facilitator assists stragglers with workspace login) 
+**Start:** 8:30 AM 
 
 | Time | Duration | Session | Notes |
 |---|---|---|---|
-| 8:30 AM | 30 min | Welcome, context-setting, and environment check | Introduce the regulatory framing (SOCI Act 2018, Privacy Act 1988, AESCSF). Confirm all participants can access the workspace. Start cluster now if not already running. |
+| 8:30 AM | 30 min | Welcome, context-setting, and environment check | Introduce the regulatory framing (Australian data residency requirements, Privacy Act 1988, AESCSF). Confirm all participants can access the workspace. Start cluster now if not already running. |
 | 9:00 AM | 45 min | **Lab 01** — Workspace AI Settings & Access Control | Inspect AI feature flags, verify geography enforcement setting, configure UC grants for AI assets, create a service principal. Hardest lab logistically — allocate extra time for participants without full admin rights. |
 | 9:45 AM | 15 min | Break | Keep to 15 minutes. Use this time to start the cluster for Lab 02 if it recycled. |
 | 10:00 AM | 45 min | **Lab 02** — AI Gateway Setup | Configure AI Gateway endpoint, routing rules, rate limits, guardrails. Demo the block on cross-geo Pay-Per-Token models. |
@@ -65,9 +65,9 @@ The following must be confirmed at least **3 business days before the first work
 
 ## Option B: Full Day (7 Hours) — Admin Track + One End-User Workshop
 
-**Audience (Day 1 morning):** Session 1 audience — admins and security architects  
-**Audience (Day 1 afternoon):** Session 5 (Genie Code) OR Session 2 (Genie Space) audience — choose based on your attendee split  
-**Session 5 (Genie Code)** suits data engineers and ML engineers  
+**Audience (Day 1 morning):** Session 1 audience — admins and security architects 
+**Audience (Day 1 afternoon):** Session 5 (Genie Code) OR Session 2 (Genie Space) audience — choose based on your attendee split 
+**Session 5 (Genie Code)** suits data engineers and ML engineers 
 **Session 2 (Genie Space)** suits business analysts and operational managers
 
 **Note on audience mixing:** Session 1 and Workshop 2x audiences often differ. If running both in the same room, expect some attendees to be present for both tracks and others only for one half. Design the seating and logistics accordingly. Participants who are not attending Session 1 should be scheduled to arrive for the 1:00 PM start.
@@ -117,7 +117,7 @@ The following must be confirmed at least **3 business days before the first work
 
 ## Option C: Two-Day Immersive — All Three Workshops
 
-**Audience:** Mix of admins, engineers, and business analysts  
+**Audience:** Mix of admins, engineers, and business analysts 
 **Structure:** Day 1 = Session 1 (full day + extension). Day 2 = Session 5 (Genie Code) (morning) + Session 2 (Genie Space) (afternoon)
 
 ### Day 1 — Admin and Governance Track
@@ -127,7 +127,7 @@ Same as Option A but with an extended afternoon for deeper content and cross-fun
 | Time | Duration | Session | Notes |
 |---|---|---|---|
 | 8:15 AM | — | Room opens | |
-| 8:30 AM | 40 min | Welcome, objectives, and regulatory landscape | Expanded opening: SOCI Act 2018, Privacy Act 1988, AESCSF, AER, NER Chapter 7. Draw the connection between each to a specific lab. |
+| 8:30 AM | 40 min | Welcome, objectives, and regulatory landscape | Expanded opening: Australian data residency requirements, Privacy Act 1988, AESCSF, AER, NER Chapter 7. Draw the connection between each to a specific lab. |
 | 9:10 AM | 50 min | **Lab 01** — Workspace AI Settings & Access Control | Extra time for mixed-experience groups. |
 | 10:00 AM | 15 min | Break | |
 | 10:15 AM | 50 min | **Lab 02** — AI Gateway Setup | |

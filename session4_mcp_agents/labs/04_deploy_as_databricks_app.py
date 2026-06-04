@@ -2,30 +2,30 @@
 
 # MAGIC %md
 # MAGIC <div style="background: linear-gradient(135deg, #1B3A6B 0%, #FF3621 100%); padding: 36px 40px; border-radius: 14px; margin-bottom: 8px;">
-# MAGIC   <h1 style="color: white; font-family: 'DM Sans', sans-serif; font-size: 2.3em; margin: 0 0 10px 0;">
-# MAGIC     Lab 04: Deploying Your Agent as a Databricks App
-# MAGIC   </h1>
-# MAGIC   <p style="color: rgba(255,255,255,0.88); font-size: 1.15em; margin: 0 0 6px 0;">
-# MAGIC     Workshop 2c: Building AI Agents with MCP — Australian Regulated Industries
-# MAGIC   </p>
-# MAGIC   <p style="color: rgba(255,255,255,0.70); font-size: 0.95em; margin: 0;">
-# MAGIC     Make your MCP agent accessible to business users as a governed web application
-# MAGIC   </p>
+# MAGIC <h1 style="color: white; font-family: 'DM Sans', sans-serif; font-size: 2.3em; margin: 0 0 10px 0;">
+# MAGIC Lab 04: Deploying Your Agent as a Databricks App
+# MAGIC </h1>
+# MAGIC <p style="color: rgba(255,255,255,0.88); font-size: 1.15em; margin: 0 0 6px 0;">
+# MAGIC Workshop 2c: Building AI Agents with MCP — Australian Regulated Industries
+# MAGIC </p>
+# MAGIC <p style="color: rgba(255,255,255,0.70); font-size: 0.95em; margin: 0;">
+# MAGIC Make your MCP agent accessible to business users as a governed web application
+# MAGIC </p>
 # MAGIC </div>
 # MAGIC
 # MAGIC <div style="display: flex; gap: 12px; margin-top: 16px; flex-wrap: wrap;">
-# MAGIC   <div style="background: #f0f4ff; border-left: 4px solid #1B3A6B; padding: 12px 18px; border-radius: 6px; flex: 1; min-width: 160px;">
-# MAGIC     <strong>Estimated time</strong><br>45 minutes
-# MAGIC   </div>
-# MAGIC   <div style="background: #fff4f0; border-left: 4px solid #FF3621; padding: 12px 18px; border-radius: 6px; flex: 1; min-width: 160px;">
-# MAGIC     <strong>Prerequisites</strong><br>Labs 01, 02, 03 complete
-# MAGIC   </div>
-# MAGIC   <div style="background: #f0fff4; border-left: 4px solid #00843D; padding: 12px 18px; border-radius: 6px; flex: 1; min-width: 160px;">
-# MAGIC     <strong>Data residency</strong><br>App runs in AU East
-# MAGIC   </div>
-# MAGIC   <div style="background: #fffbf0; border-left: 4px solid #f9a825; padding: 12px 18px; border-radius: 6px; flex: 1; min-width: 160px;">
-# MAGIC     <strong>Auth</strong><br>Databricks OAuth (automatic)
-# MAGIC   </div>
+# MAGIC <div style="background: #f0f4ff; border-left: 4px solid #1B3A6B; padding: 12px 18px; border-radius: 6px; flex: 1; min-width: 160px;">
+# MAGIC <strong>Estimated time</strong><br>45 minutes
+# MAGIC </div>
+# MAGIC <div style="background: #fff4f0; border-left: 4px solid #FF3621; padding: 12px 18px; border-radius: 6px; flex: 1; min-width: 160px;">
+# MAGIC <strong>Prerequisites</strong><br>Labs 01, 02, 03 complete
+# MAGIC </div>
+# MAGIC <div style="background: #f0fff4; border-left: 4px solid #00843D; padding: 12px 18px; border-radius: 6px; flex: 1; min-width: 160px;">
+# MAGIC <strong>Data residency</strong><br>App runs in AU East
+# MAGIC </div>
+# MAGIC <div style="background: #fffbf0; border-left: 4px solid #f9a825; padding: 12px 18px; border-radius: 6px; flex: 1; min-width: 160px;">
+# MAGIC <strong>Auth</strong><br>Databricks OAuth (automatic)
+# MAGIC </div>
 # MAGIC </div>
 
 # COMMAND ----------
@@ -56,48 +56,48 @@
 
 # COMMAND ----------
 
-dbutils.widgets.text("catalog",        "workshop_au",          "Catalog name")
-dbutils.widgets.text("schema_aemo",    "aemo",                 "AEMO schema name")
-dbutils.widgets.text("pt_endpoint",    "au_east_llm_inregion", "PT endpoint name")
-dbutils.widgets.text("genie_space_id", "",                     "AEMO Genie Space ID")
-dbutils.widgets.text("app_name",       "aemo-operations-agent","App name (lowercase + hyphens)")
+dbutils.widgets.text("catalog", "workshop_au", "Catalog name")
+dbutils.widgets.text("schema_aemo", "aemo", "AEMO schema name")
+dbutils.widgets.text("pt_endpoint", "au_east_llm_inregion", "PT endpoint name")
+dbutils.widgets.text("genie_space_id", "", "AEMO Genie Space ID")
+dbutils.widgets.text("app_name", "aemo-operations-agent","App name (lowercase + hyphens)")
 
-CATALOG        = dbutils.widgets.get("catalog")
-SCHEMA_AEMO    = dbutils.widgets.get("schema_aemo")
-PT_ENDPOINT    = dbutils.widgets.get("pt_endpoint")
+CATALOG = dbutils.widgets.get("catalog")
+SCHEMA_AEMO = dbutils.widgets.get("schema_aemo")
+PT_ENDPOINT = dbutils.widgets.get("pt_endpoint")
 GENIE_SPACE_ID = dbutils.widgets.get("genie_space_id")
-APP_NAME       = dbutils.widgets.get("app_name")
+APP_NAME = dbutils.widgets.get("app_name")
 
 from databricks.sdk import WorkspaceClient
 ws = WorkspaceClient()
 HOST = ws.config.host.rstrip("/")
 
-print(f"Workspace host  : {HOST}")
-print(f"Catalog.Schema  : {CATALOG}.{SCHEMA_AEMO}")
-print(f"PT endpoint     : {PT_ENDPOINT}")
-print(f"Genie Space ID  : {GENIE_SPACE_ID}")
-print(f"App name        : {APP_NAME}")
+print(f"Workspace host : {HOST}")
+print(f"Catalog.Schema : {CATALOG}.{SCHEMA_AEMO}")
+print(f"PT endpoint : {PT_ENDPOINT}")
+print(f"Genie Space ID : {GENIE_SPACE_ID}")
+print(f"App name : {APP_NAME}")
 
 if not GENIE_SPACE_ID:
-    print("\nNOTE: Set 'genie_space_id' widget — the app still deploys without it.")
+ print("\nNOTE: Set 'genie_space_id' widget — the app still deploys without it.")
 
 # COMMAND ----------
 
 # MAGIC %md
 # MAGIC **Expected output:**
 # MAGIC ```
-# MAGIC Workspace host  : https://adb-1234567890123456.7.azuredatabricks.net
-# MAGIC Catalog.Schema  : workshop_au.aemo
-# MAGIC PT endpoint     : au_east_llm_inregion
-# MAGIC Genie Space ID  : 01jf3k2m9xyz456   (or FILL_IN)
-# MAGIC App name        : aemo-operations-agent
+# MAGIC Workspace host : https://adb-1234567890123456.7.azuredatabricks.net
+# MAGIC Catalog.Schema : workshop_au.aemo
+# MAGIC PT endpoint : au_east_llm_inregion
+# MAGIC Genie Space ID : 01jf3k2m9xyz456 (or FILL_IN)
+# MAGIC App name : aemo-operations-agent
 # MAGIC ```
 
 # COMMAND ----------
 
 # MAGIC %md
 # MAGIC <div style="background: #1B3A6B; color: white; padding: 10px 18px; border-radius: 6px; font-size: 1.05em; font-weight: bold; margin: 16px 0 4px 0;">
-# MAGIC   Section 1 — UI Tour of Databricks Apps (10 min)
+# MAGIC Section 1 — UI Tour of Databricks Apps (10 min)
 # MAGIC </div>
 
 # COMMAND ----------
@@ -116,10 +116,10 @@ if not GENIE_SPACE_ID:
 # MAGIC **Apps home page:**
 # MAGIC ```
 # MAGIC ┌─── Databricks Apps ──────────────────────────────────────┐
-# MAGIC │  [+ Create app]                       Search apps        │
-# MAGIC │  ──────────────────────────────────────────────────────  │
-# MAGIC │  My Apps:   App Name | Status | URL                      │
-# MAGIC │  Shared with me:   (none yet)                            │
+# MAGIC │ [+ Create app] Search apps │
+# MAGIC │ ────────────────────────────────────────────────────── │
+# MAGIC │ My Apps: App Name | Status | URL │
+# MAGIC │ Shared with me: (none yet) │
 # MAGIC └──────────────────────────────────────────────────────────┘
 # MAGIC ```
 
@@ -132,11 +132,11 @@ if not GENIE_SPACE_ID:
 # MAGIC
 # MAGIC **App name rules — permanent after creation:**
 # MAGIC ```
-# MAGIC ✅  lowercase letters, numbers, hyphens only (3–40 chars)
-# MAGIC ❌  no underscores, spaces, or uppercase
-# MAGIC ❌  cannot be changed after creation (must delete and recreate)
+# MAGIC ✅ lowercase letters, numbers, hyphens only (3–40 chars)
+# MAGIC ❌ no underscores, spaces, or uppercase
+# MAGIC ❌ cannot be changed after creation (must delete and recreate)
 # MAGIC
-# MAGIC aemo-operations-agent  →  https://aemo-operations-agent-{ws-id}.databricksapps.com
+# MAGIC aemo-operations-agent → https://aemo-operations-agent-{ws-id}.databricksapps.com
 # MAGIC ```
 # MAGIC
 # MAGIC Use `aemo-operations-agent-{your-initials}` if multiple participants share the same workspace.
@@ -150,9 +150,9 @@ if not GENIE_SPACE_ID:
 # MAGIC
 # MAGIC ```
 # MAGIC ┌─── App: aemo-operations-agent ───────────────────────────────┐
-# MAGIC │  Status: Running      URL: https://aemo-...databricksapps.com │
-# MAGIC │  [Open app] [Redeploy] [Stop] [Delete]                        │
-# MAGIC │  Tabs: Overview | Resources | Logs | Deployments              │
+# MAGIC │ Status: Running URL: https://aemo-...databricksapps.com │
+# MAGIC │ [Open app] [Redeploy] [Stop] [Delete] │
+# MAGIC │ Tabs: Overview | Resources | Logs | Deployments │
 # MAGIC └───────────────────────────────────────────────────────────────┘
 # MAGIC ```
 # MAGIC
@@ -172,11 +172,11 @@ if not GENIE_SPACE_ID:
 # MAGIC ```
 # MAGIC App management page → Permissions tab → [Edit permissions]
 # MAGIC
-# MAGIC Principal                     Permission
-# MAGIC aemo-operations-team (group)  CAN_USE    ← can open the app URL
-# MAGIC you@databricks.com            IS_OWNER   ← full control
+# MAGIC Principal Permission
+# MAGIC aemo-operations-team (group) CAN_USE ← can open the app URL
+# MAGIC you@databricks.com IS_OWNER ← full control
 # MAGIC
-# MAGIC CAN_USE    → open the URL (no workspace seat needed)
+# MAGIC CAN_USE → open the URL (no workspace seat needed)
 # MAGIC CAN_MANAGE → redeploy, edit settings, view logs
 # MAGIC ```
 # MAGIC
@@ -186,7 +186,7 @@ if not GENIE_SPACE_ID:
 
 # MAGIC %md
 # MAGIC <div style="background: #1B3A6B; color: white; padding: 10px 18px; border-radius: 6px; font-size: 1.05em; font-weight: bold; margin: 16px 0 4px 0;">
-# MAGIC   Section 2 — Create the Agent App Files (15 min)
+# MAGIC Section 2 — Create the Agent App Files (15 min)
 # MAGIC </div>
 
 # COMMAND ----------
@@ -228,9 +228,9 @@ import asyncio
 import os
 
 from databricks_langchain import (
-    DatabricksMCPServer,
-    DatabricksMultiServerMCPClient,
-    ChatDatabricks,
+ DatabricksMCPServer,
+ DatabricksMultiServerMCPClient,
+ ChatDatabricks,
 )
 from langgraph.prebuilt import create_react_agent
 import mlflow
@@ -238,11 +238,11 @@ import mlflow
 # ---------------------------------------------------------------------------
 # Configuration — read from Databricks Apps environment variables
 # ---------------------------------------------------------------------------
-PT_ENDPOINT    = os.environ.get("PT_ENDPOINT",    "au_east_llm_inregion")
+PT_ENDPOINT = os.environ.get("PT_ENDPOINT", "au_east_llm_inregion")
 GENIE_SPACE_ID = os.environ.get("GENIE_SPACE_ID", "")
-WORKSPACE_URL  = os.environ.get("DATABRICKS_HOST", "").rstrip("/")
-CATALOG        = os.environ.get("CATALOG",        "workshop_au")
-SCHEMA_AEMO    = os.environ.get("SCHEMA_AEMO",    "aemo")
+WORKSPACE_URL = os.environ.get("DATABRICKS_HOST", "").rstrip("/")
+CATALOG = os.environ.get("CATALOG", "workshop_au")
+SCHEMA_AEMO = os.environ.get("SCHEMA_AEMO", "aemo")
 
 mlflow.set_experiment("/Apps/aemo-operations-agent")
 
@@ -251,35 +251,35 @@ mlflow.set_experiment("/Apps/aemo-operations-agent")
 # ---------------------------------------------------------------------------
 
 async def build_agent():
-    servers = [
-        DatabricksMCPServer.from_uc_function(
-            catalog=CATALOG,
-            schema=SCHEMA_AEMO,
-            name="aemo-uc-tools",
-        ),
-    ]
+ servers = [
+ DatabricksMCPServer.from_uc_function(
+ catalog=CATALOG,
+ schema=SCHEMA_AEMO,
+ name="aemo-uc-tools",
+ ),
+ ]
 
-    if GENIE_SPACE_ID:
-        servers.append(
-            DatabricksMCPServer(
-                name="aemo-genie",
-                url=f"{WORKSPACE_URL}/api/2.0/mcp/genie/{GENIE_SPACE_ID}",
-            )
-        )
+ if GENIE_SPACE_ID:
+ servers.append(
+ DatabricksMCPServer(
+ name="aemo-genie",
+ url=f"{WORKSPACE_URL}/api/2.0/mcp/genie/{GENIE_SPACE_ID}",
+ )
+ )
 
-    client = DatabricksMultiServerMCPClient(servers)
-    tools  = await client.get_tools()
-    llm    = ChatDatabricks(endpoint=PT_ENDPOINT)
+ client = DatabricksMultiServerMCPClient(servers)
+ tools = await client.get_tools()
+ llm = ChatDatabricks(endpoint=PT_ENDPOINT)
 
-    system_prompt = (
-        "You are the AEMO NEM Operations Assistant. "
-        "You help operations staff answer questions about NEM dispatch intervals, "
-        "spot prices, market notices, settlements, and generation unit status. "
-        "When you use a tool, briefly explain what you looked up before presenting results. "
-        "All data is from Australia East — data residency is maintained."
-    )
+ system_prompt = (
+ "You are the AEMO NEM Operations Assistant. "
+ "You help operations staff answer questions about NEM dispatch intervals, "
+ "spot prices, market notices, settlements, and generation unit status. "
+ "When you use a tool, briefly explain what you looked up before presenting results. "
+ "All data is from Australia East — data residency is maintained."
+ )
 
-    return create_react_agent(model=llm, tools=tools, prompt=system_prompt)
+ return create_react_agent(model=llm, tools=tools, prompt=system_prompt)
 
 
 # ---------------------------------------------------------------------------
@@ -287,14 +287,14 @@ async def build_agent():
 # ---------------------------------------------------------------------------
 
 def chat(message: str, history: list) -> str:
-    async def run():
-        agent  = await build_agent()
-        result = await agent.ainvoke(
-            {"messages": [{"role": "user", "content": message}]}
-        )
-        return result["messages"][-1].content
+ async def run():
+ agent = await build_agent()
+ result = await agent.ainvoke(
+ {"messages": [{"role": "user", "content": message}]}
+ )
+ return result["messages"][-1].content
 
-    return asyncio.run(run())
+ return asyncio.run(run())
 
 
 # ---------------------------------------------------------------------------
@@ -302,23 +302,23 @@ def chat(message: str, history: list) -> str:
 # ---------------------------------------------------------------------------
 
 demo = gr.ChatInterface(
-    fn=chat,
-    title="AEMO NEM Operations Assistant",
-    description=(
-        "Ask questions about NEM dispatch intervals, spot prices, market notices, "
-        "settlements, and generation unit status. "
-        "All data is processed in **Australia East** — SOCI Act / critical infrastructure data residency maintained."
-    ),
-    examples=[
-        "What was the average spot price in VIC yesterday?",
-        "Which generators dispatched the most in NSW last week?",
-        "Were there any LOR1 or LOR2 events this week?",
-        "Show me the five highest 5-minute dispatch prices across all regions this month.",
-    ],
-    theme=gr.themes.Soft(primary_hue="blue", secondary_hue="orange"),
-    retry_btn="Retry",
-    undo_btn="Undo last turn",
-    clear_btn="Clear conversation",
+ fn=chat,
+ title="AEMO NEM Operations Assistant",
+ description=(
+ "Ask questions about NEM dispatch intervals, spot prices, market notices, "
+ "settlements, and generation unit status. "
+ "All data is processed in **Australia East** — data residency maintained (AU East)."
+ ),
+ examples=[
+ "What was the average spot price in VIC yesterday?",
+ "Which generators dispatched the most in NSW last week?",
+ "Were there any LOR1 or LOR2 events this week?",
+ "Show me the five highest 5-minute dispatch prices across all regions this month.",
+ ],
+ theme=gr.themes.Soft(primary_hue="blue", secondary_hue="orange"),
+ retry_btn="Retry",
+ undo_btn="Undo last turn",
+ clear_btn="Clear conversation",
 )
 
 
@@ -327,7 +327,7 @@ demo = gr.ChatInterface(
 # ---------------------------------------------------------------------------
 
 if __name__ == "__main__":
-    demo.launch(server_name="0.0.0.0", server_port=8080, show_error=True)
+ demo.launch(server_name="0.0.0.0", server_port=8080, show_error=True)
 '''
 
 print(APP_PY_CONTENT)
@@ -378,22 +378,22 @@ print(REQUIREMENTS_CONTENT)
 APP_YAML_CONTENT = f"""command: ["python", "app.py"]
 
 env:
-  - name: PT_ENDPOINT
-    value: {PT_ENDPOINT}
-  - name: CATALOG
-    value: {CATALOG}
-  - name: SCHEMA_AEMO
-    value: {SCHEMA_AEMO}
-  # To add GENIE_SPACE_ID: uncomment below or set it via the UI Environment tab
-  # - name: GENIE_SPACE_ID
-  #   value: {GENIE_SPACE_ID}
+ - name: PT_ENDPOINT
+ value: {PT_ENDPOINT}
+ - name: CATALOG
+ value: {CATALOG}
+ - name: SCHEMA_AEMO
+ value: {SCHEMA_AEMO}
+ # To add GENIE_SPACE_ID: uncomment below or set it via the UI Environment tab
+ # - name: GENIE_SPACE_ID
+ # value: {GENIE_SPACE_ID}
 
 resources:
-  - name: aemo-pt-endpoint
-    description: Provisioned Throughput endpoint for AEMO agent LLM calls
-    serving_endpoint:
-      name: {PT_ENDPOINT}
-      permission: CAN_QUERY
+ - name: aemo-pt-endpoint
+ description: Provisioned Throughput endpoint for AEMO agent LLM calls
+ serving_endpoint:
+ name: {PT_ENDPOINT}
+ permission: CAN_QUERY
 """
 
 dbutils.fs.put(f"{APP_FOLDER}/app.yaml", APP_YAML_CONTENT, overwrite=True)
@@ -410,12 +410,12 @@ print(APP_YAML_CONTENT)
 files = dbutils.fs.ls(APP_FOLDER)
 print(f"Files in {APP_FOLDER}:\n")
 for f in files:
-    print(f"  {f.name:<25} {f.size / 1024:>6.1f} KB")
+ print(f" {f.name:<25} {f.size / 1024:>6.1f} KB")
 
 names = {f.name for f in files}
-assert "app.py" in names,           "app.py missing"
+assert "app.py" in names, "app.py missing"
 assert "requirements.txt" in names, "requirements.txt missing"
-assert "app.yaml" in names,         "app.yaml missing"
+assert "app.yaml" in names, "app.yaml missing"
 print("\nAll three required files present. Ready to deploy.")
 
 # COMMAND ----------
@@ -426,16 +426,16 @@ print("\nAll three required files present. Ready to deploy.")
 # COMMAND ----------
 
 print("=" * 65)
-print("  Workspace folder path for Databricks Apps deployment")
+print(" Workspace folder path for Databricks Apps deployment")
 print("=" * 65)
-print(f"\n  {APP_FOLDER}\n")
+print(f"\n {APP_FOLDER}\n")
 print("=" * 65)
 
 # COMMAND ----------
 
 # MAGIC %md
 # MAGIC <div style="background: #1B3A6B; color: white; padding: 10px 18px; border-radius: 6px; font-size: 1.05em; font-weight: bold; margin: 16px 0 4px 0;">
-# MAGIC   Section 3 — Deploy via the Databricks Apps UI (10 min)
+# MAGIC Section 3 — Deploy via the Databricks Apps UI (10 min)
 # MAGIC </div>
 
 # COMMAND ----------
@@ -461,21 +461,21 @@ print("=" * 65)
 # MAGIC ```
 # MAGIC Source type: Workspace folder
 # MAGIC Workspace folder: paste the path from Section 2.7
-# MAGIC     → UI shows: app.py detected / requirements.txt detected / app.yaml detected
+# MAGIC → UI shows: app.py detected / requirements.txt detected / app.yaml detected
 # MAGIC ```
 # MAGIC → [Next]
 # MAGIC
 # MAGIC **Step 5 — Review Resources** (auto-populated from `app.yaml`)
 # MAGIC ```
-# MAGIC Serving endpoint: au_east_llm_inregion   CAN_QUERY
+# MAGIC Serving endpoint: au_east_llm_inregion CAN_QUERY
 # MAGIC ```
 # MAGIC → [Next]
 # MAGIC
 # MAGIC **Step 6 — Review Environment Variables** (auto-populated from `app.yaml`)
 # MAGIC ```
-# MAGIC PT_ENDPOINT   au_east_llm_inregion
-# MAGIC CATALOG       workshop_au
-# MAGIC SCHEMA_AEMO   aemo
+# MAGIC PT_ENDPOINT au_east_llm_inregion
+# MAGIC CATALOG workshop_au
+# MAGIC SCHEMA_AEMO aemo
 # MAGIC [+ Add variable] ← add GENIE_SPACE_ID here if you have one
 # MAGIC ```
 # MAGIC → [Deploy]
@@ -513,17 +513,17 @@ print("=" * 65)
 # COMMAND ----------
 
 try:
-    app_info = ws.apps.get(APP_NAME)
-    sp_name = app_info.service_principal_name
-    print(f"App service principal: {sp_name}")
-    print()
-    print("Run this SQL in a SQL cell or DBSQL editor:\n")
-    print(f"  GRANT USE CATALOG ON CATALOG {CATALOG} TO `{sp_name}`;")
-    print(f"  GRANT USE SCHEMA ON SCHEMA {CATALOG}.{SCHEMA_AEMO} TO `{sp_name}`;")
-    print(f"  GRANT EXECUTE ON SCHEMA {CATALOG}.{SCHEMA_AEMO} TO `{sp_name}`;")
+ app_info = ws.apps.get(APP_NAME)
+ sp_name = app_info.service_principal_name
+ print(f"App service principal: {sp_name}")
+ print()
+ print("Run this SQL in a SQL cell or DBSQL editor:\n")
+ print(f" GRANT USE CATALOG ON CATALOG {CATALOG} TO `{sp_name}`;")
+ print(f" GRANT USE SCHEMA ON SCHEMA {CATALOG}.{SCHEMA_AEMO} TO `{sp_name}`;")
+ print(f" GRANT EXECUTE ON SCHEMA {CATALOG}.{SCHEMA_AEMO} TO `{sp_name}`;")
 except Exception as e:
-    print(f"App '{APP_NAME}' not found yet — deploy it first via the UI, then re-run this cell.")
-    print(f"(Error: {e})")
+ print(f"App '{APP_NAME}' not found yet — deploy it first via the UI, then re-run this cell.")
+ print(f"(Error: {e})")
 
 # COMMAND ----------
 
@@ -536,7 +536,7 @@ except Exception as e:
 # MAGIC
 # MAGIC # Deploy from a local directory
 # MAGIC databricks apps deploy aemo-operations-agent \
-# MAGIC   --source-code-path /local/path/to/app/folder
+# MAGIC --source-code-path /local/path/to/app/folder
 # MAGIC
 # MAGIC # Stream logs
 # MAGIC databricks apps logs aemo-operations-agent --follow
@@ -546,7 +546,7 @@ except Exception as e:
 
 # MAGIC %md
 # MAGIC <div style="background: #1B3A6B; color: white; padding: 10px 18px; border-radius: 6px; font-size: 1.05em; font-weight: bold; margin: 16px 0 4px 0;">
-# MAGIC   Section 4 — Test and Share the App (10 min)
+# MAGIC Section 4 — Test and Share the App (10 min)
 # MAGIC </div>
 
 # COMMAND ----------
@@ -574,25 +574,25 @@ except Exception as e:
 import urllib.request, urllib.error
 
 try:
-    app_info = ws.apps.get(APP_NAME)
-    app_url  = app_info.url
-    print(f"App URL: {app_url}")
-    print(f"Status:  {app_info.compute_status.state if app_info.compute_status else 'unknown'}")
+ app_info = ws.apps.get(APP_NAME)
+ app_url = app_info.url
+ print(f"App URL: {app_url}")
+ print(f"Status: {app_info.compute_status.state if app_info.compute_status else 'unknown'}")
 
-    try:
-        with urllib.request.urlopen(f"{app_url}/", timeout=10) as resp:
-            print(f"HTTP {resp.status} — app is reachable.")
-    except urllib.error.HTTPError as e:
-        if e.code == 302:
-            print("HTTP 302 redirect to login — expected. Databricks Apps enforces OAuth before serving content.")
-            print("Open the URL in a browser to authenticate and use the app.")
-        else:
-            print(f"HTTP error: {e.code} {e.reason}")
-    except Exception as e:
-        print(f"Could not reach app URL: {e}")
+ try:
+ with urllib.request.urlopen(f"{app_url}/", timeout=10) as resp:
+ print(f"HTTP {resp.status} — app is reachable.")
+ except urllib.error.HTTPError as e:
+ if e.code == 302:
+ print("HTTP 302 redirect to login — expected. Databricks Apps enforces OAuth before serving content.")
+ print("Open the URL in a browser to authenticate and use the app.")
+ else:
+ print(f"HTTP error: {e.code} {e.reason}")
+ except Exception as e:
+ print(f"Could not reach app URL: {e}")
 
 except Exception as e:
-    print(f"App '{APP_NAME}' not found. Deploy it via the UI first.")
+ print(f"App '{APP_NAME}' not found. Deploy it via the UI first.")
 
 # COMMAND ----------
 
@@ -602,7 +602,7 @@ except Exception as e:
 # MAGIC **In the UI:**
 # MAGIC ```
 # MAGIC App management page → Permissions tab → [Edit permissions]
-# MAGIC   → [+ Add principal] → search for user/group → set CAN_USE → [Save]
+# MAGIC → [+ Add principal] → search for user/group → set CAN_USE → [Save]
 # MAGIC
 # MAGIC Send them: https://aemo-operations-agent-{ws-id}.databricksapps.com
 # MAGIC They log in with their Databricks account (SSO via Azure AD) — no PAT needed.
@@ -618,13 +618,13 @@ except Exception as e:
 # from databricks.sdk.service.apps import AppAccessControlRequest
 
 # ws.apps.set_permissions(
-#     app_name=APP_NAME,
-#     access_control_list=[
-#         AppAccessControlRequest(
-#             group_name="aemo-operations-staff",
-#             permission_level=PermissionLevel.CAN_USE,
-#         )
-#     ],
+# app_name=APP_NAME,
+# access_control_list=[
+# AppAccessControlRequest(
+# group_name="aemo-operations-staff",
+# permission_level=PermissionLevel.CAN_USE,
+# )
+# ],
 # )
 # print(f"Granted CAN_USE to aemo-operations-staff on app: {APP_NAME}")
 
@@ -638,8 +638,8 @@ print("Uncomment the code above and set your group name to grant access.")
 # MAGIC Every redeploy is versioned. If a new `app.py` breaks something, roll back from the UI:
 # MAGIC ```
 # MAGIC App management page → Deployments tab
-# MAGIC   → click [Restore] on any previous deployment
-# MAGIC   → previous version serves traffic within ~30 seconds
+# MAGIC → click [Restore] on any previous deployment
+# MAGIC → previous version serves traffic within ~30 seconds
 # MAGIC ```
 # MAGIC Roll back first, investigate second.
 
@@ -654,12 +654,12 @@ print(f"{'App name':<35} {'Status':<15} {'URL'}")
 print("-" * 100)
 
 try:
-    for app in ws.apps.list():
-        state = app.compute_status.state if app.compute_status else "—"
-        url   = app.url or "—"
-        print(f"{app.name:<35} {str(state):<15} {url}")
+ for app in ws.apps.list():
+ state = app.compute_status.state if app.compute_status else "—"
+ url = app.url or "—"
+ print(f"{app.name:<35} {str(state):<15} {url}")
 except Exception as e:
-    print(f"Could not list apps: {e}")
+ print(f"Could not list apps: {e}")
 
 # COMMAND ----------
 

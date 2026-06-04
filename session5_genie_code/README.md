@@ -1,8 +1,8 @@
 # Session 5: Extending Genie Code
 
-**Duration:** 60 minutes  
-**Format:** 3 hands-on labs, in-order  
-**Based on:** Sourabh Ghosh's [genie_for_energy](https://github.com/sourabhghose/genie_for_energy) Module 5 (05-extending.md sections 5A + 5B), adapted for AEMO  
+**Duration:** 60 minutes 
+**Format:** 3 hands-on labs, in-order 
+**Based on:** Sourabh Ghosh's [genie_for_energy](https://github.com/sourabhghose/genie_for_energy) Module 5 (05-extending.md sections 5A + 5B), adapted for AEMO 
 **Target audience:** AEMO data engineers, analysts, and platform owners
 
 ---
@@ -31,7 +31,7 @@ This lab creates AEMO-specific personal instructions covering:
 - Number formatting: `$/MWh` to 2dp, energy in `MWh`
 - Date convention: `DD/MM/YYYY` for AER-formatted output
 - Default catalog: `workshop_au`
-- Regulatory context: SOCI Act 2018, Privacy Act 1988, NER, AER
+- Regulatory context: Australian data residency requirements, Privacy Act 1988, NER, AER
 
 You also see the workspace-level pattern (`Workspace/.assistant_workspace_instructions.md`) that a workspace admin would set once for all users.
 
@@ -53,9 +53,9 @@ SAIDI/SAIFI/CAIDI formulas, NEM spot price reference table (cap $15,300/MWh, flo
 Auto-loads on: SAIDI, SAIFI, spot price, RRP, dispatch, LOR, NEM analysis.
 
 ### `regulatory-compliance`
-SOCI Act 2018 incident reporting obligations (12h critical / 72h significant), Privacy Act APP 6 and APP 11 for NMI data, NER Chapter 7 retention (7 years), STPIS performance benchmarks by network zone, and Major Event Day exclusion rules.
+Australian data residency requirements incident reporting obligations (12h critical / 72h significant), Privacy Act APP 6 and APP 11 for NMI data, NER Chapter 7 retention (7 years), STPIS performance benchmarks by network zone, and Major Event Day exclusion rules.
 
-Auto-loads on: SOCI Act, compliance, AER, Privacy Act, STPIS, NER obligations.
+Auto-loads on: Australian regulatory requirements, compliance, AER, Privacy Act, STPIS, NER obligations.
 
 ### `genie-space-creator`
 Full REST API walkthrough to create a Genie Space (create → add tables → add golden queries → set permissions). Includes five ready-to-use golden query templates for NEM data and the MCP endpoint URL pattern for connecting agents to the space.
@@ -101,11 +101,11 @@ All three endpoints run on Azure Australia East — no data leaves the region.
 ## Skills Installed After This Session
 
 ```
-/Users/{email}/.assistant_instructions.md           ← loads every session
+/Users/{email}/.assistant_instructions.md ← loads every session
 /Users/{email}/.assistant/skills/
-  energy-analytics/SKILL.md                         ← SAIDI/SAIFI, spot price, SQL patterns
-  regulatory-compliance/SKILL.md                    ← SOCI Act, Privacy Act, STPIS
-  genie-space-creator/SKILL.md                      ← REST API, golden queries, MCP endpoint
+ energy-analytics/SKILL.md ← SAIDI/SAIFI, spot price, SQL patterns
+ regulatory-compliance/SKILL.md ← Australian regulatory requirements, Privacy Act, STPIS
+ genie-space-creator/SKILL.md ← REST API, golden queries, MCP endpoint
 ```
 
 ---

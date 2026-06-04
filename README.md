@@ -1,6 +1,6 @@
 # AEMO AI Enablement Workshops — Databricks
 
-Six-session hands-on AI enablement programme for AEMO on Azure Australia East. All content is scoped to in-region features only and governed under the SOCI Act 2018, Privacy Act 1988, and the Australian Energy Sector Cyber Security Framework (AESCSF).
+Six-session hands-on AI enablement programme for AEMO on Azure Australia East. All content is scoped to in-region features only and governed under the Australian data residency requirements and the Australian Energy Sector Cyber Security Framework (AESCSF).
 
 ---
 

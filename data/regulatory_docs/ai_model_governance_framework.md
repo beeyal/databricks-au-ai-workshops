@@ -1,10 +1,10 @@
 # AI Model Governance Framework
 
-**Document ID:** FRAME-AI-002  
-**Version:** 1.2  
-**Effective Date:** 1 April 2025  
-**Review Date:** 1 April 2026  
-**Owner:** Chief Data & Analytics Officer  
+**Document ID:** FRAME-AI-002 
+**Version:** 1.2 
+**Effective Date:** 1 April 2025 
+**Review Date:** 1 April 2026 
+**Owner:** Chief Data & Analytics Officer 
 **Classification:** Internal
 
 ---
@@ -13,7 +13,7 @@
 
 This framework defines the governance requirements for the full lifecycle of AI and machine learning models developed, procured, or deployed by the company. It supplements the AI Usage Policy (POL-AI-001) with specific requirements for model development, validation, production deployment, ongoing monitoring, and retirement.
 
-The framework responds to the increasing use of AI in regulated activities—including asset condition assessment, load forecasting for AEMO market participation, and customer interaction—and the expectation from the AER that regulated entities demonstrate control over technology risks, including algorithmic risk, consistent with Security of Critical Infrastructure Act 2018 (SOCI Act) obligations.
+The framework responds to the increasing use of AI in regulated activities—including asset condition assessment, load forecasting for AEMO market participation, and customer interaction—and the expectation from the AER that regulated entities demonstrate control over technology risks, including algorithmic risk, consistent with Security of Critical Infrastructure Act 2018 obligations.
 
 ---
 

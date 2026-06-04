@@ -1,10 +1,10 @@
 # Vendor Risk Management Policy
 
-**Document ID:** POL-VRM-005  
-**Version:** 3.1  
-**Effective Date:** 1 July 2024  
-**Review Date:** 1 July 2025  
-**Owner:** Chief Risk Officer  
+**Document ID:** POL-VRM-005 
+**Version:** 3.1 
+**Effective Date:** 1 July 2024 
+**Review Date:** 1 July 2025 
+**Owner:** Chief Risk Officer 
 **Classification:** Internal
 
 ---
@@ -13,7 +13,7 @@
 
 This policy establishes the framework for identifying, assessing, and managing risks arising from third-party vendors and service providers, with specific provisions for AI/ML service providers and cloud platforms. The policy implements the requirements of the Security of Critical Infrastructure Act 2018 (Cth) and AER Cyber Security Guidelines.
 
-The SOCI Act requires responsible entities for critical infrastructure assets to manage risks to the reliable operation of those assets, including risks arising from third-party service providers. As the company operates critical electricity infrastructure supporting the NEM, third-party failures can have consequences for market participants and energy consumers beyond the company's direct customer base.
+The Australian regulatory requirements requires responsible entities for critical infrastructure assets to manage risks to the reliable operation of those assets, including risks arising from third-party service providers. As the company operates critical electricity infrastructure supporting the NEM, third-party failures can have consequences for market participants and energy consumers beyond the company's direct customer base.
 
 ---
 
@@ -41,11 +41,11 @@ All active vendors are assigned a tier based on operational criticality and data
 
 ---
 
-## 4. Critical Infrastructure Service Providers — SOCI Act
+## 4. Critical Infrastructure Service Providers — Australian regulatory requirements
 
 ### 4.1 Identification
 
-Under the SOCI Act, the company must identify critical infrastructure service providers (CISPs) — those providers whose failure would have a material adverse impact on the company's ability to maintain safe and reliable electricity supply. The Risk team maintains the CISP Register, reviewed quarterly by the Risk and Audit Committee.
+Under the Australian regulatory requirements, the company must identify critical infrastructure service providers (CISPs) — those providers whose failure would have a material adverse impact on the company's ability to maintain safe and reliable electricity supply. The Risk team maintains the CISP Register, reviewed quarterly by the Risk and Audit Committee.
 
 Current CISP categories include:
 
@@ -107,7 +107,7 @@ Before engagement of a Tier 1 or Tier 2 vendor, the Procurement team must obtain
 - [ ] Subcontractor and supply chain risk disclosures
 - [ ] Business continuity and disaster recovery capabilities
 - [ ] Incident notification obligations and historical incident record
-- [ ] Regulatory compliance (Privacy Act, SOCI Act, NEM participation rules)
+- [ ] Regulatory compliance (Privacy Act, Australian regulatory requirements, NEM participation rules)
 - [ ] For AI vendors: data residency, training data use, explainability, model monitoring
 
 ---
@@ -135,4 +135,4 @@ All vendor contracts must include exit provisions ensuring that:
 
 ---
 
-*Queries regarding this policy should be directed to the Procurement team or the Chief Risk Officer. This policy is reviewed annually or when SOCI Act guidance or AER requirements are updated.*
+*Queries regarding this policy should be directed to the Procurement team or the Chief Risk Officer. This policy is reviewed annually or when Australian regulatory requirements guidance or AER requirements are updated.*

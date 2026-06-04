@@ -1,10 +1,10 @@
 # Emergency Response Procedure — Major Network Outages
 
-**Document ID:** PROC-OPS-011  
-**Version:** 5.1  
-**Effective Date:** 1 March 2025  
-**Review Date:** 1 March 2026  
-**Owner:** General Manager Network Operations  
+**Document ID:** PROC-OPS-011 
+**Version:** 5.1 
+**Effective Date:** 1 March 2025 
+**Review Date:** 1 March 2026 
+**Owner:** General Manager Network Operations 
 **Classification:** Internal
 
 ---

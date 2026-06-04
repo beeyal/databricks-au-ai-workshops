@@ -8,7 +8,7 @@
 
 ## Overview
 
-This workshop equips platform and security teams with the knowledge and hands-on experience to safely enable, govern, and audit Databricks AI features in environments subject to Australian regulatory obligations including SOCI Act 2018 (critical infrastructure), Privacy Act 1988 + APPs, AESCSF (energy sector cybersecurity), and AER regulatory obligations.
+This workshop equips platform and security teams with the knowledge and hands-on experience to safely enable, govern, and audit Databricks AI features in environments subject to Australian regulatory obligations including Privacy Act 1988 + APPs, AESCSF (energy sector cybersecurity), and AER regulatory obligations.
 
 The workshop takes a controls-first approach: every AI feature introduced is accompanied by the corresponding governance control, Unity Catalog permission, and audit mechanism. By the end of the day, participants will have a documented controls framework they can adapt for their organisation.
 
@@ -60,7 +60,7 @@ By the end of this workshop, you will be able to:
 
 Configure and verify AI feature flags at workspace and account level. Understand the hierarchy of controls (account admin vs workspace admin), verify the geography enforcement setting, and set up Unity Catalog grants for AI assets including models, serving endpoints, and Genie Spaces. Create service principals for automated workloads and design a group structure for an energy utility.
 
-Key topics: Settings API, geography enforcement (`shield_csp_enforcement_account_setting`), UC GRANT for AI assets, service principal creation, group structure.
+Key topics: Settings API (`llm_proxy_partner_powered`, `restrict_workspace_admins`), geography enforcement (UI-verified via Account Console; no confirmed public API), UC GRANT for AI assets, service principal creation, group structure.
 
 ---
 
@@ -106,9 +106,9 @@ Key topics: `system.ai_gateway.usage`, `system.billing.usage`, `system.access.au
 **Duration:** 30–35 minutes  
 **Difficulty:** Intermediate
 
-Assemble a compliance evidence package that satisfies SOCI Act 2018 and Privacy Act 1988 obligations. Run a pre-flight checklist that programmatically verifies geography enforcement is on, AI Gateway is routing only to in-region endpoints, and PII guardrails are active. Query `system.access.audit` to export an AI-action audit log. Package all artefacts into a structured evidence bundle.
+Assemble a compliance evidence package that satisfies Australian data residency and privacy obligations. Run a pre-flight checklist that programmatically verifies geography enforcement is on, AI Gateway is routing only to in-region endpoints, and PII guardrails are active. Query `system.access.audit` to export an AI-action audit log. Package all artefacts into a structured evidence bundle.
 
-Key topics: Geography enforcement API check, pre-flight checklist script, `system.access.audit` AI event export, SOCI Act evidence bundle, Privacy Act PII controls documentation.
+Key topics: Geography enforcement API check, pre-flight checklist script, `system.access.audit` AI event export, data residency evidence bundle, Privacy Act PII controls documentation.
 
 ---
 
@@ -120,7 +120,7 @@ At the end of this workshop, your workshop workspace will have:
 - An AI Gateway endpoint routing all LLM traffic through the in-region PT endpoint (Lab 02)
 - Configured rate limits and AU PII guardrails, with a guardrail verification report (Lab 03)
 - A cost attribution view across AI usage system tables with a budget alert configured (Lab 04)
-- A compliance evidence package with pre-flight checklist and SOCI Act audit log export (Lab 05)
+- A compliance evidence package with pre-flight checklist and regulatory audit log export (Lab 05)
 - A controls checklist you can take back to your organisation's AI governance framework
 
 ---
@@ -146,5 +146,5 @@ The table below is your quick reference for labs and discussions. It reflects th
 
 - Run the same preflight and settings checks on your production workspace
 - Review your organisation's AI feature request process against the controls covered today
-- Schedule a follow-up session with your Databricks SA to review your specific SOCI Act and Privacy Act obligations and the Databricks shared responsibility model
+- Schedule a follow-up session with your Databricks SA to review your specific Australian regulatory requirements and Privacy Act obligations and the Databricks shared responsibility model
 - Consider whether Session 5 (Genie Code) or Session 2 (Building Your Genie Space) is the right next step for your technical teams

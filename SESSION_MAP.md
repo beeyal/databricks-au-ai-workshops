@@ -126,7 +126,7 @@ Confirms the `workshop_au` catalog is accessible and Genie Code is enabled in th
 | Skill | Trigger keywords |
 |-------|-----------------|
 | `energy-analytics` | SAIDI, SAIFI, spot price, RRP, dispatch, LOR, NEM analysis |
-| `regulatory-compliance` | SOCI Act, compliance, AER, Privacy Act, STPIS, NER obligations |
+| `regulatory-compliance` | Australian regulatory requirements, compliance, AER, Privacy Act, STPIS, NER obligations |
 | `genie-space-creator` | create Genie Space, golden queries, NL-to-SQL, Genie API |
 
 **Cleanup:** `setup/cleanup.py`

@@ -180,16 +180,16 @@ In a Python notebook cell:
 from databricks.sdk import WorkspaceClient
 w = WorkspaceClient()
 
-group_name = "workshop_session3_participants"  # change to match session type
+group_name = "workshop_session3_participants" # change to match session type
 groups = list(w.groups.list(filter=f'displayName eq "{group_name}"'))
 if groups:
-    grp = groups[0]
-    members = grp.members or []
-    print(f"Group '{group_name}' has {len(members)} member(s):")
-    for m in members:
-        print(f"  - {m.display}")
+ grp = groups[0]
+ members = grp.members or []
+ print(f"Group '{group_name}' has {len(members)} member(s):")
+ for m in members:
+ print(f" - {m.display}")
 else:
-    print(f"Group '{group_name}' not found.")
+ print(f"Group '{group_name}' not found.")
 ```
 
 ### Spot-check from a participant account
@@ -199,9 +199,9 @@ If possible, log in as a participant (or ask a participant to confirm) that they
 1. Navigate to **Data** → **workshop_au** in the Catalog Explorer.
 2. See the `aemo` schema and its tables.
 3. Open the SQL editor, select the workshop warehouse, and run:
-   ```sql
-   SELECT COUNT(*) FROM workshop_au.aemo.dispatch_intervals;
-   ```
+ ```sql
+ SELECT COUNT(*) FROM workshop_au.aemo.dispatch_intervals;
+ ```
 
 ---
 

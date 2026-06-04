@@ -2,30 +2,30 @@
 
 # MAGIC %md
 # MAGIC <div style="background: linear-gradient(135deg, #1B3A6B 0%, #00843D 100%); padding: 36px 40px; border-radius: 14px; margin-bottom: 8px;">
-# MAGIC   <h1 style="color: white; font-family: 'DM Sans', sans-serif; font-size: 2.3em; margin: 0 0 10px 0;">
-# MAGIC     Lab 05: Monitoring & Governing Your MCP Agent
-# MAGIC   </h1>
-# MAGIC   <p style="color: rgba(255,255,255,0.88); font-size: 1.15em; margin: 0 0 6px 0;">
-# MAGIC     Workshop 2c: Building AI Agents with MCP — Australian Regulated Industries
-# MAGIC   </p>
-# MAGIC   <p style="color: rgba(255,255,255,0.70); font-size: 0.95em; margin: 0;">
-# MAGIC     From demo to production: visibility, cost control, and audit trail
-# MAGIC   </p>
+# MAGIC <h1 style="color: white; font-family: 'DM Sans', sans-serif; font-size: 2.3em; margin: 0 0 10px 0;">
+# MAGIC Lab 05: Monitoring & Governing Your MCP Agent
+# MAGIC </h1>
+# MAGIC <p style="color: rgba(255,255,255,0.88); font-size: 1.15em; margin: 0 0 6px 0;">
+# MAGIC Workshop 2c: Building AI Agents with MCP — Australian Regulated Industries
+# MAGIC </p>
+# MAGIC <p style="color: rgba(255,255,255,0.70); font-size: 0.95em; margin: 0;">
+# MAGIC From demo to production: visibility, cost control, and audit trail
+# MAGIC </p>
 # MAGIC </div>
 # MAGIC
 # MAGIC <div style="display: flex; gap: 12px; margin-top: 16px; flex-wrap: wrap;">
-# MAGIC   <div style="background: #f0f4ff; border-left: 4px solid #1B3A6B; padding: 12px 18px; border-radius: 6px; flex: 1; min-width: 160px;">
-# MAGIC     <strong>Estimated time</strong><br>30 minutes
-# MAGIC   </div>
-# MAGIC   <div style="background: #fff4f0; border-left: 4px solid #FF3621; padding: 12px 18px; border-radius: 6px; flex: 1; min-width: 160px;">
-# MAGIC     <strong>Prerequisites</strong><br>Labs 01–04 complete
-# MAGIC   </div>
-# MAGIC   <div style="background: #f0fff4; border-left: 4px solid #00843D; padding: 12px 18px; border-radius: 6px; flex: 1; min-width: 160px;">
-# MAGIC     <strong>Data residency</strong><br>All audit data in AU East
-# MAGIC   </div>
-# MAGIC   <div style="background: #fffbf0; border-left: 4px solid #f9a825; padding: 12px 18px; border-radius: 6px; flex: 1; min-width: 160px;">
-# MAGIC     <strong>SOCI Act relevance</strong><br>Critical infrastructure compliance evidence
-# MAGIC   </div>
+# MAGIC <div style="background: #f0f4ff; border-left: 4px solid #1B3A6B; padding: 12px 18px; border-radius: 6px; flex: 1; min-width: 160px;">
+# MAGIC <strong>Estimated time</strong><br>30 minutes
+# MAGIC </div>
+# MAGIC <div style="background: #fff4f0; border-left: 4px solid #FF3621; padding: 12px 18px; border-radius: 6px; flex: 1; min-width: 160px;">
+# MAGIC <strong>Prerequisites</strong><br>Labs 01–04 complete
+# MAGIC </div>
+# MAGIC <div style="background: #f0fff4; border-left: 4px solid #00843D; padding: 12px 18px; border-radius: 6px; flex: 1; min-width: 160px;">
+# MAGIC <strong>Data residency</strong><br>All audit data in AU East
+# MAGIC </div>
+# MAGIC <div style="background: #fffbf0; border-left: 4px solid #f9a825; padding: 12px 18px; border-radius: 6px; flex: 1; min-width: 160px;">
+# MAGIC <strong>Australian regulatory requirements relevance</strong><br>Critical infrastructure compliance evidence
+# MAGIC </div>
 # MAGIC </div>
 
 # COMMAND ----------
@@ -37,7 +37,7 @@
 # MAGIC |---|---------|-------|------|
 # MAGIC | 1 | AI Gateway | Usage dashboard, inference table, rate limits per SP | 10 min |
 # MAGIC | 2 | MLflow Traces | Trace UI, slow/failed MCP call detection | 10 min |
-# MAGIC | 3 | Audit Logging | `system.access.audit` for MCP, SOCI Act + Privacy Act evidence, anomaly alerts | 10 min |
+# MAGIC | 3 | Audit Logging | `system.access.audit` for MCP, Australian regulatory requirements evidence, anomaly alerts | 10 min |
 # MAGIC
 # MAGIC **Why agents need more governance than notebooks:** a single user message can trigger ten tool calls across three systems. The governance surface is proportionally larger.
 # MAGIC
@@ -46,7 +46,7 @@
 # MAGIC | Cost overrun | Unbounded PT endpoint calls | AI Gateway rate limits per SP |
 # MAGIC | Data exfiltration | No record of which tables the agent queried | `system.access.audit` logs every MCP call |
 # MAGIC | Incident investigation | "Something went wrong" — no detail | MLflow traces: every tool call and LLM step |
-# MAGIC | SOCI Act 2018 | Cannot demonstrate AI access controls | Full chain: user → agent → tool → data asset |
+# MAGIC | Australian data residency requirements | Cannot demonstrate AI access controls | Full chain: user → agent → tool → data asset |
 
 # COMMAND ----------
 
@@ -55,30 +55,30 @@
 
 # COMMAND ----------
 
-dbutils.widgets.text("catalog",     "workshop_au",          "Catalog name")
-dbutils.widgets.text("schema_aemo", "aemo",                 "AEMO schema name")
+dbutils.widgets.text("catalog", "workshop_au", "Catalog name")
+dbutils.widgets.text("schema_aemo", "aemo", "AEMO schema name")
 dbutils.widgets.text("pt_endpoint", "au_east_llm_inregion", "PT endpoint name")
-dbutils.widgets.text("app_name",    "aemo-operations-agent","App name (from Lab 04)")
+dbutils.widgets.text("app_name", "aemo-operations-agent","App name (from Lab 04)")
 
-CATALOG     = dbutils.widgets.get("catalog")
+CATALOG = dbutils.widgets.get("catalog")
 SCHEMA_AEMO = dbutils.widgets.get("schema_aemo")
 PT_ENDPOINT = dbutils.widgets.get("pt_endpoint")
-APP_NAME    = dbutils.widgets.get("app_name")
+APP_NAME = dbutils.widgets.get("app_name")
 
 from databricks.sdk import WorkspaceClient
 ws = WorkspaceClient()
 HOST = ws.config.host.rstrip("/")
 
-print(f"Workspace host  : {HOST}")
-print(f"Catalog.Schema  : {CATALOG}.{SCHEMA_AEMO}")
-print(f"PT endpoint     : {PT_ENDPOINT}")
-print(f"App name        : {APP_NAME}")
+print(f"Workspace host : {HOST}")
+print(f"Catalog.Schema : {CATALOG}.{SCHEMA_AEMO}")
+print(f"PT endpoint : {PT_ENDPOINT}")
+print(f"App name : {APP_NAME}")
 
 # COMMAND ----------
 
 # MAGIC %md
 # MAGIC <div style="background: #1B3A6B; color: white; padding: 10px 18px; border-radius: 6px; font-size: 1.05em; font-weight: bold; margin: 16px 0 4px 0;">
-# MAGIC   Section 1 — AI Gateway for MCP Agents (10 min)
+# MAGIC Section 1 — AI Gateway for MCP Agents (10 min)
 # MAGIC </div>
 
 # COMMAND ----------
@@ -94,9 +94,9 @@ print(f"App name        : {APP_NAME}")
 # MAGIC
 # MAGIC **What the Monitor tab shows:**
 # MAGIC ```
-# MAGIC Token usage (24h):  input 3,891 / output 632
-# MAGIC Request volume:     44 success / 3 rate-limited (429)
-# MAGIC Latency:            p50 987ms  p90 2,341ms  p99 4,892ms
+# MAGIC Token usage (24h): input 3,891 / output 632
+# MAGIC Request volume: 44 success / 3 rate-limited (429)
+# MAGIC Latency: p50 987ms p90 2,341ms p99 4,892ms
 # MAGIC ```
 # MAGIC
 # MAGIC For MCP agents, input tokens are consistently higher than output — the system prompt + tool schemas + tool results all count as input on every turn.
@@ -109,7 +109,7 @@ print(f"App name        : {APP_NAME}")
 # MAGIC The inference table stores one row per request — richer than the metrics chart. Navigate to it:
 # MAGIC ```
 # MAGIC Left sidebar → Serving → au_east_llm_inregion → AI Gateway tab
-# MAGIC   Inference table: workshop_au.aemo.inference_au_east_llm_inregion
+# MAGIC Inference table: workshop_au.aemo.inference_au_east_llm_inregion
 # MAGIC ```
 # MAGIC
 # MAGIC Calls from the deployed App appear with the App SP identity (`app-sp-aemo-...`), not your personal email.
@@ -122,13 +122,13 @@ print(f"Inference table: {INFERENCE_TABLE}\n")
 sql_usage_summary = f"""
 -- AI Gateway usage summary — last 24 hours
 SELECT
-  DATE_TRUNC('hour', timestamp)                          AS hour,
-  client_user_id,
-  COUNT(*)                                               AS request_count,
-  SUM(usage.prompt_tokens)                               AS input_tokens,
-  SUM(usage.completion_tokens)                           AS output_tokens,
-  ROUND(AVG(databricks_output.latency_ms), 0)            AS avg_latency_ms,
-  SUM(CASE WHEN status_code = 429 THEN 1 ELSE 0 END)    AS rate_limited_count
+ DATE_TRUNC('hour', timestamp) AS hour,
+ client_user_id,
+ COUNT(*) AS request_count,
+ SUM(usage.prompt_tokens) AS input_tokens,
+ SUM(usage.completion_tokens) AS output_tokens,
+ ROUND(AVG(databricks_output.latency_ms), 0) AS avg_latency_ms,
+ SUM(CASE WHEN status_code = 429 THEN 1 ELSE 0 END) AS rate_limited_count
 FROM {INFERENCE_TABLE}
 WHERE timestamp >= CURRENT_TIMESTAMP - INTERVAL 24 HOURS
 GROUP BY 1, 2
@@ -144,28 +144,28 @@ print(sql_usage_summary)
 # COMMAND ----------
 
 try:
-    df = spark.sql(f"""
-        SELECT
-            client_user_id,
-            COUNT(*)                                           AS requests,
-            SUM(usage.total_tokens)                           AS total_tokens,
-            ROUND(AVG(databricks_output.latency_ms), 0)       AS avg_latency_ms,
-            MAX(databricks_output.latency_ms)                 AS max_latency_ms,
-            SUM(CASE WHEN status_code != 200 THEN 1 ELSE 0 END) AS errors
-        FROM {INFERENCE_TABLE}
-        WHERE timestamp >= CURRENT_TIMESTAMP - INTERVAL 7 DAYS
-        GROUP BY client_user_id
-        ORDER BY total_tokens DESC
-        LIMIT 10
-    """)
-    print(f"Top callers to {PT_ENDPOINT} — last 7 days:\n")
-    df.show(truncate=60)
+ df = spark.sql(f"""
+ SELECT
+ client_user_id,
+ COUNT(*) AS requests,
+ SUM(usage.total_tokens) AS total_tokens,
+ ROUND(AVG(databricks_output.latency_ms), 0) AS avg_latency_ms,
+ MAX(databricks_output.latency_ms) AS max_latency_ms,
+ SUM(CASE WHEN status_code != 200 THEN 1 ELSE 0 END) AS errors
+ FROM {INFERENCE_TABLE}
+ WHERE timestamp >= CURRENT_TIMESTAMP - INTERVAL 7 DAYS
+ GROUP BY client_user_id
+ ORDER BY total_tokens DESC
+ LIMIT 10
+ """)
+ print(f"Top callers to {PT_ENDPOINT} — last 7 days:\n")
+ df.show(truncate=60)
 except Exception as e:
-    print(f"Could not query inference table: {e}")
-    print("\nPossible causes:")
-    print("  - AI Gateway inference logging not enabled on the endpoint")
-    print("    -> Serving -> endpoint -> AI Gateway tab -> enable logging")
-    print("  - No calls in the last 7 days")
+ print(f"Could not query inference table: {e}")
+ print("\nPossible causes:")
+ print(" - AI Gateway inference logging not enabled on the endpoint")
+ print(" -> Serving -> endpoint -> AI Gateway tab -> enable logging")
+ print(" - No calls in the last 7 days")
 
 # COMMAND ----------
 
@@ -176,7 +176,7 @@ except Exception as e:
 # MAGIC
 # MAGIC ```
 # MAGIC Left sidebar → Serving → au_east_llm_inregion → AI Gateway tab → Rate limits
-# MAGIC   → [+ Add rate limit] → select principal → set type and value
+# MAGIC → [+ Add rate limit] → select principal → set type and value
 # MAGIC ```
 # MAGIC
 # MAGIC | Limit type | Suggested value | Rationale |
@@ -189,7 +189,7 @@ except Exception as e:
 
 # MAGIC %md
 # MAGIC <div style="background: #1B3A6B; color: white; padding: 10px 18px; border-radius: 6px; font-size: 1.05em; font-weight: bold; margin: 16px 0 4px 0;">
-# MAGIC   Section 2 — MLflow Traces for Agent Debugging (10 min)
+# MAGIC Section 2 — MLflow Traces for Agent Debugging (10 min)
 # MAGIC </div>
 
 # COMMAND ----------
@@ -206,13 +206,13 @@ except Exception as e:
 # MAGIC **Reading the trace tree (click any row):**
 # MAGIC ```
 # MAGIC AgentRun (2,341ms)
-# MAGIC  ├── LLMCall — tool selection (456ms)
-# MAGIC  │     Output: tool_call { name: "ask_aemo_nem_operations", args: {...} }
-# MAGIC  ├── MCPToolCall — ask_aemo_nem_operations (1,203ms)
-# MAGIC  │     Input:  { query: "average spot price VIC yesterday" }
-# MAGIC  │     Output: { sql: "...", result: [{"avg(RRP)": 142.50}] }
-# MAGIC  └── LLMCall — synthesise answer (682ms)
-# MAGIC        Output: "The average spot price in VIC1 yesterday was $142.50/MWh..."
+# MAGIC ├── LLMCall — tool selection (456ms)
+# MAGIC │ Output: tool_call { name: "ask_aemo_nem_operations", args: {...} }
+# MAGIC ├── MCPToolCall — ask_aemo_nem_operations (1,203ms)
+# MAGIC │ Input: { query: "average spot price VIC yesterday" }
+# MAGIC │ Output: { sql: "...", result: [{"avg(RRP)": 142.50}] }
+# MAGIC └── LLMCall — synthesise answer (682ms)
+# MAGIC Output: "The average spot price in VIC1 yesterday was $142.50/MWh..."
 # MAGIC ```
 # MAGIC
 # MAGIC | Symptom | Where to look |
@@ -235,28 +235,28 @@ from mlflow.entities import ViewType
 EXPERIMENT_NAME = "/Apps/aemo-operations-agent"
 
 try:
-    experiment = mlflow.get_experiment_by_name(EXPERIMENT_NAME)
-    if experiment is None:
-        print(f"Experiment '{EXPERIMENT_NAME}' not found.")
-        print("Run some queries through the deployed app first, then re-run this cell.")
-    else:
-        print(f"Experiment found: {experiment.name}  (ID: {experiment.experiment_id})\n")
-        recent_runs = mlflow.search_runs(
-            experiment_ids=[experiment.experiment_id],
-            filter_string="",
-            run_view_type=ViewType.ACTIVE_ONLY,
-            max_results=20,
-            order_by=["start_time DESC"],
-        )
-        if recent_runs.empty:
-            print("No runs found yet. Run queries through the app to generate traces.")
-        else:
-            display_cols = [c for c in recent_runs.columns
-                            if any(k in c for k in ["start_time", "end_time", "status", "metrics", "params"])]
-            print(f"Recent runs ({len(recent_runs)}):\n")
-            print(recent_runs[display_cols[:8]].to_string(index=False))
+ experiment = mlflow.get_experiment_by_name(EXPERIMENT_NAME)
+ if experiment is None:
+ print(f"Experiment '{EXPERIMENT_NAME}' not found.")
+ print("Run some queries through the deployed app first, then re-run this cell.")
+ else:
+ print(f"Experiment found: {experiment.name} (ID: {experiment.experiment_id})\n")
+ recent_runs = mlflow.search_runs(
+ experiment_ids=[experiment.experiment_id],
+ filter_string="",
+ run_view_type=ViewType.ACTIVE_ONLY,
+ max_results=20,
+ order_by=["start_time DESC"],
+ )
+ if recent_runs.empty:
+ print("No runs found yet. Run queries through the app to generate traces.")
+ else:
+ display_cols = [c for c in recent_runs.columns
+ if any(k in c for k in ["start_time", "end_time", "status", "metrics", "params"])]
+ print(f"Recent runs ({len(recent_runs)}):\n")
+ print(recent_runs[display_cols[:8]].to_string(index=False))
 except Exception as e:
-    print(f"Could not query MLflow: {e}")
+ print(f"Could not query MLflow: {e}")
 
 # COMMAND ----------
 
@@ -266,40 +266,40 @@ except Exception as e:
 # COMMAND ----------
 
 try:
-    traces = mlflow.search_traces(
-        experiment_names=[EXPERIMENT_NAME],
-        filter_string="",
-        max_results=50,
-    )
+ traces = mlflow.search_traces(
+ experiment_names=[EXPERIMENT_NAME],
+ filter_string="",
+ max_results=50,
+ )
 
-    if not traces:
-        print("No traces found. Run some queries through the app first.")
-    else:
-        print(f"Found {len(traces)} traces. Analysing MCP tool call latencies...\n")
-        tool_latencies = []
-        for trace in traces:
-            for span in trace.data.spans:
-                if span.span_type in ("TOOL", "RETRIEVER") or "mcp" in span.name.lower():
-                    duration_ms = (span.end_time_ns - span.start_time_ns) / 1_000_000
-                    tool_latencies.append({
-                        "tool_name":   span.name[:40],
-                        "duration_ms": round(duration_ms, 0),
-                        "status":      span.status.status_code if span.status else "unknown",
-                        "trace_id":    trace.info.trace_id[:12] + "...",
-                    })
+ if not traces:
+ print("No traces found. Run some queries through the app first.")
+ else:
+ print(f"Found {len(traces)} traces. Analysing MCP tool call latencies...\n")
+ tool_latencies = []
+ for trace in traces:
+ for span in trace.data.spans:
+ if span.span_type in ("TOOL", "RETRIEVER") or "mcp" in span.name.lower():
+ duration_ms = (span.end_time_ns - span.start_time_ns) / 1_000_000
+ tool_latencies.append({
+ "tool_name": span.name[:40],
+ "duration_ms": round(duration_ms, 0),
+ "status": span.status.status_code if span.status else "unknown",
+ "trace_id": trace.info.trace_id[:12] + "...",
+ })
 
-        if tool_latencies:
-            tool_latencies.sort(key=lambda x: x["duration_ms"], reverse=True)
-            print(f"{'Tool name':<42} {'Duration ms':>12} {'Status':<12} {'Trace'}")
-            print("-" * 90)
-            for row in tool_latencies[:15]:
-                print(f"{row['tool_name']:<42} {row['duration_ms']:>12.0f} {str(row['status']):<12} {row['trace_id']}")
-        else:
-            print("No MCP tool spans found. Ensure app.py has MLflow autolog or manual tracing enabled.")
+ if tool_latencies:
+ tool_latencies.sort(key=lambda x: x["duration_ms"], reverse=True)
+ print(f"{'Tool name':<42} {'Duration ms':>12} {'Status':<12} {'Trace'}")
+ print("-" * 90)
+ for row in tool_latencies[:15]:
+ print(f"{row['tool_name']:<42} {row['duration_ms']:>12.0f} {str(row['status']):<12} {row['trace_id']}")
+ else:
+ print("No MCP tool spans found. Ensure app.py has MLflow autolog or manual tracing enabled.")
 
 except Exception as e:
-    print(f"Trace query failed: {e}")
-    print(f"MLflow search_traces requires MLflow 2.17+. Installed: {mlflow.__version__}")
+ print(f"Trace query failed: {e}")
+ print(f"MLflow search_traces requires MLflow 2.17+. Installed: {mlflow.__version__}")
 
 # COMMAND ----------
 
@@ -309,42 +309,42 @@ except Exception as e:
 # COMMAND ----------
 
 try:
-    traces = mlflow.search_traces(
-        experiment_names=[EXPERIMENT_NAME],
-        filter_string="",
-        max_results=100,
-    )
+ traces = mlflow.search_traces(
+ experiment_names=[EXPERIMENT_NAME],
+ filter_string="",
+ max_results=100,
+ )
 
-    failed_spans = []
-    for trace in traces:
-        for span in trace.data.spans:
-            status = span.status.status_code if span.status else "UNSET"
-            if str(status) in ("ERROR", "INTERNAL_ERROR", "UNSET"):
-                failed_spans.append({
-                    "trace_id":  trace.info.trace_id[:16] + "...",
-                    "span_name": span.name[:40],
-                    "status":    str(status),
-                    "error":     (span.attributes or {}).get("exception.message", "—")[:60],
-                })
+ failed_spans = []
+ for trace in traces:
+ for span in trace.data.spans:
+ status = span.status.status_code if span.status else "UNSET"
+ if str(status) in ("ERROR", "INTERNAL_ERROR", "UNSET"):
+ failed_spans.append({
+ "trace_id": trace.info.trace_id[:16] + "...",
+ "span_name": span.name[:40],
+ "status": str(status),
+ "error": (span.attributes or {}).get("exception.message", "—")[:60],
+ })
 
-    if not failed_spans:
-        print("No failed spans found in recent traces. All MCP tool calls completed successfully.")
-    else:
-        print(f"Found {len(failed_spans)} failed span(s):\n")
-        for row in failed_spans:
-            print(f"  Trace:  {row['trace_id']}")
-            print(f"  Span:   {row['span_name']}")
-            print(f"  Status: {row['status']}")
-            print(f"  Error:  {row['error']}\n")
+ if not failed_spans:
+ print("No failed spans found in recent traces. All MCP tool calls completed successfully.")
+ else:
+ print(f"Found {len(failed_spans)} failed span(s):\n")
+ for row in failed_spans:
+ print(f" Trace: {row['trace_id']}")
+ print(f" Span: {row['span_name']}")
+ print(f" Status: {row['status']}")
+ print(f" Error: {row['error']}\n")
 
 except Exception as e:
-    print(f"Trace query failed: {e}")
+ print(f"Trace query failed: {e}")
 
 # COMMAND ----------
 
 # MAGIC %md
 # MAGIC <div style="background: #1B3A6B; color: white; padding: 10px 18px; border-radius: 6px; font-size: 1.05em; font-weight: bold; margin: 16px 0 4px 0;">
-# MAGIC   Section 3 — Audit Logging for MCP Calls (10 min)
+# MAGIC Section 3 — Audit Logging for MCP Calls (10 min)
 # MAGIC </div>
 
 # COMMAND ----------
@@ -357,7 +357,7 @@ except Exception as e:
 # MAGIC **Navigate:**
 # MAGIC ```
 # MAGIC Left sidebar → Catalog → system catalog → access schema → audit table
-# MAGIC   Or: SELECT * FROM system.access.audit WHERE service_name = 'mcpServer' LIMIT 10
+# MAGIC Or: SELECT * FROM system.access.audit WHERE service_name = 'mcpServer' LIMIT 10
 # MAGIC ```
 # MAGIC
 # MAGIC | Column | What it contains |
@@ -378,15 +378,15 @@ except Exception as e:
 # MAGIC %sql
 # MAGIC -- All MCP tool calls in the last hour
 # MAGIC SELECT
-# MAGIC   event_time,
-# MAGIC   user_identity.email                              AS user,
-# MAGIC   action_name                                     AS mcp_action,
-# MAGIC   request_params                                  AS request_params,
-# MAGIC   response.statusCode                             AS http_status
+# MAGIC event_time,
+# MAGIC user_identity.email AS user,
+# MAGIC action_name AS mcp_action,
+# MAGIC request_params AS request_params,
+# MAGIC response.statusCode AS http_status
 # MAGIC FROM system.access.audit
 # MAGIC WHERE service_name = 'mcpServer'
-# MAGIC   AND action_name  = 'mcpToolsCall'
-# MAGIC   AND event_time  >= CURRENT_TIMESTAMP - INTERVAL 1 HOUR
+# MAGIC AND action_name = 'mcpToolsCall'
+# MAGIC AND event_time >= CURRENT_TIMESTAMP - INTERVAL 1 HOUR
 # MAGIC ORDER BY event_time DESC
 # MAGIC LIMIT 50
 
@@ -401,17 +401,17 @@ sql_asset_access = """
 -- Data asset access frequency via MCP — last 7 days
 -- request_params.toolName holds the specific MCP tool called (e.g. ask_aemo_nem_operations)
 SELECT
-  request_params.toolName                            AS tool_name,
-  user_identity.email                                AS accessed_by,
-  COUNT(*)                                           AS call_count,
-  SUM(CASE WHEN response.statusCode = 200 THEN 1 ELSE 0 END) AS success_count,
-  SUM(CASE WHEN response.statusCode != 200 THEN 1 ELSE 0 END) AS error_count,
-  MIN(event_time)                                    AS first_seen,
-  MAX(event_time)                                    AS last_seen
+ request_params.toolName AS tool_name,
+ user_identity.email AS accessed_by,
+ COUNT(*) AS call_count,
+ SUM(CASE WHEN response.statusCode = 200 THEN 1 ELSE 0 END) AS success_count,
+ SUM(CASE WHEN response.statusCode != 200 THEN 1 ELSE 0 END) AS error_count,
+ MIN(event_time) AS first_seen,
+ MAX(event_time) AS last_seen
 FROM system.access.audit
 WHERE service_name = 'mcpServer'
-  AND action_name  = 'mcpToolsCall'
-  AND event_time  >= CURRENT_TIMESTAMP - INTERVAL 7 DAYS
+ AND action_name = 'mcpToolsCall'
+ AND event_time >= CURRENT_TIMESTAMP - INTERVAL 7 DAYS
 GROUP BY request_params.toolName, user_identity.email
 ORDER BY call_count DESC
 """
@@ -421,11 +421,11 @@ print(sql_asset_access)
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC ### 3.4 — MCP Audit and SOCI Act Compliance
+# MAGIC ### 3.4 — MCP Audit and Australian regulatory requirements Compliance
 # MAGIC
-# MAGIC The SOCI Act 2018 and Privacy Act 1988 require audit trails for critical infrastructure data access, including access by automated systems. The controls in this workshop provide the following compliance evidence:
+# MAGIC The Australian data residency and privacy requirements require audit trails for critical infrastructure data access, including access by automated systems. The controls in this workshop provide the following compliance evidence:
 # MAGIC
-# MAGIC | SOCI Act 2018 requirement | Control | Evidence location |
+# MAGIC | regulatory requirement | Control | Evidence location |
 # MAGIC |--------------------------|---------|-------------------|
 # MAGIC | Asset access is logged | Every MCP call → `system.access.audit` | `WHERE service_name='mcpServer' AND action_name='mcpToolsCall'` |
 # MAGIC | Access attributed to an identity | App runs as named SP; notebook calls use user email | `user_identity.email` column |
@@ -442,32 +442,32 @@ print(sql_asset_access)
 # COMMAND ----------
 
 try:
-    df = spark.sql("""
-        SELECT
-            request_params.toolName                            AS tool_name,
-            COUNT(DISTINCT user_identity.email)                AS distinct_callers,
-            COUNT(*)                                           AS total_calls,
-            MIN(event_time)                                    AS first_call,
-            MAX(event_time)                                    AS last_call
-        FROM system.access.audit
-        WHERE service_name = 'mcpServer'
-          AND action_name  = 'mcpToolsCall'
-          AND event_time  >= CURRENT_TIMESTAMP - INTERVAL 24 HOURS
-        GROUP BY request_params.toolName
-        ORDER BY total_calls DESC
-    """)
+ df = spark.sql("""
+ SELECT
+ request_params.toolName AS tool_name,
+ COUNT(DISTINCT user_identity.email) AS distinct_callers,
+ COUNT(*) AS total_calls,
+ MIN(event_time) AS first_call,
+ MAX(event_time) AS last_call
+ FROM system.access.audit
+ WHERE service_name = 'mcpServer'
+ AND action_name = 'mcpToolsCall'
+ AND event_time >= CURRENT_TIMESTAMP - INTERVAL 24 HOURS
+ GROUP BY request_params.toolName
+ ORDER BY total_calls DESC
+ """)
 
-    if df.count() == 0:
-        print("No MCP tool calls found in the last 24 hours.")
-        print("Trigger some queries through the app or notebook, then re-run.")
-    else:
-        print("MCP tool calls — last 24 hours:\n")
-        df.show(truncate=50)
+ if df.count() == 0:
+ print("No MCP tool calls found in the last 24 hours.")
+ print("Trigger some queries through the app or notebook, then re-run.")
+ else:
+ print("MCP tool calls — last 24 hours:\n")
+ df.show(truncate=50)
 
 except Exception as e:
-    print(f"Could not query system.access.audit: {e}")
-    print("\nEnsure you have USAGE privilege on the system catalog.")
-    print("Ask your workspace admin: GRANT USAGE ON CATALOG system TO <your-user>")
+ print(f"Could not query system.access.audit: {e}")
+ print("\nEnsure you have USAGE privilege on the system catalog.")
+ print("Ask your workspace admin: GRANT USAGE ON CATALOG system TO <your-user>")
 
 # COMMAND ----------
 
@@ -479,19 +479,19 @@ except Exception as e:
 sql_after_hours = """
 -- MCP calls outside business hours (before 7am or after 7pm AEST)
 SELECT
-  event_time,
-  user_identity.email                          AS caller,
-  request_params.toolName                      AS tool_called,
-  HOUR(CONVERT_TIMEZONE('UTC', 'Australia/Sydney', event_time)) AS hour_aest
+ event_time,
+ user_identity.email AS caller,
+ request_params.toolName AS tool_called,
+ HOUR(CONVERT_TIMEZONE('UTC', 'Australia/Sydney', event_time)) AS hour_aest
 FROM system.access.audit
 WHERE service_name = 'mcpServer'
-  AND action_name  = 'mcpToolsCall'
-  AND event_time  >= CURRENT_TIMESTAMP - INTERVAL 30 DAYS
-  AND (
-    HOUR(CONVERT_TIMEZONE('UTC', 'Australia/Sydney', event_time)) < 7
-    OR
-    HOUR(CONVERT_TIMEZONE('UTC', 'Australia/Sydney', event_time)) > 19
-  )
+ AND action_name = 'mcpToolsCall'
+ AND event_time >= CURRENT_TIMESTAMP - INTERVAL 30 DAYS
+ AND (
+ HOUR(CONVERT_TIMEZONE('UTC', 'Australia/Sydney', event_time)) < 7
+ OR
+ HOUR(CONVERT_TIMEZONE('UTC', 'Australia/Sydney', event_time)) > 19
+ )
 ORDER BY event_time DESC
 LIMIT 20
 """
@@ -505,17 +505,17 @@ print(sql_after_hours)
 # MAGIC
 # MAGIC ```
 # MAGIC Left sidebar → SQL Editor → paste the after-hours query above → Run → [Save]
-# MAGIC   → [+ Create Alert] (top right of the query editor)
+# MAGIC → [+ Create Alert] (top right of the query editor)
 # MAGIC
 # MAGIC Alert settings:
-# MAGIC   Name:       AEMO Agent MCP After-Hours Activity
-# MAGIC   Condition:  count(*) >= 1   (trigger if any after-hours calls appear)
-# MAGIC   Schedule:   Every 1 hour
-# MAGIC   Notify:     email or Slack channel
-# MAGIC   → [Create Alert]
+# MAGIC Name: AEMO Agent MCP After-Hours Activity
+# MAGIC Condition: count(*) >= 1 (trigger if any after-hours calls appear)
+# MAGIC Schedule: Every 1 hour
+# MAGIC Notify: email or Slack channel
+# MAGIC → [Create Alert]
 # MAGIC ```
 # MAGIC
-# MAGIC Results remain in `system.access.audit` — no extra data movement required. Roll out-of-hours call detection as a standard Databricks Job to close the SOCI Act 2018 continuous monitoring loop.
+# MAGIC Results remain in `system.access.audit` — no extra data movement required. Roll out-of-hours call detection as a standard Databricks Job to close the regulatory continuous monitoring loop.
 
 # COMMAND ----------
 
@@ -531,7 +531,7 @@ print(sql_after_hours)
 # MAGIC | `system.access.audit` | Every MCP call attributed to an identity | Catalog → system → access → audit |
 # MAGIC | DBSQL Alert | Automated anomaly detection and notification | SQL Editor → Save → Create Alert |
 # MAGIC
-# MAGIC **SOCI Act 2018 + Privacy Act compliance checklist after Labs 01–05:**
+# MAGIC **Australian data residency requirements + Privacy Act compliance checklist after Labs 01–05:**
 # MAGIC - All LLM inference stays in AU East (PT endpoint + workspace-local MCP)
 # MAGIC - Every agent call attributed to a named identity in `system.access.audit`
 # MAGIC - UC function permissions control which tools the agent can call

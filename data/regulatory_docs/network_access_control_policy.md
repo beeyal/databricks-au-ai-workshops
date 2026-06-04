@@ -1,10 +1,10 @@
 # Network Access Control Policy
 
-**Document ID:** POL-IAM-006  
-**Version:** 2.3  
-**Effective Date:** 1 April 2025  
-**Review Date:** 1 April 2026  
-**Owner:** Chief Information Security Officer  
+**Document ID:** POL-IAM-006 
+**Version:** 2.3 
+**Effective Date:** 1 April 2025 
+**Review Date:** 1 April 2026 
+**Owner:** Chief Information Security Officer 
 **Classification:** Internal
 
 ---
@@ -87,7 +87,7 @@ Contractors requiring physical access to substations or control rooms must:
 
 ### 4.4 Critical Infrastructure Protection
 
-Contractors performing work on assets listed in the Critical Infrastructure Register (CIR) — including transmission substations >66 kV, zone substations, and the Network Control Centre — are subject to additional vetting under the Critical Infrastructure Risk Management Program (CIRMP) as required by the SOCI Act. This vetting is administered by the Cyber Security and Physical Security teams in consultation with Legal.
+Contractors performing work on assets listed in the Critical Infrastructure Register (CIR) — including transmission substations >66 kV, zone substations, and the Network Control Centre — are subject to additional vetting under the Critical Infrastructure Risk Management Program (CIRMP) as required by the Australian regulatory requirements. This vetting is administered by the Cyber Security and Physical Security teams in consultation with Legal.
 
 ---
 

@@ -1,10 +1,10 @@
 # Asset Management Policy — Electricity Network Assets
 
-**Document ID:** POL-ASSET-007  
-**Version:** 4.2  
-**Effective Date:** 1 January 2025  
-**Review Date:** 1 January 2026  
-**Owner:** General Manager Asset Management  
+**Document ID:** POL-ASSET-007 
+**Version:** 4.2 
+**Effective Date:** 1 January 2025 
+**Review Date:** 1 January 2026 
+**Owner:** General Manager Asset Management 
 **Classification:** Internal
 
 ---

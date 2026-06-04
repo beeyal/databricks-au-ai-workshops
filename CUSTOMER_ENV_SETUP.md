@@ -116,15 +116,15 @@ Rather than granting individual permissions, create a Unity Catalog group and a 
 -- Run as metastore admin
 CREATE GROUP workshop_participants;
 
-GRANT USE CATALOG   ON CATALOG <catalog>             TO workshop_participants;
-GRANT USE SCHEMA    ON SCHEMA  <catalog>.energy      TO workshop_participants;
-GRANT USE SCHEMA    ON SCHEMA  <catalog>.audit        TO workshop_participants;
-GRANT USE SCHEMA    ON SCHEMA  <catalog>.ai_governance TO workshop_participants;
-GRANT SELECT        ON ALL TABLES IN SCHEMA <catalog>.energy       TO workshop_participants;
-GRANT SELECT        ON ALL TABLES IN SCHEMA <catalog>.audit         TO workshop_participants;
-GRANT SELECT        ON ALL TABLES IN SCHEMA <catalog>.ai_governance TO workshop_participants;
-GRANT SELECT        ON system.access.audit   TO workshop_participants;
-GRANT SELECT        ON system.billing.usage  TO workshop_participants;
+GRANT USE CATALOG ON CATALOG <catalog> TO workshop_participants;
+GRANT USE SCHEMA ON SCHEMA <catalog>.energy TO workshop_participants;
+GRANT USE SCHEMA ON SCHEMA <catalog>.audit TO workshop_participants;
+GRANT USE SCHEMA ON SCHEMA <catalog>.ai_governance TO workshop_participants;
+GRANT SELECT ON ALL TABLES IN SCHEMA <catalog>.energy TO workshop_participants;
+GRANT SELECT ON ALL TABLES IN SCHEMA <catalog>.audit TO workshop_participants;
+GRANT SELECT ON ALL TABLES IN SCHEMA <catalog>.ai_governance TO workshop_participants;
+GRANT SELECT ON system.access.audit TO workshop_participants;
+GRANT SELECT ON system.billing.usage TO workshop_participants;
 ```
 
 Then add participants to `workshop_participants` via Account Console → Groups before the workshop.
@@ -155,14 +155,14 @@ The setup notebook creates the catalog automatically. If the customer's governan
 
 ```sql
 CREATE CATALOG IF NOT EXISTS workshop_aemo
-  COMMENT 'Databricks AI Workshop — temporary, will be dropped after the session';
+ COMMENT 'Databricks AI Workshop — temporary, will be dropped after the session';
 ```
 
 You can also create it via the Databricks CLI:
 
 ```bash
 databricks catalogs create workshop_aemo \
-  --comment "Databricks AI Workshop — temporary, will be dropped after the session"
+ --comment "Databricks AI Workshop — temporary, will be dropped after the session"
 ```
 
 ---
@@ -268,56 +268,56 @@ No special networking changes are required. If the workspace is in a VPC without
 
 1. **Upload sample data** (from your laptop, before the workshop day):
 
-   ```bash
-   # Requires Databricks CLI >= 0.18 authenticated against the customer workspace
-   databricks fs cp -r ./data/sample_data/ dbfs:/tmp/au_workshop/sample_data/ --overwrite
-   ```
+ ```bash
+ # Requires Databricks CLI >= 0.18 authenticated against the customer workspace
+ databricks fs cp -r ./data/sample_data/ dbfs:/tmp/au_workshop/sample_data/ --overwrite
+ ```
 
-   Verify the upload:
+ Verify the upload:
 
-   ```bash
-   databricks fs ls dbfs:/tmp/au_workshop/sample_data/
-   ```
+ ```bash
+ databricks fs ls dbfs:/tmp/au_workshop/sample_data/
+ ```
 
-   Expected output: 6 CSV files (`energy_assets.csv`, `meter_readings.csv`, `outage_events.csv`, `maintenance_work_orders.csv`, `regulatory_reports.csv`, `policy_documents.csv`).
+ Expected output: 6 CSV files (`energy_assets.csv`, `meter_readings.csv`, `outage_events.csv`, `maintenance_work_orders.csv`, `regulatory_reports.csv`, `policy_documents.csv`).
 
 2. **Clone the repo into the customer workspace:**
 
-   - Workspace → Repos → Add Repo → paste the GitHub URL
-   - Or use the Databricks CLI: `databricks repos create --url <github_url> --provider github`
+ - Workspace → Repos → Add Repo → paste the GitHub URL
+ - Or use the Databricks CLI: `databricks repos create --url <github_url> --provider github`
 
 3. **Run the pre-flight check** (`setup/preflight_check.py`):
 
-   - Change `catalog` widget to `workshop_<customer_name>`
-   - Run all cells
-   - All checks should be PASS or WARNING — no FAILs
-   - Fix any FAILs before proceeding
+ - Change `catalog` widget to `workshop_<customer_name>`
+ - Run all cells
+ - All checks should be PASS or WARNING — no FAILs
+ - Fix any FAILs before proceeding
 
 4. **Run setup** (`setup/00_workspace_setup.py`):
 
-   - Change `catalog` widget to match the pre-flight check value
-   - Run all cells
-   - Expected runtime: 12–20 minutes (most time is Vector Search index sync)
-   - All smoke tests must pass before the workshop begins
+ - Change `catalog` widget to match the pre-flight check value
+ - Run all cells
+ - Expected runtime: 12–20 minutes (most time is Vector Search index sync)
+ - All smoke tests must pass before the workshop begins
 
 5. **Grant participant permissions** (after catalog is created by setup):
 
-   ```sql
-   -- Run as metastore admin or catalog owner
-   GRANT USE CATALOG    ON CATALOG workshop_aemo       TO workshop_participants;
-   GRANT USE SCHEMA     ON SCHEMA  workshop_aemo.energy      TO workshop_participants;
-   GRANT USE SCHEMA     ON SCHEMA  workshop_aemo.audit        TO workshop_participants;
-   GRANT USE SCHEMA     ON SCHEMA  workshop_aemo.ai_governance TO workshop_participants;
-   GRANT SELECT ON ALL TABLES IN SCHEMA workshop_aemo.energy       TO workshop_participants;
-   GRANT SELECT ON ALL TABLES IN SCHEMA workshop_aemo.audit         TO workshop_participants;
-   GRANT SELECT ON ALL TABLES IN SCHEMA workshop_aemo.ai_governance TO workshop_participants;
-   ```
+ ```sql
+ -- Run as metastore admin or catalog owner
+ GRANT USE CATALOG ON CATALOG workshop_aemo TO workshop_participants;
+ GRANT USE SCHEMA ON SCHEMA workshop_aemo.energy TO workshop_participants;
+ GRANT USE SCHEMA ON SCHEMA workshop_aemo.audit TO workshop_participants;
+ GRANT USE SCHEMA ON SCHEMA workshop_aemo.ai_governance TO workshop_participants;
+ GRANT SELECT ON ALL TABLES IN SCHEMA workshop_aemo.energy TO workshop_participants;
+ GRANT SELECT ON ALL TABLES IN SCHEMA workshop_aemo.audit TO workshop_participants;
+ GRANT SELECT ON ALL TABLES IN SCHEMA workshop_aemo.ai_governance TO workshop_participants;
+ ```
 
 6. **Test end-to-end as a participant:**
 
-   - Log out and log back in as a test participant account (or use a second browser in incognito)
-   - Open Genie and confirm the workshop Genie Space is visible
-   - Run one sample query to confirm data access works
+ - Log out and log back in as a test participant account (or use a second browser in incognito)
+ - Open Genie and confirm the workshop Genie Space is visible
+ - Run one sample query to confirm data access works
 
 ---
 
@@ -329,18 +329,18 @@ Run `setup/99_teardown.py` **within 24 hours of the workshop ending** to avoid o
 
 1. Open `setup/99_teardown.py` in the workspace.
 2. Set widget values to match what was used during setup:
-   - `catalog` → e.g. `workshop_aemo`
-   - `vs_endpoint` → e.g. `workshop_vs`
-   - `pt_endpoint` → whatever was used (default: `au_east_llm_inregion`)
+ - `catalog` → e.g. `workshop_aemo`
+ - `vs_endpoint` → e.g. `workshop_vs`
+ - `pt_endpoint` → whatever was used (default: `au_east_llm_inregion`)
 3. **First, do a dry run:**
-   - Set `dry_run` → `true`
-   - Set `confirm_delete` → `false`
-   - Run all cells
-   - Review the "Would remove" output — confirm it lists only workshop resources
+ - Set `dry_run` → `true`
+ - Set `confirm_delete` → `false`
+ - Run all cells
+ - Review the "Would remove" output — confirm it lists only workshop resources
 4. **Then, do the actual delete:**
-   - Set `dry_run` → `false`
-   - Set `confirm_delete` → `true`
-   - Run all cells
+ - Set `dry_run` → `false`
+ - Set `confirm_delete` → `true`
+ - Run all cells
 5. Verify the final summary shows no errors.
 
 ### What the teardown removes

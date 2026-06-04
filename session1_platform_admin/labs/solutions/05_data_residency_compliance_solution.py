@@ -201,7 +201,7 @@ def generate_compliance_evidence_package(workspace_url, account_id, feature_inve
         "account_id":      account_id,
         "assessment_date": report_timestamp,
         "assessed_by":     spark.sql("SELECT current_user()").collect()[0][0],
-        "regulatory_frameworks": ["SOCI Act 2018", "Privacy Act 1988", "AESCSF", "National Electricity Rules"],
+        "regulatory_frameworks": ["data-residency", "Privacy Act 1988", "AESCSF", "National Electricity Rules"],
         "section_1_infrastructure": {
             "workspace_region":               region_check.get("location"),
             "cloud_provider":                 "Microsoft Azure",
@@ -276,11 +276,11 @@ save_compliance_evidence(spark, CATALOG_NAME, SCHEMA_NAME, package)
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC ## 5. SOCI Act + Privacy Act Audit Log — SOLUTION
+# MAGIC ## 5. Australian data residency requirements Audit Log — SOLUTION
 
 # COMMAND ----------
 
-# SOLUTION: AI model access log for SOCI Act + Privacy Act compliance audit
+# SOLUTION: AI model access log for Australian regulatory compliance audit
 AUDIT_START = "2024-05-01"
 AUDIT_END   = "2024-05-31"
 
@@ -562,7 +562,7 @@ print("  [DONE] Workspace region verified (IMDS + Spark conf)")
 print("  [DONE] Geography enforcement checked via Account API")
 print("  [DONE] Feature inventory: 11 features with live flag status")
 print("  [DONE] Compliance evidence package generated and saved to Delta")
-print("  [DONE] SOCI Act + Privacy Act audit log generated and exported to UC Volume")
+print("  [DONE] Australian data residency requirements audit log generated and exported to UC Volume")
 print("  [DONE] UC tags applied to AI models and endpoints")
 print("  [DONE] Pre-flight checklist: all checks executed")
 print("  [DONE] Pre-flight report saved to Delta")

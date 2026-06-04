@@ -25,7 +25,7 @@ Run through this checklist before **every session**. Steps marked (First time on
 ### 1 week before
 
 - [ ] **Confirm workspace region.** The workspace must be in Australia East (`australiaeast`). Log into `accounts.cloud.databricks.com`, navigate to Workspaces, and confirm the Azure region shown is `Australia East`.
-- [ ] **Enable data processing geography enforcement.** In Account Console → Workspaces → [workspace] → Security and Compliance, confirm **"Enforce data processing within workspace Geography"** is toggled ON. If it is not enabled, enable it now — it can take up to 30 minutes to propagate. This is the single most important compliance control for AEMO as a SOCI Act-regulated entity.
+- [ ] **Enable data processing geography enforcement.** In Account Console → Workspaces → [workspace] → Security and Compliance, confirm **"Enforce data processing within workspace Geography"** is toggled ON. If it is not enabled, enable it now — it can take up to 30 minutes to propagate. This is the single most important compliance control for AEMO as a regulated entity.
 - [ ] **Deploy the Provisioned Throughput endpoint.** Go to Serving → Create serving endpoint. Select `databricks-claude-haiku-4-5` (AU East in-region; do not use Llama models — they route cross-geo for AU East). Name it `databricks-claude-haiku-4-5`. Allow 15 minutes for the endpoint to reach Ready status. Verify it is green before the session day.
 - [ ] **Import the workshop repo.** Import `https://github.com/beeyal/databricks-au-ai-workshops` into Databricks Repos in the workshop workspace. If you have already done this for a previous session, do a Git pull to ensure you have the latest version.
 - [ ] **Run setup/preflight_check.py.** Open the notebook in the workspace and run all cells. All 10 checks must show `[PASS]`. Do not proceed with any other setup steps until all checks pass. Fix any `[FAIL]` items before the session day — do not leave them for the morning.
@@ -58,7 +58,7 @@ Run through this checklist before **every session**. Steps marked (First time on
 ## 2. Session 1 — Platform Administrators (2 hours)
 
 **Audience:** Workspace admins, security architects, platform engineers, CISO team  
-**Goal:** Participants leave knowing how to configure, govern, and audit AI features in Databricks for a SOCI Act-regulated environment  
+**Goal:** Participants leave knowing how to configure, govern, and audit AI features in Databricks for a regulated environment  
 **Labs:** 4 labs (one condensed)
 
 ### Timing guide
@@ -94,7 +94,7 @@ Run through this checklist before **every session**. Steps marked (First time on
 
 ### Lab 01 facilitation notes
 
-Walk through the AU East residency table in the lab header before participants start. The green/red availability matrix is the anchor for every governance decision in this session. Participants from SOCI Act-regulated teams will have questions about Pay-per-Token — acknowledge the concern and tell them Lab 02 covers how to block it at the AI Gateway level.
+Walk through the AU East residency table in the lab header before participants start. The green/red availability matrix is the anchor for every governance decision in this session. Participants from regulated teams will have questions about Pay-per-Token — acknowledge the concern and tell them Lab 02 covers how to block it at the AI Gateway level.
 
 The GRANT SQL cells in Section 4 are deliberately commented out. Do not uncomment them in a shared lab workspace. In regulated environments, reviewing a pattern without executing it in production is standard practice — reinforce that habit.
 

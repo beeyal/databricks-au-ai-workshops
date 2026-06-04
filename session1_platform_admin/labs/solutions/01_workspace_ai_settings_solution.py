@@ -173,7 +173,7 @@ def compliance_check_geography(setting_response: dict) -> bool:
     print("─" * 60)
     if csp == "COMPLIANCE_SECURITY_PROFILE":
         print("PASS — Enforce data processing within Geography: ENABLED")
-        print("    SOCI Act data residency requirement: MET")
+        print("    data residency requirement: MET")
         result = True
     else:
         print("FAIL — Enforce data processing within Geography: NOT ENABLED")

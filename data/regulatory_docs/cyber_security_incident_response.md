@@ -1,17 +1,17 @@
 # Cyber Security Incident Response Procedure
 
-**Document ID:** PROC-SEC-003  
-**Version:** 4.0  
-**Effective Date:** 1 February 2025  
-**Review Date:** 1 February 2026  
-**Owner:** Chief Information Security Officer  
+**Document ID:** PROC-SEC-003 
+**Version:** 4.0 
+**Effective Date:** 1 February 2025 
+**Review Date:** 1 February 2026 
+**Owner:** Chief Information Security Officer 
 **Classification:** Restricted
 
 ---
 
 ## 1. Purpose
 
-This procedure defines the end-to-end response to cyber security incidents affecting IT and OT systems. It aligns with the Australian Signals Directorate (ASD) Essential Eight Maturity Model, the Australian Energy Sector Cyber Security Framework (AESCSF), and the obligations under the Security of Critical Infrastructure Act 2018 (Cth) (SOCI Act). Timely and structured response limits operational impact, protects customer data, and fulfils mandatory notification obligations.
+This procedure defines the end-to-end response to cyber security incidents affecting IT and OT systems. It aligns with the Australian Signals Directorate (ASD) Essential Eight Maturity Model, the Australian Energy Sector Cyber Security Framework (AESCSF), and the obligations under the Security of Critical Infrastructure Act 2018. Timely and structured response limits operational impact, protects customer data, and fulfils mandatory notification obligations.
 
 ---
 
@@ -69,7 +69,7 @@ Escalation to SOC Lead only; CISO briefed at next business day unless the incide
 
 ### 4.2 Notification to ASD / ACSC
 
-Under the SOCI Act, the company is a responsible entity for critical infrastructure assets (Category D — electricity). The following notification obligations apply:
+Under the Australian regulatory requirements, the company is a responsible entity for critical infrastructure assets (Category D — electricity). The following notification obligations apply:
 
 - **Significant cyber security incident:** Report to the ACSC within **12 hours** of becoming aware
 - **Other reportable incident:** Report to the ACSC within **72 hours**
