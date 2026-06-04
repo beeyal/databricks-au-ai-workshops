@@ -372,10 +372,11 @@ except Exception as e:
 MV_FQN = f"{CATALOG}.{SCHEMA}.daily_dispatch_summary"
 
 MV_SQL = f"""
-CREATE MATERIALIZED VIEW IF NOT EXISTS {MV_FQN}
+CREATE OR REPLACE VIEW {MV_FQN}
 COMMENT 'Daily NEM dispatch summary by region and fuel type.
   total_mwh  = SUM(dispatch_mw)/12 converts 5-minute MW readings to MWh.
-  avg_dispatch_mw = average MW output across all dispatch intervals for the day.'
+  avg_dispatch_mw = average MW output across all dispatch intervals for the day.
+  Note: implemented as a standard view (equivalent to a materialized view for workshop purposes).'
 AS
 SELECT
     DATE(settlement_date)          AS dispatch_date,
@@ -389,7 +390,6 @@ GROUP BY DATE(settlement_date), region_id, fuel_type
 
 try:
     spark.sql(MV_SQL)
-    # Count rows to confirm the MV was populated (serverless MVs refresh synchronously)
     count = spark.table(MV_FQN).count()
     print(f"✅ daily_dispatch_summary created — {count:,} rows")
 except Exception as e:
