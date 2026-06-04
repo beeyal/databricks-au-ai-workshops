@@ -7,37 +7,54 @@
 # MAGIC
 # MAGIC **What this removes:**
 # MAGIC - All Delta tables in `workshop_au.energy` and the `energy` schema itself
+# MAGIC - AI Gateway routes on the pay-per-token endpoint (disabled by resetting the gateway config)
 # MAGIC - AI Gateway payload log tables and other workshop artefacts in `ai_governance` (schema itself is kept)
 # MAGIC - UC permission grants per participant email
 # MAGIC
 # MAGIC **What this does NOT remove:**
-# MAGIC - The `workshop_au` catalog (may be shared with other workshops)
+# MAGIC - The `workshop_au` catalog (may be shared with other workshops — set `drop_catalog=true` to also remove it)
 # MAGIC - The `ai_governance` schema itself
-# MAGIC - Any AI Gateway routes or external endpoint configs (managed outside UC)
 # MAGIC
 # MAGIC ⚠️ **`dry_run = true` by default** — prints what would be deleted without doing anything.
 # MAGIC Set to `false` to actually delete.
 
 # COMMAND ----------
 
-dbutils.widgets.text("catalog",          "workshop_au",   "Catalog")
-dbutils.widgets.text("schema_energy",    "energy",        "Energy schema to drop")
-dbutils.widgets.text("schema_governance","ai_governance", "Governance schema (tables only, schema kept)")
-dbutils.widgets.text("revoke_emails",    "",              "Emails to revoke (comma-separated)")
-dbutils.widgets.dropdown("dry_run",      "true", ["true", "false"], "Dry run (true = preview only)")
+import requests
+
+dbutils.widgets.text("catalog",          "workshop_au",          "Catalog")
+dbutils.widgets.text("schema_energy",    "energy",               "Energy schema to drop")
+dbutils.widgets.text("schema_governance","ai_governance",        "Governance schema (tables only, schema kept)")
+dbutils.widgets.text("pt_endpoint",      "au_east_llm_inregion", "Pay-per-token endpoint name")
+dbutils.widgets.text("revoke_emails",    "",                     "Emails to revoke (comma-separated)")
+dbutils.widgets.dropdown("drop_catalog", "false", ["true", "false"], "Drop workshop_au catalog when empty")
+dbutils.widgets.dropdown("dry_run",      "true",  ["true", "false"], "Dry run (true = preview only)")
 
 CATALOG    = dbutils.widgets.get("catalog")
 SCHEMA_E   = dbutils.widgets.get("schema_energy")
 SCHEMA_GOV = dbutils.widgets.get("schema_governance")
+PT_EP      = dbutils.widgets.get("pt_endpoint")
+DROP_CATALOG = dbutils.widgets.get("drop_catalog") == "true"
 DRY_RUN    = dbutils.widgets.get("dry_run") == "true"
 
 raw_emails   = dbutils.widgets.get("revoke_emails")
 revoke_list  = [e.strip().lower() for e in raw_emails.split(",") if e.strip()]
 
+# Initialise summary variables so the summary cell is safe to run even if
+# earlier cells were interrupted or skipped.
+energy_tables = []
+found_any     = False
+
+HOST    = spark.conf.get("spark.databricks.workspaceUrl")
+TOKEN   = dbutils.notebook.entry_point.getDbutils().notebook().getContext().apiToken().get()
+HEADERS = {"Authorization": f"Bearer {TOKEN}", "Content-Type": "application/json"}
+
 mode = "DRY RUN — nothing will be deleted" if DRY_RUN else "LIVE — deletions will happen"
 print(f"Mode              : {mode}")
 print(f"Energy schema     : {CATALOG}.{SCHEMA_E}   (will be dropped)")
 print(f"Governance schema : {CATALOG}.{SCHEMA_GOV} (tables cleared, schema kept)")
+print(f"PT endpoint       : {PT_EP}  (AI Gateway config will be reset)")
+print(f"Drop catalog      : {DROP_CATALOG}")
 print(f"Revoke emails     : {revoke_list or '(none provided)'}")
 if DRY_RUN:
     print()
@@ -89,7 +106,41 @@ do(
 
 # MAGIC %md
 # MAGIC ---
-# MAGIC ## Step 2: Clean up governance schema tables
+# MAGIC ## Step 2: Disable AI Gateway on the pay-per-token endpoint
+# MAGIC
+# MAGIC Session 1 Lab 02 creates AI Gateway routes on the `au_east_llm_inregion` endpoint.
+# MAGIC After cleanup, those routes would otherwise remain active — payload logging would
+# MAGIC continue writing to a dropped schema, and future workshop runs on the same workspace
+# MAGIC could see route conflicts.
+# MAGIC
+# MAGIC This step resets the AI Gateway config to an empty state (no routes, no guardrails,
+# MAGIC no rate limits) by calling `PUT /api/2.0/serving-endpoints/{name}/ai-gateway` with
+# MAGIC an empty body. The endpoint itself is not deleted — only the gateway overlay is cleared.
+
+# COMMAND ----------
+
+gw_url = f"https://{HOST}/api/2.0/serving-endpoints/{PT_EP}/ai-gateway"
+
+def _reset_ai_gateway():
+    # PUT with an empty AiGatewayConfig resets all routes, rate limits, and guardrails.
+    resp = requests.put(gw_url, headers=HEADERS, json={}, timeout=30)
+    if resp.status_code in (200, 204):
+        print(f"  ✅ AI Gateway config cleared on endpoint: {PT_EP}")
+    elif resp.status_code == 404:
+        print(f"  ✅ Endpoint {PT_EP} not found — nothing to reset (may already be deleted)")
+    else:
+        print(f"  ⚠️  HTTP {resp.status_code}: {resp.text[:200]}")
+
+do(
+    f"Reset AI Gateway config on endpoint '{PT_EP}' (PUT empty config)",
+    _reset_ai_gateway,
+)
+
+# COMMAND ----------
+
+# MAGIC %md
+# MAGIC ---
+# MAGIC ## Step 3: Clean up governance schema tables
 # MAGIC
 # MAGIC Drops `genie_space_registry` and any other workshop-created tables in `ai_governance`.
 # MAGIC The schema itself is preserved as it may be shared across workshop sessions.
@@ -126,7 +177,10 @@ if not found_any:
 
 # MAGIC %md
 # MAGIC ---
-# MAGIC ## Step 3: Revoke UC grants per participant
+# MAGIC ## Step 4: Revoke UC grants per participant
+# MAGIC
+# MAGIC Note: revoking schema-level grants after the schema has been dropped is a harmless
+# MAGIC no-op in Unity Catalog — UC ignores revoke statements targeting non-existent objects.
 
 # COMMAND ----------
 
@@ -157,7 +211,28 @@ else:
 
 # MAGIC %md
 # MAGIC ---
-# MAGIC ## Step 4: Summary
+# MAGIC ## Step 5: Drop catalog (optional)
+# MAGIC
+# MAGIC The `workshop_au` catalog is intentionally preserved by default because it may be
+# MAGIC shared with other workshop sessions (Session 2, Session 4, etc.).
+# MAGIC Set `drop_catalog = true` in the widget above to also remove the catalog.
+
+# COMMAND ----------
+
+if DROP_CATALOG:
+    do(
+        f"DROP CATALOG {CATALOG} CASCADE",
+        lambda: spark.sql(f"DROP CATALOG IF EXISTS {CATALOG} CASCADE")
+    )
+else:
+    print(f"  [SKIP] Catalog {CATALOG} preserved — shared with other workshop sessions.")
+    print(f"         Set drop_catalog=true to remove it.")
+
+# COMMAND ----------
+
+# MAGIC %md
+# MAGIC ---
+# MAGIC ## Step 6: Summary
 
 # COMMAND ----------
 
@@ -172,16 +247,20 @@ if DRY_RUN:
     print("  2. Re-run all cells")
 else:
     print("Removed:")
-    if energy_tables:
+    if 'energy_tables' in dir() and energy_tables:
         print(f"  • {len(energy_tables)} table(s) in {CATALOG}.{SCHEMA_E}")
     print(f"  • Schema {CATALOG}.{SCHEMA_E}")
-    if found_any:
+    print(f"  • AI Gateway config on endpoint {PT_EP} (routes/guardrails/rate limits cleared)")
+    if 'found_any' in dir() and found_any:
         print(f"  • Workshop tables in {CATALOG}.{SCHEMA_GOV}")
     if revoke_list:
         print(f"  • UC grants for {len(revoke_list)} user(s)")
+    if DROP_CATALOG:
+        print(f"  • Catalog {CATALOG}")
     print()
     print("Not removed (shared resources):")
-    print(f"  • Catalog {CATALOG}")
-    print(f"  • Schema {CATALOG}.{SCHEMA_GOV}")
-    print(f"  • AI Gateway routes and endpoint configurations")
+    if not DROP_CATALOG:
+        print(f"  • Catalog {CATALOG} — set drop_catalog=true to remove")
+    print(f"  • Schema {CATALOG}.{SCHEMA_GOV} (schema structure kept, workshop tables dropped)")
+    print(f"  • The serving endpoint '{PT_EP}' itself (only the AI Gateway overlay was cleared)")
     print(f"  • Any external data or configurations outside UC")

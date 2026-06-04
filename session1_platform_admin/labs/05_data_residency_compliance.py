@@ -1,12 +1,13 @@
 # Databricks notebook source
 # MAGIC %md
 # MAGIC <div style="background: linear-gradient(135deg, #1B3139 0%, #243447 100%); padding: 24px; border-radius: 8px; margin-bottom: 8px">
-# MAGIC   <h1 style="color: #FF6B35; margin: 0 0 8px 0; font-size: 28px">🔒 Lab 05: Data Residency & Compliance Evidence</h1>
+# MAGIC   <h1 style="color: #FF6B35; margin: 0 0 8px 0; font-size: 28px">Lab 05: Data Residency &amp; Compliance Evidence</h1>
 # MAGIC   <p style="color: #AECBCC; margin: 0; font-size: 14px">Workshop 1: Admin Track · Australian Regulated Industries · Databricks</p>
 # MAGIC </div>
 # MAGIC
 # MAGIC | | |
 # MAGIC |---|---|
+# MAGIC | ⏱️ **Duration** | 25–30 minutes |
 # MAGIC | **Prerequisites** | Labs 01–04 complete |
 # MAGIC | **By the end** | Compliance evidence package generated, pre-flight checklist run, regulatory audit log exported |
 # MAGIC
@@ -14,8 +15,8 @@
 # MAGIC
 # MAGIC | Regulation | Requirement | How this lab addresses it |
 # MAGIC |---|---|---|
-# MAGIC | Australian data residency requirements | Data processed in permitted jurisdictions | Geography enforcement API check |
-# MAGIC | Australian data residency requirements | Access logs maintained for all information assets | Audit log query + evidence package |
+# MAGIC | AER Cyber Security Guidelines / NER Chapter 7 | Data processed within permitted Australian jurisdictions | Geography enforcement workspace conf check |
+# MAGIC | NER Chapter 7 | Access logs maintained for all information assets (typically 7-year retention) | Audit log query + evidence package |
 # MAGIC | Privacy Act 1988 | Security of personal information — reasonable steps under APP 11 | Pre-flight checklist script |
 # MAGIC | Privacy Act 1988 | Cross-border disclosure accountability — APP 8 requires reasonable steps before overseas transfer | PII guardrail + geography enforcement |
 # MAGIC
@@ -26,13 +27,15 @@
 # MAGIC | Feature | Residency | Safe for regulated data? |
 # MAGIC |---|---|---|
 # MAGIC | Genie Spaces | In-region | Yes |
+# MAGIC | Genie Agent Mode (within Genie Spaces) | In-region | Yes — in-region for ANZ |
 # MAGIC | AI Gateway | In-region | Yes |
 # MAGIC | FMAPI Provisioned Throughput | In-region | Yes |
 # MAGIC | External Models (Azure OpenAI Regional) | In-region | Yes — verify deployment region |
 # MAGIC | Vector Search | In-region | Yes |
 # MAGIC | MLflow Tracking | In-region | Yes |
 # MAGIC | FMAPI Pay-Per-Token | Cross-geo | **No** — routes to US East |
-# MAGIC | Knowledge Assistant | Cross-geo | **No** — not GA in AU East |
+# MAGIC | Knowledge Assistant (Agent Bricks) | Not available | **No** — not GA in AU East as of June 2026 |
+# MAGIC | Supervisor Agent / MAS (Agent Bricks) | Not available | **No** — not GA in AU East as of June 2026 |
 # MAGIC | Foundation Model Fine-tuning | Not available | Not applicable |
 
 # COMMAND ----------
@@ -42,15 +45,17 @@
 # MAGIC
 # MAGIC **Confirm workspace region (Account Console):**
 # MAGIC ```
-# MAGIC Navigate: accounts.cloud.databricks.com → Workspaces → [your workspace name] → look at the Region field
+# MAGIC Navigate: accounts.azuredatabricks.net → Workspaces → [your workspace name] → look at the Region field
 # MAGIC You should see: australiaeast
+# MAGIC Note: AWS accounts use accounts.cloud.databricks.com — for Azure workspaces (such as this one) use accounts.azuredatabricks.net
 # MAGIC ```
 # MAGIC
 # MAGIC **Geography enforcement toggle (most critical setting in this lab):**
 # MAGIC ```
-# MAGIC Navigate: accounts.cloud.databricks.com → Workspaces → [your workspace name] → Security and compliance tab
+# MAGIC Navigate: accounts.azuredatabricks.net → Workspaces → [your workspace name] → Security and compliance tab
 # MAGIC You should see: toggle labelled "Enforce data processing within workspace Geography for Designated Services"
 # MAGIC Default state is OFF — when ON, cross-geo features return an error instead of routing data outside AU.
+# MAGIC Note: AWS accounts use accounts.cloud.databricks.com — for Azure workspaces (such as this one) use accounts.azuredatabricks.net
 # MAGIC ```
 # MAGIC
 # MAGIC **UC tags in Catalog Explorer:**
@@ -59,10 +64,13 @@
 # MAGIC You should see: existing key-value tags and a [+ Add tag] button; SQL alternative: ALTER TABLE ... SET TAGS (...)
 # MAGIC ```
 # MAGIC
-# MAGIC > ⚠️ **Two workspace settings must both be correct for AI to work:**
-# MAGIC > - **Geography enforcement** → Account Console → Security and compliance → **ON** (keeps data in AU East)
+# MAGIC > **Two workspace settings must both be correct for AI to work:**
+# MAGIC > - **Geography enforcement** → Account Console → Security and compliance → **ON** (keeps data in AU East; required for data sovereignty obligations under AER guidelines and Privacy Act APP 8)
 # MAGIC > - **Partner-Powered AI Features** → workspace settings → must remain **ON** (NEVER turn this off — it disables Genie, Genie Code, and AI/BI entirely)
+# MAGIC >
 # MAGIC > These are different settings with different purposes. Geography enforcement controls where data goes. Partner-Powered controls whether AI features work at all.
+# MAGIC >
+# MAGIC > **Important:** Geography enforcement is a workspace-level configuration (`enableDataProcessingWithinGeography`). The Compliance Security Profile (CSP) is a separate account-level setting. This lab checks geography enforcement, not CSP — they are independent controls.
 
 # COMMAND ----------
 
@@ -113,7 +121,8 @@ HEADERS = {
     "Content-Type": "application/json",
 }
 
-w = WorkspaceClient()
+w = WorkspaceClient(host=WORKSPACE_URL, token=DATABRICKS_TOKEN)
+print(f"WorkspaceClient initialized — host: {w.config.host}")
 
 REPORT_TIMESTAMP = datetime.now(timezone.utc).isoformat()
 print(f"Compliance evidence run timestamp: {REPORT_TIMESTAMP}")
@@ -127,24 +136,39 @@ print(f"Compliance evidence run timestamp: {REPORT_TIMESTAMP}")
 # MAGIC
 # MAGIC Azure IMDS (Instance Metadata Service) is the most authoritative source; Spark conf tags are a fast cluster-level alternative.
 # MAGIC
-# MAGIC 🖱️ **UI:** accounts.cloud.databricks.com → Workspaces → [your workspace name] → look at the Region field
-# MAGIC You should see: `australiaeast`. This is the authoritative region for this workspace — all compute and storage resides here unless cross-geo features are used.
+# MAGIC Note: IMDS is only reachable from classic compute clusters. On serverless compute (SQL warehouses, serverless jobs), IMDS returns a connection error — the function falls back to reporting `unknown`. In that case, verify the region via Account Console and include a screenshot in your evidence package.
 # MAGIC
-# MAGIC ⚡ **Run the cell below to verify the region programmatically via Azure IMDS and Spark conf tags:**
+# MAGIC **UI:** accounts.azuredatabricks.net → Workspaces → [your workspace name] → look at the Region field. You should see: `australiaeast`. (Note: AWS accounts use `accounts.cloud.databricks.com` — for Azure workspaces use `accounts.azuredatabricks.net`.)
+# MAGIC
+# MAGIC **Run the cell below to verify the region programmatically via Azure IMDS and Spark conf tags:**
 
 # COMMAND ----------
 
 def check_workspace_region_from_host(workspace_url: str) -> dict:
-    """Attempt Azure IMDS. Falls back to URL inference if not on Azure compute."""
+    """
+    Attempt to confirm the Azure region via Instance Metadata Service (IMDS).
+
+    IMDS is authoritative and only reachable from classic compute nodes (not serverless).
+    On serverless or when network policy blocks 169.254.x.x, returns 'unknown' — the
+    caller should surface this clearly rather than assuming a region.
+    """
     try:
         imds_url = "http://169.254.169.254/metadata/instance?api-version=2021-02-01"
         resp = requests.get(imds_url, headers={"Metadata": "true"}, timeout=5)
         if resp.status_code == 200:
             m = resp.json().get("compute", {})
-            return {"location": m.get("location"), "vm_size": m.get("vmSize"), "source": "Azure IMDS (authoritative)"}
+            return {
+                "location": m.get("location"),
+                "vm_size":  m.get("vmSize"),
+                "source":   "Azure IMDS (authoritative)",
+            }
     except Exception:
         pass
-    return {"location": "australiaeast (inferred from workspace URL)", "source": "URL inference — run from a cluster for IMDS confirmation"}
+    # Do not fabricate a region — return unknown so downstream evidence is accurate
+    return {
+        "location": "unknown — verify via Account Console screenshot",
+        "source":   "IMDS unreachable (serverless or network policy). Run from a classic cluster for IMDS confirmation.",
+    }
 
 
 print(f"SDK host : {w.config.host}")
@@ -181,70 +205,84 @@ display(spark.sql("""
 # MAGIC <h2 style="color: #1B3139; margin: 0">Section 2: Verify "Enforce Data Processing Within Geography"</h2>
 # MAGIC </div>
 # MAGIC
-# MAGIC This is the **most critical Australian regulatory requirements control** in this lab. When disabled (the default), some AI features may route data outside Australia. The API check below confirms the setting programmatically for your evidence package.
+# MAGIC This is the **most critical data residency control** in this lab (required for Privacy Act APP 8 cross-border disclosure accountability and energy sector data sovereignty obligations under AER guidelines). When disabled (the default), some AI features may route data outside Australia.
+# MAGIC
+# MAGIC The check below reads the workspace configuration key `enableDataProcessingWithinGeography` via the Workspace Conf API. This key is the correct programmatic signal for the "Enforce data processing within workspace Geography for Designated Services" toggle in Account Console.
+# MAGIC
+# MAGIC **Note on Compliance Security Profile (CSP):** CSP is a separate account-level setting that enables additional security controls (audit log streaming, enhanced encryption, etc.). Geography enforcement and CSP are independent — a workspace can have CSP without geography enforcement and vice versa. This lab checks geography enforcement only.
 
 # COMMAND ----------
 
-def check_geography_enforcement(account_id: str, headers: dict) -> dict:
+def check_geography_enforcement(workspace_client: WorkspaceClient) -> dict:
     """
-    Fetch and evaluate the Geography enforcement account setting.
-    Returns a structured result with pass/fail status.
-    Requires account admin role — returns CANNOT_VERIFY if 403.
-    """
-    url = (
-        f"https://accounts.azuredatabricks.net/api/2.0/accounts/{account_id}"
-        f"/settings/types/shield_csp_enforcement_account_setting/names/default"
-    )
+    Check whether 'Enforce data processing within workspace Geography for Designated Services' is enabled.
 
+    Uses the Workspace Conf API key 'enableDataProcessingWithinGeography' — this is the
+    correct programmatic signal for the Account Console toggle. It is a workspace-level
+    setting, not an account-level setting.
+
+    Falls back to CANNOT_VERIFY if the SDK call fails (e.g., insufficient permissions).
+    This function does NOT check the Compliance Security Profile (CSP), which is a separate
+    control at the account level.
+    """
     try:
-        response = requests.get(url, headers=headers, timeout=30)
+        # The SDK passes the keys value directly as a query parameter (comma-separated string).
+        # Passing a list causes it to be URL-encoded as "['enableDataProcessingWithinGeography']"
+        # which the API does not recognise — the key will be absent from the response dict,
+        # causing a false FAIL on every run. Pass a plain string instead.
+        conf = workspace_client.workspace_conf.get_status(
+            keys="enableDataProcessingWithinGeography"
+        )
+        value = conf.get("enableDataProcessingWithinGeography", "").lower()
 
-        if response.status_code == 403:
+        if value == "true":
             return {
-                "status":         "CANNOT_VERIFY",
-                "reason":         "403 Forbidden — account admin role required",
-                "recommendation": "Ask your Account Admin to verify this setting and provide a screenshot as evidence.",
-                "compliant":      None,
+                "status":    "PASS",
+                "raw_value": value,
+                "reason":    "Geography enforcement is ENABLED (enableDataProcessingWithinGeography = true)",
+                "compliant": True,
             }
-
-        if response.status_code == 404:
+        elif value == "false":
             return {
                 "status":         "FAIL",
-                "reason":         "Setting not found — Geography enforcement is NOT enabled",
+                "raw_value":      value,
+                "reason":         "Geography enforcement is NOT enabled (enableDataProcessingWithinGeography = false)",
                 "recommendation": (
                     "Enable via Account Console → Workspaces → [workspace] → "
                     "Security and compliance tab → 'Enforce data processing within workspace Geography for Designated Services'"
                 ),
-                "compliant":      False,
-            }
-
-        response.raise_for_status()
-        body      = response.json()
-        csp_block = body.get("shield_csp_enforcement_account_setting", {})
-        csp_value = csp_block.get("csp", "")
-
-        if csp_value == "COMPLIANCE_SECURITY_PROFILE":
-            return {
-                "status":    "PASS",
-                "csp_value": csp_value,
-                "etag":      body.get("etag"),
-                "reason":    "Geography enforcement is ENABLED",
-                "compliant": True,
+                "compliant": False,
             }
         else:
+            # Key returned but value is empty or unexpected — treat as not set (defaults to off)
             return {
                 "status":         "FAIL",
-                "csp_value":      csp_value,
-                "reason":         f"Geography enforcement is NOT enabled (current value: '{csp_value}')",
-                "recommendation": "Enable via Account Console → Workspaces → [workspace] → Security and compliance tab",
-                "compliant":      False,
+                "raw_value":      value or "(empty)",
+                "reason":         f"Geography enforcement key returned unexpected value: '{value}' — treating as NOT enabled",
+                "recommendation": (
+                    "Enable via Account Console → Workspaces → [workspace] → "
+                    "Security and compliance tab"
+                ),
+                "compliant": False,
             }
 
     except Exception as e:
-        return {"status": "ERROR", "reason": str(e), "compliant": None}
+        err_str = str(e)
+        if "403" in err_str or "PERMISSION_DENIED" in err_str.upper():
+            return {
+                "status":         "CANNOT_VERIFY",
+                "reason":         "Insufficient permissions to read workspace configuration",
+                "recommendation": "Ask your workspace admin to verify this setting and provide a screenshot as evidence.",
+                "compliant":      None,
+            }
+        return {
+            "status":  "ERROR",
+            "reason":  err_str,
+            "compliant": None,
+        }
 
 
-geo_result = check_geography_enforcement(ACCOUNT_ID, HEADERS)
+geo_result = check_geography_enforcement(w)
 print("=== Geography Enforcement Check ===")
 print(json.dumps(geo_result, indent=2))
 
@@ -262,10 +300,11 @@ print(f"\n{icon} {geo_result['reason']}")
 # MAGIC
 # MAGIC Query workspace-level AI feature flags and record current state. This forms the Feature Inventory section of the compliance evidence package.
 # MAGIC
-# MAGIC 🖱️ **UI:** Click username (top-right) → Settings → look for AI / Machine Learning or Previews section. Section label varies by workspace version. Cross-reference against the residency table in the header above.
-# MAGIC You should see: Each toggle's current state. Features marked cross-geo in the table above should be OFF for any workspace handling regulated data.
+# MAGIC **UI:** Click username (top-right) → Settings → look for AI / Machine Learning or Previews section. Section label varies by workspace version. Cross-reference against the residency table in the header above. Features marked cross-geo or not-available in the table above should not be used with regulated data.
 # MAGIC
-# MAGIC ⚡ **Run the cell below to check all 11 AI features programmatically and print a residency/approved-status table:**
+# MAGIC **Run the cell below to print the AI feature inventory with residency and approval status.**
+# MAGIC
+# MAGIC Note: Only features with a workspace-level feature flag are queried programmatically (currently Genie Spaces). Features marked NOT_FLAG_CONTROLLED are governed by endpoint configuration and AI Gateway rules rather than a binary toggle — refer to the Residency and Approved columns for guidance.
 
 # COMMAND ----------
 
@@ -279,12 +318,20 @@ AI_FEATURE_INVENTORY = [
         "notes": "Queries execute in-region. External model calls via AI Gateway are separately controlled.",
     },
     {
+        "feature_name": "Genie Agent Mode (within Genie Spaces)",
+        "feature_flag_type": None,
+        "residency": "IN_REGION",
+        "risk_rating": "LOW",
+        "approved_for_regulated_data": True,
+        "notes": "Agent mode within Genie Spaces is in-region for ANZ. Distinct from Supervisor Agent Bricks product.",
+    },
+    {
         "feature_name": "AI Gateway",
         "feature_flag_type": None,
         "residency": "IN_REGION",
         "risk_rating": "LOW",
         "approved_for_regulated_data": True,
-        "notes": "Rate limits, guardrails, and payload logging recommended before user enablement.",
+        "notes": "Rate limits, guardrails, and payload logging (inference_table_config) recommended before user enablement.",
     },
     {
         "feature_name": "FMAPI Provisioned Throughput",
@@ -308,7 +355,7 @@ AI_FEATURE_INVENTORY = [
         "residency": "IN_REGION",
         "risk_rating": "LOW",
         "approved_for_regulated_data": True,
-        "notes": "Requires Azure OpenAI resource deployed in australiaeast. Verify deployment region.",
+        "notes": "Requires Azure OpenAI resource deployed in australiaeast. Verify deployment region before use.",
     },
     {
         "feature_name": "Vector Search",
@@ -319,20 +366,20 @@ AI_FEATURE_INVENTORY = [
         "notes": "Use databricks-qwen3-embedding-0-6b model for in-region embeddings.",
     },
     {
-        "feature_name": "Knowledge Assistant (KA)",
+        "feature_name": "Knowledge Assistant (Agent Bricks)",
         "feature_flag_type": None,
-        "residency": "CROSS_GEO",
+        "residency": "NOT_AVAILABLE",
         "risk_rating": "HIGH",
         "approved_for_regulated_data": False,
-        "notes": "Not available in AU East as of May 2026. Workaround: use Agent Framework with PT backend.",
+        "notes": "Not GA in AU East as of June 2026. Workaround: use Agent Framework with PT backend for in-region Q&A.",
     },
     {
-        "feature_name": "Multi-Agent System (MAS)",
+        "feature_name": "Supervisor Agent / MAS (Agent Bricks)",
         "feature_flag_type": None,
-        "residency": "CROSS_GEO",
+        "residency": "NOT_AVAILABLE",
         "risk_rating": "HIGH",
         "approved_for_regulated_data": False,
-        "notes": "Not GA in AU East. Monitor Databricks release notes for AU East availability.",
+        "notes": "Not GA in AU East as of June 2026. Monitor Databricks release notes for AU East availability.",
     },
     {
         "feature_name": "Foundation Model Fine-tuning",
@@ -340,7 +387,7 @@ AI_FEATURE_INVENTORY = [
         "residency": "NOT_AVAILABLE",
         "risk_rating": "N/A",
         "approved_for_regulated_data": False,
-        "notes": "Not available in AU East. No committed availability date as of May 2026.",
+        "notes": "Not available in AU East. No committed availability date as of June 2026.",
     },
     {
         "feature_name": "MLflow Tracking",
@@ -362,7 +409,12 @@ AI_FEATURE_INVENTORY = [
 
 
 def check_feature_flag_status(workspace_url: str, headers: dict, flag_type: str) -> str:
-    """Query a workspace feature flag and return ENABLED, DISABLED, or NOT_FLAG_CONTROLLED."""
+    """
+    Query a workspace feature flag setting and return its status string.
+
+    Returns NOT_FLAG_CONTROLLED when flag_type is None — meaning the feature is
+    governed by endpoint configuration and AI Gateway rules, not a binary workspace toggle.
+    """
     if flag_type is None:
         return "NOT_FLAG_CONTROLLED"
     url = f"{workspace_url}/api/2.0/settings/types/{flag_type}/names/default"
@@ -388,11 +440,12 @@ print("Querying AI feature flag status...\n")
 for feature in AI_FEATURE_INVENTORY:
     feature["flag_status"] = check_feature_flag_status(WORKSPACE_URL, HEADERS, feature["feature_flag_type"])
 
-print(f"{'Feature':<45} {'Residency':<14} {'Approved':<10} {'Flag Status'}")
-print("-" * 100)
+# NOT_FLAG_CONTROLLED = feature is governed by endpoint config/AI Gateway rules, not a workspace toggle
+print(f"{'Feature':<50} {'Residency':<14} {'Approved':<10} {'Flag Status'}")
+print("-" * 110)
 for f in AI_FEATURE_INVENTORY:
     approved = "YES" if f["approved_for_regulated_data"] else "NO"
-    print(f"  {f['feature_name']:<43} {f['residency']:<14} {approved:<10} {f['flag_status']}")
+    print(f"  {f['feature_name']:<48} {f['residency']:<14} {approved:<10} {f['flag_status']}")
 
 # COMMAND ----------
 
@@ -400,6 +453,8 @@ for f in AI_FEATURE_INVENTORY:
 # MAGIC <div style="border-left: 4px solid #FF3621; padding-left: 16px; margin: 24px 0">
 # MAGIC <h2 style="color: #1B3139; margin: 0">Section 4: Generate Compliance Evidence Package</h2>
 # MAGIC </div>
+# MAGIC
+# MAGIC This cell assembles the evidence gathered in Sections 1–3 into a structured JSON document. Fill in your organisation name and assessor name before sharing with your security team.
 
 # COMMAND ----------
 
@@ -412,28 +467,40 @@ compliance_package = {
     "account_id":      ACCOUNT_ID,
     "assessment_date": REPORT_TIMESTAMP,
     "assessed_by":     "TODO: Name/Role",
-    "regulatory_frameworks": ["Australian data residency requirements", "Privacy Act 1988", "AESCSF", "AER", "NER"],
+    # Named regulatory frameworks applicable to AU energy sector AI deployments
+    "regulatory_frameworks": ["Privacy Act 1988", "AESCSF", "AER Cyber Security Guidelines", "NER Chapter 7"],
     "section_1_infrastructure": {
-        "workspace_region":              region_check.get("location", "unknown"),
-        "cloud_provider":                "Microsoft Azure",
-        "geography_enforcement_enabled": geo_result.get("compliant"),
-        "geography_enforcement_status":  geo_result.get("status"),
-        "geography_enforcement_detail":  geo_result.get("reason"),
+        "workspace_region":                     region_check.get("location", "unknown"),
+        "region_verification_source":           region_check.get("source", "unknown"),
+        "cloud_provider":                       "Microsoft Azure",
+        # Geography enforcement = workspace conf key 'enableDataProcessingWithinGeography'
+        # This is the toggle "Enforce data processing within workspace Geography for Designated Services"
+        # in Account Console. It is NOT the Compliance Security Profile (CSP) — those are separate controls.
+        "geography_enforcement_enabled":        geo_result.get("compliant"),
+        "geography_enforcement_status":         geo_result.get("status"),
+        "geography_enforcement_detail":         geo_result.get("reason"),
     },
     "section_2_feature_inventory": {
-        "total_features":      len(AI_FEATURE_INVENTORY),
-        "in_region_approved":  sum(1 for f in AI_FEATURE_INVENTORY if f["residency"] == "IN_REGION"),
-        "non_compliant":       len(not_approved),
-        "features":            AI_FEATURE_INVENTORY,
+        "total_features_reviewed": len(AI_FEATURE_INVENTORY),
+        "in_region_approved":      sum(1 for f in AI_FEATURE_INVENTORY if f["residency"] == "IN_REGION"),
+        "not_approved_count":      len(not_approved),
+        "features":                AI_FEATURE_INVENTORY,
     },
-    "section_3_access_controls": [
-        "Unity Catalog RBAC on all AI assets",
-        "Service principals for all automated workloads",
-        "Separate endpoint tiers: admin / analyst / app",
-        "Rate limits on all endpoints",
-        "PII BLOCK + safety filter on all production endpoints",
-        "Payload logging to Delta on all production endpoints",
+    # Access controls below are DECLARED by the assessor — they are not automatically verified
+    # by this script. Attach supporting evidence (Lab 02 endpoint config output, Lab 03 guardrail
+    # test results) to validate each declared control.
+    "section_3_access_controls_declared": [
+        "Unity Catalog RBAC on all AI assets (verify: Lab 02 endpoint permissions output)",
+        "Service principals for all automated workloads (verify: workspace service principal list)",
+        "Separate endpoint tiers: admin / analyst / app (verify: Lab 02 endpoint config)",
+        "Rate limits on all endpoints (verify: Lab 02 rate limit config output)",
+        "PII BLOCK + safety filter on all production endpoints (verify: Lab 03 guardrail test results)",
+        "Payload logging to Delta via inference_table_config on all production endpoints (verify: Lab 02)",
     ],
+    "section_3_verification_note": (
+        "Declared controls are not automatically verified by this script. "
+        "Attach the output from Labs 02 and 03 as supporting evidence for each declared control."
+    ),
     "section_4_exceptions": {
         "features_requiring_exception": [
             {"feature": f["feature_name"], "risk": f["risk_rating"], "status": f["residency"]}
@@ -449,55 +516,64 @@ print(json.dumps(compliance_package, indent=2, default=str))
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC 🖱️ **UI (to view saved evidence):** Left sidebar → Catalog → [catalog] → [schema] → `ai_compliance_evidence` → Sample Data tab
-# MAGIC You should see: One row per evidence run. Each row contains the full JSON package — queryable with `from_json()` for automated compliance dashboards.
+# MAGIC **Save evidence to Delta (optional):** The cell below persists this package as a Delta table row for audit retention. Uncomment after confirming catalog and schema exist.
 # MAGIC
-# MAGIC ⚡ **Or run the cell below to persist the evidence package to a Delta table (uncomment to execute):**
+# MAGIC **UI (to view saved evidence):** Left sidebar → Catalog → [catalog] → [schema] → `ai_compliance_evidence` → Sample Data tab. Each row contains the full JSON package, queryable with `from_json()` for automated compliance dashboards.
 
 # COMMAND ----------
 
 CATALOG_NAME = CATALOG_W
 SCHEMA_NAME  = SCHEMA_W
 
-# TODO: Uncomment to persist the evidence to Delta for audit retention
+# Uncomment to persist the evidence to Delta for audit retention
 # spark.sql(f"CREATE SCHEMA IF NOT EXISTS {CATALOG_NAME}.{SCHEMA_NAME}")
 # row = {
 #     "assessment_timestamp":            compliance_package["assessment_date"],
 #     "workspace_url":                   compliance_package["workspace_url"],
 #     "geography_enforcement_compliant": compliance_package["section_1_infrastructure"]["geography_enforcement_enabled"],
+#     "geography_enforcement_status":    compliance_package["section_1_infrastructure"]["geography_enforcement_status"],
 #     "workspace_region":                compliance_package["section_1_infrastructure"]["workspace_region"],
-#     "non_compliant_count":             compliance_package["section_2_feature_inventory"]["non_compliant"],
+#     "not_approved_count":              compliance_package["section_2_feature_inventory"]["not_approved_count"],
 #     "full_package_json":               json.dumps(compliance_package, default=str),
 # }
 # spark.createDataFrame([row]).write.format("delta").mode("append").option("mergeSchema", "true") \
 #     .saveAsTable(f"{CATALOG_NAME}.{SCHEMA_NAME}.ai_compliance_evidence")
+# print(f"Evidence saved to {CATALOG_NAME}.{SCHEMA_NAME}.ai_compliance_evidence")
 
-print("Compliance evidence save is commented out — uncomment after configuring catalog/schema.")
+print("Evidence package Delta save: pattern provided above — uncomment to execute after confirming catalog/schema.")
 
 # COMMAND ----------
 
 # MAGIC %md
 # MAGIC <div style="border-left: 4px solid #FF3621; padding-left: 16px; margin: 24px 0">
-# MAGIC <h2 style="color: #1B3139; margin: 0">Section 5: Australian regulatory requirements Audit Evidence — AI Model Access Logs</h2>
+# MAGIC <h2 style="color: #1B3139; margin: 0">Section 5: Regulatory Compliance Audit Evidence — AI Model Access Logs</h2>
 # MAGIC </div>
 # MAGIC
-# MAGIC Australian data residency requirements requires logs of access to AI models. Confirm the retention period with your legal team (typically 7 years for financial records).
+# MAGIC NER Chapter 7 requires records of access to information assets. For AI models, `system.access.audit` captures admin-level actions (configuration changes, endpoint creation, permission changes). Confirm the retention period with your legal team — typically 7 years for records supporting regulatory obligations.
 # MAGIC
-# MAGIC 🖱️ **UI:** Left sidebar → Catalog → system → access → audit → Sample Data tab → filter column `service_name` to `modelServing` or `databricksGenie`
-# MAGIC You should see: Raw audit rows. The cell below queries and formats these into a structured access log with user, IP, action, and endpoint columns.
+# MAGIC **What is in `system.access.audit` for AI:** Admin and configuration events — endpoint creation, AI Gateway config updates (`putInferenceEndpointAiGateway`), permission changes (`changeInferenceEndpointAcl`). These all appear under `service_name = 'serverlessRealTimeInference'`.
 # MAGIC
-# MAGIC ⚡ **Run the cell below to generate the 30-day AI access log (runs immediately, exports with the TODO block):**
+# MAGIC **What is NOT in `system.access.audit`:** Per-request inference detail (individual queries, token counts, user prompts). For per-request audit, use `system.ai_gateway.usage` (Beta, available in AU East). For endpoint inventory (models, versions, state), use `system.serving.served_entities`.
+# MAGIC
+# MAGIC **UI:** Left sidebar → Catalog → system → access → audit → Sample Data tab → filter column `service_name` to `serverlessRealTimeInference`
+# MAGIC
+# MAGIC **Run the cell below to generate the 30-day AI admin action log:**
+# MAGIC
+# MAGIC Note: `df.count()` on 30 days of audit data may take 2–4 minutes on a cold cluster. If you are short on time, skip the count line — `display(df)` will still show a sample.
 
 # COMMAND ----------
 
 def generate_ai_access_log(start_date: str, end_date: str, include_endpoints: list = None):
     """
-    Generate an AI model access log for Australian regulatory requirements + Privacy Act compliance audit purposes.
+    Generate an AI model admin action log for Privacy Act and NER Chapter 7 compliance audit purposes.
+
+    Queries system.access.audit for AI-related service events. Note that per-request
+    inference detail is in system.ai_gateway.usage (Beta), not system.access.audit.
 
     Parameters
     ----------
-    start_date : str   Format YYYY-MM-DD
-    end_date   : str   Format YYYY-MM-DD
+    start_date : str   Format YYYY-MM-DD (inclusive)
+    end_date   : str   Format YYYY-MM-DD (inclusive — upper bound is start of next day)
     include_endpoints : list of endpoint names to filter (None = all)
     """
     endpoint_filter = ""
@@ -505,6 +581,9 @@ def generate_ai_access_log(start_date: str, end_date: str, include_endpoints: li
         names = ", ".join(f"'{n}'" for n in include_endpoints)
         endpoint_filter = f"AND request_params['endpointName'] IN ({names})"
 
+    # Upper bound uses strict less-than against start of next day to avoid the sub-second
+    # gap that '23:59:59' creates (events between 23:59:59.000001 and 23:59:59.999999 would
+    # be excluded). This is the standard pattern for closed date ranges in compliance queries.
     access_log_sql = f"""
     SELECT
       event_time                                       AS access_time,
@@ -514,23 +593,24 @@ def generate_ai_access_log(start_date: str, end_date: str, include_endpoints: li
       action_name                                      AS action,
       service_name                                     AS service,
       request_params['endpointName']                   AS endpoint_name,
-      response.statusCode                             AS response_code,
+      response.statusCode                              AS response_code,
       request_id                                       AS audit_request_id
     FROM system.access.audit
     WHERE
       event_time >= TIMESTAMP '{start_date} 00:00:00'
-      AND event_time < TIMESTAMP '{end_date} 23:59:59'
-      AND service_name IN ('modelServing', 'databricksGenie', 'aiPlayground', 'aiGateway')
+      AND event_time < TIMESTAMP '{end_date} 00:00:00' + INTERVAL 1 DAY
+      AND service_name IN ('serverlessRealTimeInference', 'databricksGenie', 'aiPlayground')
       {endpoint_filter}
     ORDER BY event_time DESC
     """
 
-    print(f"AI Access Log: {start_date} to {end_date}")
-    print(f"Filter: {endpoint_filter or 'All AI service endpoints'}\n")
+    print(f"AI Admin Action Log: {start_date} to {end_date} (inclusive)")
+    print(f"Service filter: serverlessRealTimeInference, databricksGenie, aiPlayground")
+    print(f"Endpoint filter: {endpoint_filter or 'All AI service endpoints'}\n")
 
     df        = spark.sql(access_log_sql)
     row_count = df.count()
-    print(f"Total access events: {row_count:,}")
+    print(f"Total admin action events in period: {row_count:,}")
     display(df)
     return df
 
@@ -542,13 +622,15 @@ access_log_df = generate_ai_access_log(AUDIT_START, AUDIT_END)
 
 # COMMAND ----------
 
-# TODO: Uncomment to export access log to a Unity Catalog volume (CSV)
+# Uncomment to export access log to a Unity Catalog volume (CSV) for offline audit submission
 # Download from: Left sidebar → Catalog → Volumes → [catalog] → [schema] → audit_exports
+#
 # spark.sql(f"CREATE VOLUME IF NOT EXISTS {CATALOG_NAME}.{SCHEMA_NAME}.audit_exports")
 # (access_log_df.coalesce(1).write.mode("overwrite").option("header", "true")
 #     .csv(f"/Volumes/{CATALOG_NAME}/{SCHEMA_NAME}/audit_exports/ai_access_log_{AUDIT_START}_to_{AUDIT_END}.csv"))
+# print(f"Access log exported to /Volumes/{CATALOG_NAME}/{SCHEMA_NAME}/audit_exports/")
 
-print("Access log export is commented out — uncomment after confirming catalog/schema.")
+print("Access log export pattern: provided above — uncomment to execute after confirming catalog/schema.")
 
 # COMMAND ----------
 
@@ -557,12 +639,9 @@ print("Access log export is commented out — uncomment after confirming catalog
 # MAGIC <h2 style="color: #1B3139; margin: 0">Section 6: Unity Catalog Tag Schema for AI Asset Classification</h2>
 # MAGIC </div>
 # MAGIC
-# MAGIC UC governed tags classify AI assets by data sensitivity, enabling governance policies based on classification rather than naming conventions.
+# MAGIC UC governed tags classify AI assets by data sensitivity, enabling governance policies based on classification rather than naming conventions. This section is reference material — read the schema, then use the SQL examples in your own workspace.
 # MAGIC
-# MAGIC 🖱️ **UI:** Left sidebar → Catalog → [catalog] → [table or model] → Overview tab → Tags section → [+ Add tag]
-# MAGIC You should see: A key-value field. Enter tag names from the schema below (e.g. `data_classification` = `confidential`). Tags are immediately visible to all users with SELECT on the asset and queryable via `system.information_schema.table_tags`.
-# MAGIC
-# MAGIC ⚡ **Run the cell below to print the tag schema, then copy the SQL examples into a %sql cell to apply tags in bulk:**
+# MAGIC **UI:** Left sidebar → Catalog → [catalog] → [table or model] → Overview tab → Tags section → [+ Add tag]. Tags are immediately visible to all users with SELECT on the asset and queryable via `system.information_schema.table_tags`.
 
 # COMMAND ----------
 
@@ -571,7 +650,7 @@ AI_TAG_SCHEMA = {
     "data_classification": (["public", "internal", "confidential", "restricted", "secret"], "internal"),
     "data_residency":      (["au-east", "any-au", "global"],                                "au-east"),
     "pii_processes":       (["yes", "no", "conditional"],                                   "no"),
-    "regulatory_scope":    (["data-residency", "privacy-act-1988", "aescsf", "aer", "ner", "none"], "none"),
+    "regulatory_scope":    (["privacy-act-1988", "aescsf", "aer", "ner", "none"],           "none"),
     "ai_approved":         (["approved", "pending-review", "not-approved", "conditional"],  "pending-review"),
     "owner_team":          (None,                                                            None),
 }
@@ -586,7 +665,7 @@ for tag_name, (values, default) in AI_TAG_SCHEMA.items():
 # COMMAND ----------
 
 # SQL statements to apply tags to AI assets
-# TODO: Replace catalog, schema, and asset names with your own
+# Replace catalog, schema, and asset names with your own before running
 
 TAG_SQL_EXAMPLES = """
 -- Apply a residency policy tag at the catalog level
@@ -599,16 +678,16 @@ ALTER MODEL energy_ai.models.meter_anomaly_v1
     'data_classification' = 'confidential',
     'data_residency'      = 'au-east',
     'pii_processes'       = 'no',
-    'regulatory_scope'    = 'data-residency',
+    'regulatory_scope'    = 'aer',
     'ai_approved'         = 'approved',
     'owner_team'          = 'grp_data_science'
   );
 
--- Serving endpoints are NOT Unity Catalog objects — use REST API instead:
+-- Serving endpoints are NOT Unity Catalog objects — tag them via REST API:
 --   PUT /api/2.0/serving-endpoints/{name}/tags
 --   Body: {"tags": [{"key": "ai_approved", "value": "approved"}, ...]}
 
--- Query all UC object tags by classification
+-- Query all UC table and model tags by classification
 SELECT
   catalog_name, schema_name, table_name AS asset_name, tag_name, tag_value
 FROM system.information_schema.table_tags
@@ -631,66 +710,86 @@ print(TAG_SQL_EXAMPLES)
 # MAGIC <h2 style="color: #1B3139; margin: 0">Section 7: Pre-flight Checklist — Before Enabling AI for New User Groups</h2>
 # MAGIC </div>
 # MAGIC
-# MAGIC Run this checklist every time you enable AI access for a new business unit or user group. All checks must PASS before proceeding. The report is saved to Delta as change management evidence.
+# MAGIC Run this checklist every time you enable AI access for a new business unit or user group. Resolve all FAIL items before proceeding. WARN items (where verification requires elevated permissions) should be confirmed out-of-band and documented separately.
 # MAGIC
-# MAGIC 🖱️ **UI (manual pre-flight equivalent):**
-# MAGIC 1. accounts.cloud.databricks.com → Workspaces → [workspace] → Security and compliance tab → verify Geography enforcement is ON
+# MAGIC **UI (manual pre-flight equivalent):**
+# MAGIC 1. accounts.azuredatabricks.net → Workspaces → [workspace] → Security and compliance tab → verify Geography enforcement is ON (Note: AWS accounts use accounts.cloud.databricks.com)
 # MAGIC 2. Left sidebar → Serving → AI Gateway tab → [endpoint] → verify state is Ready
 # MAGIC 3. Edit Unity AI Gateway → confirm PII BLOCK + safety filter are enabled on input and output
 # MAGIC 4. User management → Groups → confirm target group exists and has correct members
 # MAGIC
-# MAGIC ⚡ **Or run the cell below to execute all checks automatically and print a structured PASS/FAIL report:**
+# MAGIC **Run the cell below to execute all checks automatically and print a structured PASS/FAIL/WARN report:**
 
 # COMMAND ----------
 
 def run_preflight_checklist(
     workspace_url: str,
-    account_id: str,
     headers: dict,
+    workspace_client: WorkspaceClient,
     endpoint_name: str,
     target_group: str,
 ) -> dict:
-    """Run pre-flight checks before enabling AI access for a new group."""
+    """
+    Run pre-flight checks before enabling AI access for a new group.
+
+    CANNOT_VERIFY results (e.g., geography enforcement requiring elevated permissions)
+    are treated as WARN rather than FAIL — they do not block the overall pass/fail
+    determination but are flagged for out-of-band confirmation.
+    """
     results = []
 
-    def add_check(name: str, passed: bool, detail: str = "", remediation: str = "") -> None:
+    def add_check(name: str, status: str, detail: str = "", remediation: str = "") -> None:
+        """status: 'PASS', 'FAIL', or 'WARN'"""
         results.append({
             "check":       name,
-            "status":      "PASS" if passed else "FAIL",
+            "status":      status,
             "detail":      detail,
-            "remediation": remediation if not passed else "",
+            "remediation": remediation if status != "PASS" else "",
         })
 
     # 1. Workspace region
     try:
         region    = check_workspace_region_from_host(workspace_url)
         location  = region.get("location", "")
-        in_region = "australiaeast" in location.lower()
-        add_check("Workspace in australiaeast", in_region, detail=location,
-                  remediation="This check cannot be remediated — do not use this workspace for AU-regulated data.")
+        if "australiaeast" in location.lower():
+            add_check("Workspace in australiaeast", "PASS", detail=location)
+        elif "unknown" in location.lower():
+            add_check("Workspace in australiaeast", "WARN",
+                      detail="Region could not be confirmed via IMDS (serverless or network policy)",
+                      remediation="Verify region via Account Console and attach a screenshot as evidence.")
+        else:
+            add_check("Workspace in australiaeast", "FAIL", detail=location,
+                      remediation="Do not use this workspace for AU-regulated data — it is not in australiaeast.")
     except Exception as e:
-        add_check("Workspace region check", False, detail=str(e))
+        add_check("Workspace region check", "FAIL", detail=str(e))
 
-    # 2. Geography enforcement
-    geo = check_geography_enforcement(account_id, headers)
+    # 2. Geography enforcement — WARN if cannot verify (requires admin), not FAIL
+    geo = check_geography_enforcement(workspace_client)
     if geo["compliant"] is True:
-        add_check("Geography enforcement enabled", True, detail="COMPLIANCE_SECURITY_PROFILE")
+        add_check("Geography enforcement enabled", "PASS", detail=geo.get("reason", ""))
     elif geo["compliant"] is False:
-        add_check("Geography enforcement enabled", False, remediation=geo.get("recommendation", ""))
+        add_check("Geography enforcement enabled", "FAIL",
+                  detail=geo.get("reason", ""),
+                  remediation=geo.get("recommendation", "Enable via Account Console → Security and compliance tab"))
     else:
-        add_check("Geography enforcement enabled", False,
-                  detail="Cannot verify — account admin access needed",
-                  remediation="Confirm with Account Admin before proceeding.")
+        # CANNOT_VERIFY or ERROR — flag as WARN, not FAIL, so workspace admins can still run the checklist
+        add_check("Geography enforcement enabled", "WARN",
+                  detail=geo.get("reason", "Cannot verify"),
+                  remediation="Obtain account/workspace admin confirmation before enabling AI access for this group.")
 
     # 3. Target endpoint exists and is READY
     try:
-        ep_url  = f"{workspace_url}/api/2.0/serving-endpoints/{endpoint_name}"
-        ep_resp = requests.get(ep_url, headers=headers, timeout=15)
-        ep_json = ep_resp.json() if ep_resp.status_code == 200 else {}
+        ep_url   = f"{workspace_url}/api/2.0/serving-endpoints/{endpoint_name}"
+        ep_resp  = requests.get(ep_url, headers=headers, timeout=15)
+        ep_json  = ep_resp.json() if ep_resp.status_code == 200 else {}
         ep_ready = (ep_resp.status_code == 200 and ep_json.get("state", {}).get("ready") == "READY")
-        detail = f"State: {ep_json.get('state', {}).get('ready', 'unknown')}" if ep_resp.status_code == 200 else f"HTTP {ep_resp.status_code}"
-        add_check(f"Endpoint '{endpoint_name}' is READY", ep_ready, detail=detail,
-                  remediation="Wait for endpoint to reach READY state, or create the endpoint first.")
+        detail   = f"State: {ep_json.get('state', {}).get('ready', 'unknown')}" if ep_resp.status_code == 200 else f"HTTP {ep_resp.status_code}"
+        add_check(
+            f"Endpoint '{endpoint_name}' is READY",
+            "PASS" if ep_ready else "FAIL",
+            detail=detail,
+            remediation="Wait for endpoint to reach READY state, or create the endpoint first.",
+        )
 
         # 4. AI Gateway config checks (only if endpoint accessible)
         if ep_resp.status_code == 200:
@@ -699,46 +798,64 @@ def run_preflight_checklist(
             pii_block  = guardrails.get("input", {}).get("pii", {}).get("behavior") == "BLOCK"
             safety_on  = guardrails.get("input", {}).get("safety", False)
             usage_on   = gateway.get("usage_tracking_config",  {}).get("enabled", False)
+            # payload logging uses inference_table_config (auto_capture_config is deprecated for AI Gateway endpoints)
             payload_on = gateway.get("inference_table_config", {}).get("enabled", False)
             rate_set   = len(gateway.get("rate_limits", [])) > 0
 
-            add_check("AI Gateway: PII BLOCK on input",  pii_block,  remediation="Set pii.behavior = BLOCK via gateway config update.")
-            add_check("AI Gateway: Safety filter on",    safety_on,  remediation="Set guardrails.input.safety = true.")
-            add_check("AI Gateway: Usage tracking on",   usage_on,   remediation="Enable usage_tracking_config.enabled = true.")
-            add_check("AI Gateway: Payload logging on",  payload_on, remediation="Enable inference_table_config with a valid catalog/schema/table.")
-            add_check("AI Gateway: Rate limits set",     rate_set,   remediation="Add at least one rate limit (endpoint QPM).")
+            add_check("AI Gateway: PII BLOCK on input",  "PASS" if pii_block  else "FAIL",
+                      remediation="Set guardrails.input.pii.behavior = BLOCK via AI Gateway config update.")
+            add_check("AI Gateway: Safety filter on",    "PASS" if safety_on  else "FAIL",
+                      remediation="Set guardrails.input.safety = true in AI Gateway config.")
+            add_check("AI Gateway: Usage tracking on",   "PASS" if usage_on   else "FAIL",
+                      remediation="Enable usage_tracking_config.enabled = true in AI Gateway config.")
+            add_check("AI Gateway: Payload logging on",  "PASS" if payload_on else "FAIL",
+                      remediation="Enable inference_table_config with a valid catalog/schema/table_name_prefix.")
+            add_check("AI Gateway: Rate limits set",     "PASS" if rate_set   else "FAIL",
+                      remediation="Add at least one rate limit (e.g., endpoint-level QPM) in AI Gateway config.")
 
     except Exception as e:
-        add_check("Endpoint check", False, detail=str(e))
+        add_check("Endpoint check", "FAIL", detail=str(e))
 
     # 5. Target group exists in the workspace
     try:
-        groups      = list(w.groups.list(filter=f"displayName eq \"{target_group}\""))
+        groups       = list(workspace_client.groups.list(filter=f"displayName eq \"{target_group}\""))
         group_exists = len(groups) > 0
-        add_check(f"Group '{target_group}' exists", group_exists,
-                  detail=f"Found {len(groups)} match(es)",
-                  remediation=f"Create the group '{target_group}' before assigning endpoint access.")
+        add_check(
+            f"Group '{target_group}' exists",
+            "PASS" if group_exists else "FAIL",
+            detail=f"Found {len(groups)} match(es)",
+            remediation=f"Create the group '{target_group}' before assigning endpoint access.",
+        )
     except Exception as e:
-        add_check(f"Group '{target_group}' exists", False, detail=str(e))
+        add_check(f"Group '{target_group}' exists", "FAIL", detail=str(e))
 
     # 6. Endpoint has permission entries
     try:
         perms_url  = f"{workspace_url}/api/2.0/permissions/serving-endpoints/{endpoint_name}"
         perms_resp = requests.get(perms_url, headers=headers, timeout=15)
         has_perms  = perms_resp.status_code == 200 and bool(perms_resp.json().get("access_control_list"))
-        add_check("Serving endpoint has permission entries", has_perms,
-                  detail=f"HTTP {perms_resp.status_code}",
-                  remediation="Add CAN_QUERY grant for the target group before enabling access.")
+        add_check(
+            "Serving endpoint has permission entries",
+            "PASS" if has_perms else "FAIL",
+            detail=f"HTTP {perms_resp.status_code}",
+            remediation="Add CAN_QUERY grant for the target group before enabling access.",
+        )
     except Exception as e:
-        add_check("Endpoint permissions check", False, detail=str(e))
+        add_check("Endpoint permissions check", "FAIL", detail=str(e))
 
-    all_passed = all(r["status"] == "PASS" for r in results)
+    # Overall status: PASS only if no FAIL. WARN items are flagged but do not block.
+    fail_count = sum(1 for r in results if r["status"] == "FAIL")
+    warn_count = sum(1 for r in results if r["status"] == "WARN")
+    all_passed = fail_count == 0
+
     return {
         "preflight_timestamp": datetime.now(timezone.utc).isoformat(),
         "endpoint_name":       endpoint_name,
         "target_group":        target_group,
         "overall_status":      "PASS — safe to enable AI access" if all_passed else "FAIL — resolve issues before enabling AI access",
         "all_checks_passed":   all_passed,
+        "fail_count":          fail_count,
+        "warn_count":          warn_count,
         "checks":              results,
     }
 
@@ -754,27 +871,29 @@ def print_preflight_report(report: dict) -> None:
     print()
 
     for check in report["checks"]:
-        icon = "[PASS]" if check["status"] == "PASS" else "[FAIL]"
+        icon = {"PASS": "[PASS]", "FAIL": "[FAIL]", "WARN": "[WARN]"}.get(check["status"], "[?]")
         print(f"  {icon}  {check['check']}")
         if check.get("detail"):
             print(f"         {check['detail']}")
         if check.get("remediation"):
-            print(f"  FIX  → {check['remediation']}")
+            label = "FIX" if check["status"] == "FAIL" else "ACT"
+            print(f"  {label}  → {check['remediation']}")
 
     print()
     print(f"  Overall: {report['overall_status']}")
-    if not report["all_checks_passed"]:
-        failed = [c["check"] for c in report["checks"] if c["status"] == "FAIL"]
-        print(f"  Resolve {len(failed)} failing check(s) before enabling AI access.")
+    if report["fail_count"] > 0:
+        print(f"  Resolve {report['fail_count']} FAIL item(s) before enabling AI access.")
+    if report["warn_count"] > 0:
+        print(f"  {report['warn_count']} WARN item(s) require out-of-band confirmation — document separately.")
 
 
 PREFLIGHT_ENDPOINT = GW_ENDPOINT
-PREFLIGHT_GROUP    = "grp_analysts"        # TODO: update to your target group
+PREFLIGHT_GROUP    = "grp_analysts"        # Update to your target group
 
 preflight_report = run_preflight_checklist(
     workspace_url=WORKSPACE_URL,
-    account_id=ACCOUNT_ID,
     headers=HEADERS,
+    workspace_client=w,
     endpoint_name=PREFLIGHT_ENDPOINT,
     target_group=PREFLIGHT_GROUP,
 )
@@ -783,20 +902,23 @@ print_preflight_report(preflight_report)
 
 # COMMAND ----------
 
-# TODO: Uncomment to save the pre-flight report to Delta for change management evidence
+# Uncomment to save the pre-flight report to Delta for change management evidence
+#
 # row = {
 #     "check_timestamp":  preflight_report["preflight_timestamp"],
 #     "endpoint_name":    preflight_report["endpoint_name"],
 #     "target_group":     preflight_report["target_group"],
 #     "all_passed":       preflight_report["all_checks_passed"],
 #     "pass_count":       sum(1 for c in preflight_report["checks"] if c["status"] == "PASS"),
-#     "fail_count":       sum(1 for c in preflight_report["checks"] if c["status"] == "FAIL"),
+#     "fail_count":       preflight_report["fail_count"],
+#     "warn_count":       preflight_report["warn_count"],
 #     "full_report_json": json.dumps(preflight_report, default=str),
 # }
 # spark.createDataFrame([row]).write.format("delta").mode("append").option("mergeSchema", "true") \
 #     .saveAsTable(f"{CATALOG_NAME}.{SCHEMA_NAME}.ai_preflight_checks")
+# print(f"Pre-flight report saved to {CATALOG_NAME}.{SCHEMA_NAME}.ai_preflight_checks")
 
-print("Pre-flight report save is commented out — uncomment after configuring catalog/schema.")
+print("Pre-flight report Delta save: pattern provided above — uncomment to execute after configuring catalog/schema.")
 
 # COMMAND ----------
 
@@ -807,32 +929,43 @@ print("Pre-flight report save is commented out — uncomment after configuring c
 
 # COMMAND ----------
 
-geo_status = geo_result.get("status", "UNKNOWN")
-geo_display = {"PASS": "ENABLED [PASS]", "FAIL": "NOT ENABLED [FAIL]", "CANNOT_VERIFY": "UNVERIFIED [WARN]"}.get(geo_status, geo_status)
-in_region   = [f for f in AI_FEATURE_INVENTORY if f["residency"] == "IN_REGION"]
-cross_geo   = [f for f in AI_FEATURE_INVENTORY if f["residency"] in ("CROSS_GEO", "NOT_AVAILABLE")]
-pf_status   = "ALL PASSED" if preflight_report["all_checks_passed"] else f"ISSUES ({sum(1 for c in preflight_report['checks'] if c['status'] == 'FAIL')} failing)"
+geo_status  = geo_result.get("status", "UNKNOWN")
+geo_display = {
+    "PASS":          "ENABLED [PASS]",
+    "FAIL":          "NOT ENABLED [FAIL]",
+    "CANNOT_VERIFY": "UNVERIFIED [WARN] — confirm with admin",
+    "ERROR":         "ERROR [WARN]",
+}.get(geo_status, geo_status)
+
+workspace_region_display = region_check.get("location", "unknown")
+
+in_region = [f for f in AI_FEATURE_INVENTORY if f["residency"] == "IN_REGION"]
+restricted = [f for f in AI_FEATURE_INVENTORY if f["residency"] in ("CROSS_GEO", "NOT_AVAILABLE")]
+pf_status  = "ALL PASSED" if preflight_report["all_checks_passed"] else (
+    f"ISSUES ({preflight_report['fail_count']} failing, {preflight_report['warn_count']} warn)"
+)
 
 print("=" * 60)
 print(f"AI GOVERNANCE COMPLIANCE SUMMARY — {REPORT_TIMESTAMP[:10]}")
 print("=" * 60)
-print(f"  Workspace region       : australiaeast (Azure)")
+print(f"  Workspace region       : {workspace_region_display}")
 print(f"  Geography enforcement  : {geo_display}")
 print(f"  In-region features     : {len(in_region)}")
-print(f"  Restricted/unavailable : {len(cross_geo)}")
+print(f"  Restricted/unavailable : {len(restricted)}")
 print(f"  Pre-flight checks      : {pf_status}")
-print(f"  PII guardrail          : BLOCK on all prod endpoints")
-print(f"  Audit log              : system.access.audit")
+print(f"  PII guardrail          : BLOCK on all prod endpoints (verify: pre-flight above)")
+print(f"  Admin audit log        : system.access.audit (service: serverlessRealTimeInference)")
+print(f"  Per-request audit      : system.ai_gateway.usage (Beta, in-region AU East)")
 print()
-print("  NON-COMPLIANT FEATURES (DO NOT USE WITH REGULATED DATA):")
-for f in cross_geo:
-    print(f"    - {f['feature_name']}")
+print("  FEATURES NOT APPROVED FOR REGULATED DATA:")
+for f in restricted:
+    print(f"    - {f['feature_name']} ({f['residency']})")
 
 # COMMAND ----------
 
 # MAGIC %md
 # MAGIC <div style="border-left: 4px solid #FF3621; padding-left: 16px; margin: 24px 0">
-# MAGIC <h2 style="color: #1B3139; margin: 0">Checkpoint & Workshop Recap</h2>
+# MAGIC <h2 style="color: #1B3139; margin: 0">Checkpoint &amp; Workshop Recap</h2>
 # MAGIC </div>
 
 # COMMAND ----------
@@ -843,17 +976,19 @@ print("=" * 60)
 
 checks = [
     "Workspace region verification via Azure IMDS and Spark conf",
-    "Geography enforcement check via Account API",
-    "AI feature inventory: 11 features reviewed with residency status",
-    "Compliance evidence package generated (structured JSON)",
-    "Evidence package save-to-Delta pattern documented",
-    "regulatory compliance audit log query: all AI access events with user/IP",
-    "Access log export to Unity Catalog volume",
+    "Geography enforcement check via workspace conf API (enableDataProcessingWithinGeography)",
+    "AI feature inventory: 12 features reviewed with residency and approval status",
+    "Genie Agent Mode and Supervisor Agent/MAS correctly split in inventory",
+    "Compliance evidence package generated (structured JSON with regulatory frameworks)",
+    "Evidence package Delta save: pattern provided (uncomment to execute)",
+    "Regulatory compliance audit log query: AI admin events with user/IP/action",
+    "Audit date range uses correct upper bound (strict less-than next day)",
+    "Access log export pattern: provided (uncomment to execute)",
     "UC tag schema defined for AI asset classification",
     "Tag SQL examples for models, endpoints, and UC objects",
-    "Pre-flight checklist: automated checks before new team onboarding",
-    "Pre-flight report saved to Delta for change management",
-    "Executive compliance summary printed",
+    "Pre-flight checklist: PASS/FAIL/WARN with geography enforcement as WARN (not FAIL) for non-admins",
+    "Pre-flight report Delta save: pattern provided (uncomment to execute)",
+    "Final compliance summary with correct region from region_check",
 ]
 
 for check in checks:
@@ -872,7 +1007,7 @@ print("Recommended next steps:")
 print("  1. Enable Geography enforcement in Account Console")
 print("  2. Create AI Gateway endpoints for each access tier")
 print("  3. Apply PII BLOCK + safety guardrails on all production endpoints")
-print("  4. Schedule the daily budget alert notebook")
+print("  4. Schedule the daily budget alert notebook (Lab 04)")
 print("  5. Run the pre-flight checklist before each new team onboarding")
 print("  6. Tag all AI assets in Unity Catalog")
 print("  7. Schedule the compliance evidence package as a quarterly job")
@@ -882,16 +1017,17 @@ print("  7. Schedule the compliance evidence package as a quarterly job")
 # MAGIC %md
 # MAGIC ---
 # MAGIC <div style="background: #F0F4F8; padding: 16px; border-radius: 6px; margin-top: 16px">
-# MAGIC <h3 style="color: #1B3139; margin: 0 0 12px 0">Australian data residency requirements Evidence Artefact Checklist</h3>
+# MAGIC <h3 style="color: #1B3139; margin: 0 0 12px 0">Compliance Evidence Artefact Checklist</h3>
 # MAGIC
-# MAGIC | Artefact | Source | How to produce |
-# MAGIC |---|---|---|
-# MAGIC | Workspace region confirmation | Azure IMDS / Spark conf | Section 1 output |
-# MAGIC | Geography enforcement evidence | Account Console screenshot + API JSON | Section 2 output |
-# MAGIC | Feature inventory | This notebook | Section 3 output JSON |
-# MAGIC | AI access log (per review period) | `system.access.audit` | Section 5 export to CSV |
-# MAGIC | Rate limit configuration | AI Gateway API | Lab 02 `get_endpoint_config` output |
-# MAGIC | Guardrail test evidence | Lab 03 test results | `print_guardrail_report` output |
-# MAGIC | Pre-flight checklist run log | Delta table | Section 7 in this notebook |
-# MAGIC | Budget alert job definition | Databricks Jobs API | Lab 04 Section 5 SDK snippet |
+# MAGIC | Artefact | Regulatory obligation | Source | How to produce |
+# MAGIC |---|---|---|---|
+# MAGIC | Workspace region confirmation | AER data sovereignty | Azure IMDS / Spark conf | Section 1 output |
+# MAGIC | Geography enforcement evidence | Privacy Act APP 8 / AER guidelines | Account Console screenshot + Section 2 API output | Section 2 output |
+# MAGIC | Feature inventory | Your organisation's compliance obligations | This notebook | Section 3 output (printed table) |
+# MAGIC | AI admin action log (per review period) | NER Chapter 7 (access records) | `system.access.audit` | Section 5 export to CSV |
+# MAGIC | Per-request inference log | NER Chapter 7 (model access detail) | `system.ai_gateway.usage` (Beta) | Query separately — not covered in this lab |
+# MAGIC | Rate limit configuration | Privacy Act APP 11 (reasonable security steps) | AI Gateway API | Lab 02 `get_endpoint_config` output |
+# MAGIC | Guardrail test evidence | Privacy Act APP 11 / APP 8 | Lab 03 test results | `print_guardrail_report` output |
+# MAGIC | Pre-flight checklist run log | Change management evidence | Delta table | Section 7 in this notebook |
+# MAGIC | Budget alert job definition | Governance / cost control | Databricks Jobs API | Lab 04 Section 5 SDK snippet |
 # MAGIC </div>

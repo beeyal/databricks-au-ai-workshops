@@ -1,12 +1,13 @@
 # Databricks notebook source
 # MAGIC %md
 # MAGIC <div style="background: linear-gradient(135deg, #1B3139 0%, #243447 100%); padding: 24px; border-radius: 8px; margin-bottom: 8px">
-# MAGIC   <h1 style="color: #FF6B35; margin: 0 0 8px 0; font-size: 28px">📊 Lab 04: Usage Tracking & Cost Attribution</h1>
+# MAGIC   <h1 style="color: #FF6B35; margin: 0 0 8px 0; font-size: 28px">Lab 04: Usage Tracking & Cost Attribution</h1>
 # MAGIC   <p style="color: #AECBCC; margin: 0; font-size: 14px">Workshop 1: Admin Track · Australian Regulated Industries · Databricks</p>
 # MAGIC </div>
 # MAGIC
 # MAGIC | | |
 # MAGIC |---|---|
+# MAGIC | ⏱️ **Duration** | 25–30 minutes |
 # MAGIC | **Prerequisites** | Lab 02 complete — AI Gateway endpoint with usage tracking enabled |
 # MAGIC | **By the end** | Cost attribution view built, budget alert configured, reference SQL card printed |
 # MAGIC
@@ -194,10 +195,15 @@ display(guardrail_hits)
 # MAGIC
 # MAGIC | Action type | Service name | Description |
 # MAGIC |---|---|---|
-# MAGIC | `queryEndpoint` | `modelServing` | Serving endpoint was called |
+# MAGIC | `queryEndpoint` | `modelServing` | Serving endpoint was called (inference traffic) |
 # MAGIC | `genieConversation` | `databricksGenie` | Genie Space conversation |
 # MAGIC | `aiPlaygroundQuery` | `aiPlayground` | AI Playground used |
-# MAGIC | `updateAiGateway` | `modelServing` | AI Gateway config changed |
+# MAGIC | `createServingEndpoint` / `updateServingEndpoint` | `modelServing` | Non-AI-Gateway endpoint lifecycle events |
+# MAGIC | `putInferenceEndpointAiGateway` | `serverlessRealTimeInference` | AI Gateway config created or updated |
+# MAGIC | `deleteInferenceEndpointAiGateway` | `serverlessRealTimeInference` | AI Gateway config removed |
+# MAGIC | `changeInferenceEndpointAcl` | `serverlessRealTimeInference` | Endpoint permission change |
+# MAGIC
+# MAGIC **Note on service_name split:** `modelServing` covers non-AI-Gateway endpoint lifecycle and inference calls. AI Gateway configuration actions appear under `serverlessRealTimeInference` — this matches the filter used in Lab 05. Validate against your workspace with: `SELECT DISTINCT service_name, action_name FROM system.access.audit WHERE action_name LIKE '%Endpoint%' OR action_name LIKE '%Gateway%' LIMIT 100`
 # MAGIC
 # MAGIC 🖱️ **UI:** Left sidebar → Catalog → system → access → audit → Sample Data tab (or open a Query Editor and run `SELECT * FROM system.access.audit LIMIT 100`)
 # MAGIC You should see: Raw audit rows with event_time, user_identity, action_name, service_name, and request_params. The queries below filter these to AI-specific events.
@@ -206,7 +212,10 @@ display(guardrail_hits)
 
 # COMMAND ----------
 
-# All model serving calls — last 7 days
+# Model serving inference calls — last 7 days
+# service_name = 'modelServing' covers queryEndpoint (inference traffic) and non-AI-Gateway endpoint lifecycle.
+# AI Gateway configuration actions (putInferenceEndpointAiGateway etc.) appear under
+# 'serverlessRealTimeInference' — those are queried separately in the gateway_changes cell below.
 serving_calls = spark.sql("""
   SELECT
     DATE(event_time)                AS event_date,
@@ -219,13 +228,7 @@ serving_calls = spark.sql("""
   WHERE
     event_time >= CURRENT_TIMESTAMP - INTERVAL 7 DAYS
     AND service_name = 'modelServing'
-    AND action_name IN (
-      'queryEndpoint',
-      'createServingEndpoint',
-      'updateServingEndpoint',
-      'deleteServingEndpoint',
-      'updateAiGateway'
-    )
+    AND action_name = 'queryEndpoint'
   GROUP BY 1, 2, 3, 4, 5
   ORDER BY 1 DESC, call_count DESC
 """)
@@ -274,7 +277,10 @@ display(playground_usage)
 
 # COMMAND ----------
 
-# AI Gateway configuration changes — change management audit evidence (Australian data residency requirements)
+# AI Gateway configuration changes — change management audit evidence (NER Chapter 7 / AER Cyber Security Guidelines)
+# AI Gateway config events appear under service_name = 'serverlessRealTimeInference', NOT 'modelServing'.
+# This matches the filter documented in Lab 02 and Lab 05. modelServing covers inference calls and
+# non-AI-Gateway endpoint lifecycle; serverlessRealTimeInference covers AI Gateway config and ACL changes.
 gateway_changes = spark.sql("""
   SELECT
     event_time,
@@ -286,13 +292,14 @@ gateway_changes = spark.sql("""
   FROM system.access.audit
   WHERE
     event_time >= CURRENT_TIMESTAMP - INTERVAL 90 DAYS
-    AND service_name = 'modelServing'
+    AND service_name = 'serverlessRealTimeInference'
     AND action_name IN (
+      'putInferenceEndpointAiGateway',
+      'deleteInferenceEndpointAiGateway',
+      'changeInferenceEndpointAcl',
       'createServingEndpoint',
       'updateServingEndpoint',
-      'deleteServingEndpoint',
-      'updateAiGateway',
-      'putAiGateway'
+      'deleteServingEndpoint'
     )
   ORDER BY event_time DESC
 """)
@@ -314,22 +321,24 @@ display(gateway_changes)
 
 # COMMAND ----------
 
-# Token pricing — update when contracts are finalised
-# Only include in-region models for regulated AU workloads.
-TOKEN_PRICES = {
-    "databricks-claude-haiku-4-5": {      # IN-REGION via Provisioned Throughput
-        "input_per_1m":  1.00,
-        "output_per_1m": 5.00,
-    },
-    "databricks-claude-sonnet-4-6": {     # IN-REGION via Provisioned Throughput
-        "input_per_1m":  3.00,
-        "output_per_1m": 15.00,
-    },
-}
+# Token pricing — illustrative blended rates used in the view SQL and budget functions below.
+# The view uses 0.90 AUD/1M input and 2.70 AUD/1M output as illustrative blended estimates.
+# These are NOT the published list prices for any specific model — update to your contracted
+# rates once PT agreements are in place.
+#
+# For reference, approximate list prices at time of writing (update per contract):
+#   databricks-claude-haiku-4-5   : ~$1.00/1M input, ~$5.00/1M output  (via Provisioned Throughput)
+#   databricks-claude-sonnet-4-6  : ~$3.00/1M input, ~$15.00/1M output (via Provisioned Throughput)
+#
+# The view SQL below uses fixed blended rates (0.90 / 2.70) rather than a per-model CASE expression
+# so that the view remains valid when model_name values vary. To switch to per-model pricing,
+# replace the ROUND(...) columns with a CASE expression on model_name referencing your rate table.
 
-print("Token pricing configured for cost attribution:")
-for model, prices in TOKEN_PRICES.items():
-    print(f"  {model:<55} Input: ${prices['input_per_1m']}/1M  Output: ${prices['output_per_1m']}/1M")
+ILLUSTRATIVE_INPUT_RATE_PER_1M  = 0.90   # AUD — update to contracted rate
+ILLUSTRATIVE_OUTPUT_RATE_PER_1M = 2.70   # AUD — update to contracted rate
+
+print(f"Illustrative blended rates: ${ILLUSTRATIVE_INPUT_RATE_PER_1M}/1M input, ${ILLUSTRATIVE_OUTPUT_RATE_PER_1M}/1M output (AUD)")
+print("Update ILLUSTRATIVE_INPUT_RATE_PER_1M / ILLUSTRATIVE_OUTPUT_RATE_PER_1M to contracted rates.")
 
 # COMMAND ----------
 
@@ -390,19 +399,24 @@ print(f"Target view: {CATALOG_NAME}.{SCHEMA_NAME}.ai_gateway_cost_attribution")
 # COMMAND ----------
 
 # Monthly cost by team — for internal chargeback and finance reporting
-cost_by_team = spark.sql(f"""
-  SELECT
-    DATE_TRUNC('month', usage_date)     AS billing_month,
-    team,
-    SUM(request_count)                  AS total_requests,
-    SUM(total_tokens)                   AS total_tokens,
-    ROUND(SUM(est_total_cost_aud), 2)   AS estimated_cost_aud
-  FROM {CATALOG_NAME}.{SCHEMA_NAME}.ai_gateway_cost_attribution
-  GROUP BY 1, 2
-  ORDER BY 1 DESC, estimated_cost_aud DESC
-""")
-
-display(cost_by_team)
+# IMPORTANT: this query requires the view to exist (uncomment the spark.sql(create_view_sql) call above first).
+# If you run this cell before creating the view, it will fail with AnalysisException: Table or view not found.
+try:
+    cost_by_team = spark.sql(f"""
+      SELECT
+        DATE_TRUNC('month', usage_date)     AS billing_month,
+        team,
+        SUM(request_count)                  AS total_requests,
+        SUM(total_tokens)                   AS total_tokens,
+        ROUND(SUM(est_total_cost_aud), 2)   AS estimated_cost_aud
+      FROM {CATALOG_NAME}.{SCHEMA_NAME}.ai_gateway_cost_attribution
+      GROUP BY 1, 2
+      ORDER BY 1 DESC, estimated_cost_aud DESC
+    """)
+    display(cost_by_team)
+except Exception as _e:
+    print(f"[SKIP] View not yet created — uncomment the spark.sql(create_view_sql) block above and re-run Section 3 first.")
+    print(f"       Error: {_e}")
 
 # COMMAND ----------
 
@@ -556,8 +570,8 @@ def check_daily_budget(budget_config: dict) -> dict:
     result = spark.sql(f"""
       SELECT
         ROUND(
-          SUM(input_tokens  / 1000000.0 * 0.90) +
-          SUM(output_tokens / 1000000.0 * 2.70), 2
+          SUM(input_tokens  / 1000000.0 * {ILLUSTRATIVE_INPUT_RATE_PER_1M}) +
+          SUM(output_tokens / 1000000.0 * {ILLUSTRATIVE_OUTPUT_RATE_PER_1M}), 2
         ) AS estimated_cost_aud,
         SUM(input_tokens + output_tokens) AS total_tokens,
         COUNT(*) AS request_count
@@ -594,8 +608,8 @@ def check_monthly_budget(budget_config: dict) -> dict:
     result = spark.sql(f"""
       SELECT
         ROUND(
-          SUM(input_tokens  / 1000000.0 * 0.90) +
-          SUM(output_tokens / 1000000.0 * 2.70), 2
+          SUM(input_tokens  / 1000000.0 * {ILLUSTRATIVE_INPUT_RATE_PER_1M}) +
+          SUM(output_tokens / 1000000.0 * {ILLUSTRATIVE_OUTPUT_RATE_PER_1M}), 2
         ) AS estimated_cost_aud,
         SUM(input_tokens + output_tokens) AS total_tokens,
         COUNT(*) AS request_count
@@ -716,6 +730,8 @@ LIMIT 20
     """,
 
     "Cost by team — current month": """
+-- Rates (0.90 / 2.70 AUD per 1M tokens) are illustrative blended estimates.
+-- Update to contracted rates — see ILLUSTRATIVE_INPUT_RATE_PER_1M / ILLUSTRATIVE_OUTPUT_RATE_PER_1M above.
 SELECT
   COALESCE(request_tags['team'], 'untagged')     AS team,
   SUM(input_tokens  / 1000000.0 * 0.90)
@@ -757,7 +773,9 @@ GROUP BY 1, 2
 ORDER BY 1 DESC, query_count DESC
     """,
 
-    "Model serving change log — last 90 days": """
+    "AI Gateway change log — last 90 days": """
+-- AI Gateway config changes appear under 'serverlessRealTimeInference', not 'modelServing'.
+-- modelServing covers inference calls (queryEndpoint) and non-AI-Gateway endpoint lifecycle.
 SELECT
   event_time,
   user_identity.email                AS changed_by,
@@ -766,10 +784,14 @@ SELECT
   response.statusCode               AS result_code
 FROM system.access.audit
 WHERE event_time >= CURRENT_TIMESTAMP - INTERVAL 90 DAYS
-  AND service_name = 'modelServing'
+  AND service_name = 'serverlessRealTimeInference'
   AND action_name IN (
-    'createServingEndpoint', 'updateServingEndpoint',
-    'deleteServingEndpoint', 'updateAiGateway', 'putAiGateway'
+    'putInferenceEndpointAiGateway',
+    'deleteInferenceEndpointAiGateway',
+    'changeInferenceEndpointAcl',
+    'createServingEndpoint',
+    'updateServingEndpoint',
+    'deleteServingEndpoint'
   )
 ORDER BY event_time DESC
     """,
@@ -786,19 +808,36 @@ for query_name, sql in REFERENCE_QUERIES.items():
 
 # MAGIC %md
 # MAGIC ---
-# MAGIC ## ✅ Lab 04 Checkpoint
-# MAGIC - [ ] `system.ai_gateway.usage` schema explored — date, endpoint, team, project, token counts
-# MAGIC - [ ] Top users by token consumption (30-day) queried
-# MAGIC - [ ] Daily trend query written (capacity and anomaly detection)
-# MAGIC - [ ] Guardrail hit analysis query written
-# MAGIC - [ ] `system.access.audit` queried — model serving, Genie, AI Playground, change log
-# MAGIC - [ ] Cost attribution view defined (by team / project / environment)
-# MAGIC - [ ] Untagged request detection query written
-# MAGIC - [ ] Budget check functions (daily and monthly) reviewed
-# MAGIC - [ ] Budget alert job scheduling pattern documented (UI + SDK)
-# MAGIC - [ ] Reference SQL query card printed
-# MAGIC
-# MAGIC **→ Next: Lab 05 — Data Residency & Compliance Evidence**
+# MAGIC ## Lab 04 Checkpoint
+
+# COMMAND ----------
+
+print("=" * 60)
+print("  Lab 04 — Checkpoint Summary")
+print("=" * 60)
+print()
+
+lab04_checks = [
+    "system.ai_gateway.usage schema explored (date, endpoint, team, project, token counts)",
+    "Top users by token consumption (30-day) queried",
+    "Daily trend query written (capacity and anomaly detection)",
+    "Guardrail hit analysis query written",
+    "system.access.audit queried — model serving, Genie, AI Playground, change log",
+    "Cost attribution view defined (by team / project / environment)",
+    "Untagged request detection query written",
+    "Budget check functions (daily and monthly) reviewed",
+    "Budget alert job scheduling pattern documented (UI + SDK)",
+    "Reference SQL query card printed",
+]
+
+for check in lab04_checks:
+    print(f"  [DONE]  {check}")
+
+print()
+print("-" * 60)
+print("  Next lab : 05_data_residency_compliance.py")
+print("  Topic    : Data residency verification and compliance evidence")
+print("-" * 60)
 
 # COMMAND ----------
 

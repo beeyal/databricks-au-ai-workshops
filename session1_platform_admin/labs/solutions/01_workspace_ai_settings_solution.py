@@ -174,13 +174,14 @@ def compliance_check_geography(setting_response: dict) -> bool:
     if csp == "COMPLIANCE_SECURITY_PROFILE":
         print("PASS — Enforce data processing within Geography: ENABLED")
         print("    SOCI Act data residency requirement: MET")
-        return True
+        result = True
     else:
         print("FAIL — Enforce data processing within Geography: NOT ENABLED")
         print(f"    Current value : '{csp or '(not set)'}'")
         print("    ACTION: Open the Account Console → Workspaces → Security and compliance tab.")
-        return False
+        result = False
     print("─" * 60)
+    return result
 
 
 geography_setting = get_enforce_geography_setting(ACCOUNT_ID, HEADERS)

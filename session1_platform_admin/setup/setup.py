@@ -6,7 +6,7 @@
 # MAGIC </div>
 # MAGIC
 # MAGIC **Run this notebook once as a workspace admin before Session 1.**
-# MAGIC It creates the catalog and schemas, loads the energy sample data into Unity Catalog,
+# MAGIC It creates the catalog and schemas, generates the energy sample data using SQL (no CSV files required),
 # MAGIC adds column comments, and grants participant access.
 # MAGIC The labs handle AI Gateway config, audit policies, and compliance evidence collection.
 # MAGIC
@@ -26,17 +26,17 @@ SCHEMA_GOV = dbutils.widgets.get("schema_governance")
 PT_EP      = dbutils.widgets.get("pt_endpoint")
 VS_EP      = dbutils.widgets.get("vs_endpoint")
 
-DATA_PATH  = "dbfs:/tmp/au_workshop/sample_data"
+# Safe defaults for summary cell — overwritten by Step 2 if that cell runs first
+energy_tables = []
+found_any     = False
 
 print(f"Catalog          : {CATALOG}")
 print(f"Energy schema    : {CATALOG}.{SCHEMA_E}")
 print(f"Governance schema: {CATALOG}.{SCHEMA_GOV}")
 print(f"PT endpoint      : {PT_EP}")
 print(f"VS endpoint      : {VS_EP}")
-print(f"CSV source       : {DATA_PATH}/")
 print()
-print("Upload CSVs first if not already on DBFS:")
-print(f"  databricks fs cp -r ./data/sample_data/ {DATA_PATH}/")
+print("Data is generated via SQL — no CSV upload required.")
 
 # COMMAND ----------
 
@@ -54,11 +54,244 @@ print(f"✅ {CATALOG}.{SCHEMA_GOV} ready")
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC ## Step 2: Load energy tables from CSV
+# MAGIC ## Step 2: Generate energy tables using SQL
+# MAGIC
+# MAGIC All six tables are generated entirely in-cluster using `SEQUENCE`, `RAND`, and `CASE` expressions.
+# MAGIC No CSV files or DBFS uploads are required.
 
 # COMMAND ----------
 
-# Table name → csv filename (all under DATA_PATH/)
+results = []
+
+# ── energy_assets ────────────────────────────────────────────────────────────
+try:
+    fqn = f"{CATALOG}.{SCHEMA_E}.energy_assets"
+    spark.sql(f"""
+        CREATE OR REPLACE TABLE {fqn} AS
+        SELECT
+            CONCAT('AST-', LPAD(CAST(id AS STRING), 5, '0'))                     AS asset_id,
+            CASE (id % 5)
+                WHEN 0 THEN 'TRANSFORMER'
+                WHEN 1 THEN 'LINE'
+                WHEN 2 THEN 'SUBSTATION'
+                WHEN 3 THEN 'SWITCH'
+                ELSE        'METER'
+            END                                                                   AS asset_type,
+            CASE (id % 5)
+                WHEN 0 THEN 'NSW'
+                WHEN 1 THEN 'VIC'
+                WHEN 2 THEN 'QLD'
+                WHEN 3 THEN 'SA'
+                ELSE        'TAS'
+            END                                                                   AS region,
+            CAST(10 + FLOOR(RAND(id)  * 91)  AS INT)                             AS condition_score,
+            DATE_ADD('2015-01-01', CAST(FLOOR(RAND(id + 1) * 3650) AS INT))      AS installation_date,
+            CONCAT('SUB-', LPAD(CAST((id % 20) AS STRING), 3, '0'))              AS substation_id,
+            ROUND(11 + RAND(id + 2) * 121, 1)                                    AS voltage_kv,
+            CASE WHEN RAND(id + 3) < 0.15 THEN true ELSE false END               AS is_critical
+        FROM (SELECT EXPLODE(SEQUENCE(1, 100)) AS id)
+    """)
+    count = spark.table(fqn).count()
+    results.append(("✅", "energy_assets", f"{count:,} rows"))
+except Exception as e:
+    results.append(("❌", "energy_assets", str(e)[:120]))
+
+# ── meter_readings ────────────────────────────────────────────────────────────
+try:
+    fqn = f"{CATALOG}.{SCHEMA_E}.meter_readings"
+    spark.sql(f"""
+        CREATE OR REPLACE TABLE {fqn} AS
+        SELECT
+            CONCAT('NMI', LPAD(CAST(nmi_id AS STRING), 10, '0'))                    AS nmi,
+            TIMESTAMP(DATE_ADD('2024-01-01', CAST(day_offset AS INT)))
+                + MAKE_INTERVAL(0, 0, 0, 0, interval_num * 30, 0, 0)                AS reading_datetime,
+            ROUND(0.5 + RAND(nmi_id * 1000 + day_offset * 48 + interval_num) * 4.5,
+                  3)                                                                 AS interval_kwh,
+            CASE WHEN RAND(nmi_id + day_offset + interval_num) < 0.03 THEN 'E'
+                 WHEN RAND(nmi_id + day_offset + interval_num + 1) < 0.01 THEN 'S'
+                 ELSE 'A'
+            END                                                                      AS quality_flag,
+            ROUND(220 + RAND(nmi_id + interval_num) * 20, 1)                        AS voltage_v,
+            ROUND(0.95 + RAND(nmi_id + day_offset) * 0.04, 3)                       AS power_factor
+        FROM (
+            SELECT
+                nmi.id  AS nmi_id,
+                day.d   AS day_offset,
+                ivl.i   AS interval_num
+            FROM (SELECT EXPLODE(SEQUENCE(1, 50))  AS id)  nmi
+            CROSS JOIN (SELECT EXPLODE(SEQUENCE(0, 6))   AS d)   day
+            CROSS JOIN (SELECT EXPLODE(SEQUENCE(0, 47))  AS i)   ivl
+        )
+    """)
+    count = spark.table(fqn).count()
+    results.append(("✅", "meter_readings", f"{count:,} rows"))
+except Exception as e:
+    results.append(("❌", "meter_readings", str(e)[:120]))
+
+# ── outage_events ─────────────────────────────────────────────────────────────
+try:
+    fqn = f"{CATALOG}.{SCHEMA_E}.outage_events"
+    spark.sql(f"""
+        CREATE OR REPLACE TABLE {fqn} AS
+        SELECT
+            CONCAT('EVT-', LPAD(CAST(id AS STRING), 6, '0'))            AS event_id,
+            CONCAT('AST-', LPAD(CAST((id % 100 + 1) AS STRING), 5, '0')) AS asset_id,
+            CASE (id % 2) WHEN 0 THEN 'PLANNED' ELSE 'UNPLANNED' END    AS event_type,
+            CASE (id % 5)
+                WHEN 0 THEN 'EQUIPMENT_FAILURE'
+                WHEN 1 THEN 'WEATHER'
+                WHEN 2 THEN 'VEGETATION'
+                WHEN 3 THEN 'THIRD_PARTY'
+                ELSE        'UNKNOWN'
+            END                                                          AS cause_category,
+            TIMESTAMP(DATE_ADD('2024-01-01', CAST(FLOOR(RAND(id) * 365) AS INT)))
+                                                                         AS start_time,
+            TIMESTAMP(DATE_ADD('2024-01-01', CAST(FLOOR(RAND(id) * 365) AS INT))
+                + MAKE_INTERVAL(0, 0, 0, 0, CAST(FLOOR(30 + RAND(id+1)*330) AS INT), 0, 0))
+                                                                         AS end_time,
+            CAST(10 + FLOOR(RAND(id + 2) * 590) AS INT)                 AS affected_customers,
+            ROUND(1 + RAND(id + 3) * 119, 2)                            AS saidi_minutes,
+            ROUND(0.0001 + RAND(id + 4) * 0.0099, 6)                    AS saifi_count,
+            CASE (id % 5)
+                WHEN 0 THEN 'NSW'
+                WHEN 1 THEN 'VIC'
+                WHEN 2 THEN 'QLD'
+                WHEN 3 THEN 'SA'
+                ELSE        'TAS'
+            END                                                          AS region
+        FROM (SELECT EXPLODE(SEQUENCE(1, 500)) AS id)
+    """)
+    count = spark.table(fqn).count()
+    results.append(("✅", "outage_events", f"{count:,} rows"))
+except Exception as e:
+    results.append(("❌", "outage_events", str(e)[:120]))
+
+# ── maintenance_work_orders ───────────────────────────────────────────────────
+try:
+    fqn = f"{CATALOG}.{SCHEMA_E}.maintenance_work_orders"
+    spark.sql(f"""
+        CREATE OR REPLACE TABLE {fqn} AS
+        SELECT
+            CONCAT('WO-', LPAD(CAST(id AS STRING), 7, '0'))             AS work_order_id,
+            CONCAT('AST-', LPAD(CAST((id % 100 + 1) AS STRING), 5, '0')) AS asset_id,
+            CASE (id % 5)
+                WHEN 0 THEN 'INSPECTION'
+                WHEN 1 THEN 'REPAIR'
+                WHEN 2 THEN 'REPLACEMENT'
+                WHEN 3 THEN 'UPGRADE'
+                ELSE        'EMERGENCY'
+            END                                                          AS work_type,
+            CASE (id % 4)
+                WHEN 0 THEN 'CRITICAL'
+                WHEN 1 THEN 'HIGH'
+                WHEN 2 THEN 'MEDIUM'
+                ELSE        'LOW'
+            END                                                          AS priority,
+            DATE_ADD('2024-01-01', CAST(FLOOR(RAND(id) * 365) AS INT))  AS scheduled_date,
+            DATE_ADD('2024-01-01',
+                CAST(FLOOR(RAND(id) * 365) AS INT) + CAST(FLOOR(RAND(id+1)*7) AS INT))
+                                                                         AS completed_date,
+            ROUND(500 + RAND(id + 2) * 49500, 2)                        AS cost_aud,
+            CASE (id % 3)
+                WHEN 0 THEN 'COMPLETED'
+                WHEN 1 THEN 'IN_PROGRESS'
+                ELSE        'SCHEDULED'
+            END                                                          AS status,
+            CONCAT('CREW-', LPAD(CAST((id % 20 + 1) AS STRING), 2, '0')) AS assigned_crew
+        FROM (SELECT EXPLODE(SEQUENCE(1, 500)) AS id)
+    """)
+    count = spark.table(fqn).count()
+    results.append(("✅", "maintenance_work_orders", f"{count:,} rows"))
+except Exception as e:
+    results.append(("❌", "maintenance_work_orders", str(e)[:120]))
+
+# ── regulatory_reports ────────────────────────────────────────────────────────
+try:
+    fqn = f"{CATALOG}.{SCHEMA_E}.regulatory_reports"
+    spark.sql(f"""
+        CREATE OR REPLACE TABLE {fqn} AS
+        SELECT
+            CONCAT('RPT-', LPAD(CAST(id AS STRING), 5, '0'))            AS report_id,
+            CASE (id % 4)
+                WHEN 0 THEN 'ANNUAL_SAIDI'
+                WHEN 1 THEN 'RELIABILITY_ASSESSMENT'
+                WHEN 2 THEN 'ASSET_CONDITION'
+                ELSE        'INCIDENT_SUMMARY'
+            END                                                          AS report_type,
+            DATE_ADD('2020-01-01', CAST(FLOOR(RAND(id) * 1825) AS INT)) AS report_date,
+            CASE (id % 4)
+                WHEN 0 THEN 'AER'
+                WHEN 1 THEN 'AEMC'
+                WHEN 2 THEN 'AEMO'
+                ELSE        'STATE_REGULATOR'
+            END                                                          AS regulator,
+            CASE (id % 5)
+                WHEN 0 THEN 'NSW'
+                WHEN 1 THEN 'VIC'
+                WHEN 2 THEN 'QLD'
+                WHEN 3 THEN 'SA'
+                ELSE        'TAS'
+            END                                                          AS region,
+            CASE WHEN RAND(id + 1) < 0.85 THEN 'SUBMITTED'
+                 WHEN RAND(id + 1) < 0.95 THEN 'UNDER_REVIEW'
+                 ELSE 'OVERDUE'
+            END                                                          AS status,
+            ROUND(RAND(id + 2) * 10, 2)                                 AS saidi_reported,
+            ROUND(RAND(id + 3), 4)                                       AS saifi_reported,
+            CASE WHEN RAND(id + 4) < 0.9 THEN 'COMPLIANT' ELSE 'NON_COMPLIANT' END
+                                                                         AS compliance_status
+        FROM (SELECT EXPLODE(SEQUENCE(1, 100)) AS id)
+    """)
+    count = spark.table(fqn).count()
+    results.append(("✅", "regulatory_reports", f"{count:,} rows"))
+except Exception as e:
+    results.append(("❌", "regulatory_reports", str(e)[:120]))
+
+# ── policy_documents ──────────────────────────────────────────────────────────
+try:
+    fqn = f"{CATALOG}.{SCHEMA_E}.policy_documents"
+    spark.sql(f"""
+        CREATE OR REPLACE TABLE {fqn} AS
+        SELECT
+            CONCAT('POL-', LPAD(CAST(id AS STRING), 4, '0'))            AS policy_id,
+            CASE (id % 6)
+                WHEN 0 THEN 'Asset Management Policy'
+                WHEN 1 THEN 'Outage Management Procedure'
+                WHEN 2 THEN 'Safety Management System'
+                WHEN 3 THEN 'Environmental Compliance Policy'
+                WHEN 4 THEN 'Cybersecurity Framework'
+                ELSE        'Customer Hardship Policy'
+            END                                                          AS title,
+            CASE (id % 3)
+                WHEN 0 THEN 'OPERATIONAL'
+                WHEN 1 THEN 'COMPLIANCE'
+                ELSE        'SAFETY'
+            END                                                          AS category,
+            DATE_ADD('2020-01-01', CAST(FLOOR(RAND(id) * 1825) AS INT)) AS effective_date,
+            DATE_ADD('2020-01-01',
+                CAST(FLOOR(RAND(id) * 1825) AS INT) + 365)              AS review_date,
+            CASE WHEN RAND(id + 1) < 0.8 THEN 'ACTIVE' ELSE 'UNDER_REVIEW' END
+                                                                         AS status,
+            CASE (id % 4)
+                WHEN 0 THEN 'AER'
+                WHEN 1 THEN 'AEMC'
+                WHEN 2 THEN 'INTERNAL'
+                ELSE        'STATE_REGULATOR'
+            END                                                          AS governing_body,
+            CONCAT('v', CAST(1 + (id % 5) AS STRING), '.', CAST(id % 10 AS STRING))
+                                                                         AS version
+        FROM (SELECT EXPLODE(SEQUENCE(1, 50)) AS id)
+    """)
+    count = spark.table(fqn).count()
+    results.append(("✅", "policy_documents", f"{count:,} rows"))
+except Exception as e:
+    results.append(("❌", "policy_documents", str(e)[:120]))
+
+print("Table generation results:")
+for icon, tbl, msg in results:
+    print(f"  {icon} {tbl}: {msg}")
+
+# Expose table list for downstream cells
 TABLES = [
     "energy_assets",
     "meter_readings",
@@ -67,30 +300,6 @@ TABLES = [
     "regulatory_reports",
     "policy_documents",
 ]
-
-results = []
-for table_name in TABLES:
-    fqn  = f"{CATALOG}.{SCHEMA_E}.{table_name}"
-    path = f"{DATA_PATH}/{table_name}.csv"
-    try:
-        df = (spark.read.format("csv")
-              .option("header", "true")
-              .option("inferSchema", "true")
-              .load(path))
-
-        (df.write
-           .format("delta")
-           .mode("overwrite")
-           .option("overwriteSchema", "true")
-           .saveAsTable(fqn))
-
-        count = spark.table(fqn).count()
-        results.append(("✅", table_name, f"{count:,} rows"))
-    except Exception as e:
-        results.append(("❌", table_name, str(e)[:120]))
-
-for icon, tbl, msg in results:
-    print(f"{icon} {tbl}: {msg}")
 
 # COMMAND ----------
 
@@ -104,7 +313,7 @@ COLUMN_COMMENTS = {
         "asset_id":       "Primary key. Unique identifier for each network asset (transformer, line, substation, switch, meter).",
         "asset_type":     "Asset class: TRANSFORMER, LINE, SUBSTATION, SWITCH, METER. Use exact values for filtering.",
         "region":         "Geographic region where the asset is installed (e.g. NSW, VIC, QLD, SA, TAS).",
-        "condition_score":"Numeric health score 0–100. Score < 40 indicates poor condition and maintenance priority. Higher = better.",
+        "condition_score":"Numeric health score 0-100. Score < 40 indicates poor condition and maintenance priority. Higher = better.",
     },
     f"{CATALOG}.{SCHEMA_E}.outage_events": {
         "event_id":           "Primary key. Unique identifier for the outage event.",
@@ -120,7 +329,7 @@ COLUMN_COMMENTS = {
         "nmi":              "National Metering Identifier. Primary key for a customer connection point. Join to energy_assets on asset_id.",
         "reading_datetime": "Interval end timestamp. 30-minute intervals. AEST/AEDT timezone.",
         "interval_kwh":     "Energy consumed in this 30-minute interval in kWh. Multiply by 2 for kW average.",
-        "quality_flag":     "Data quality indicator: A = Actual, E = Estimated, S = Substituted. Filter to quality_flag = ''A'' for clean data.",
+        "quality_flag":     "Data quality indicator: A = Actual, E = Estimated, S = Substituted. Filter to quality_flag = A for clean data.",
     },
     f"{CATALOG}.{SCHEMA_E}.maintenance_work_orders": {
         "work_order_id": "Primary key. Unique identifier for the work order.",
@@ -135,7 +344,8 @@ ok = err = 0
 for table_fqn, columns in COLUMN_COMMENTS.items():
     for col, comment in columns.items():
         try:
-            spark.sql(f"ALTER TABLE {table_fqn} ALTER COLUMN `{col}` COMMENT '{comment}'")
+            safe_comment = comment.replace("'", "\\'")
+            spark.sql(f"ALTER TABLE {table_fqn} ALTER COLUMN `{col}` COMMENT '{safe_comment}'")
             ok += 1
         except Exception as e:
             print(f"  ⚠️  {table_fqn.split('.')[-1]}.{col}: {e}")
@@ -214,6 +424,28 @@ HOST    = spark.conf.get("spark.databricks.workspaceUrl")
 TOKEN   = dbutils.notebook.entry_point.getDbutils().notebook().getContext().apiToken().get()
 HEADERS = {"Authorization": f"Bearer {TOKEN}", "Content-Type": "application/json"}
 
+# NOTE: Geography enforcement can be checked via three different API layers, each targeting a
+# different control surface. This step uses the workspace settings API path for a quick
+# pre-workshop smoke test. The labs use different, more specific paths:
+#
+#   setup.py (here):  workspace settings API — enforce_workspace_feature_on_network_setting
+#                     A workspace-admin-accessible API for the network enforcement setting.
+#                     May return 404 in some workspace configurations (handled below).
+#
+#   Lab 01:           account-level CSP API — shield_csp_enforcement_account_setting
+#                     Checks the Compliance Security Profile at the account level.
+#                     Requires Account Admin token; returns 403 for workspace-only admins.
+#
+#   Lab 05:           workspace conf key — enableDataProcessingWithinGeography
+#                     The authoritative programmatic signal for the Account Console toggle
+#                     "Enforce data processing within workspace Geography for Designated Services".
+#                     This is the recommended check for Labs and automation scripts.
+#
+# All three check geography enforcement but at different API layers. Lab 05 Section 2 provides
+# the authoritative check using the workspace conf key.
+#
+# If this path returns 404, verify the setting manually in the UI and proceed — it does not
+# block the labs from running.
 setting_url = (
     f"https://{HOST}/api/2.0/settings/types/"
     f"enforce_workspace_feature_on_network_setting/names/default"
@@ -233,7 +465,9 @@ try:
             print("  For AU data residency labs, enable it under:")
             print("  Admin Console → Security → Network → Enforce geography")
     elif resp.status_code == 404:
-        print("⚠️  Geography enforcement setting not found (feature may not be available in this region/tier).")
+        print("⚠️  Geography enforcement setting not found.")
+        print("   This API path may not be available in this region or workspace tier.")
+        print("   Check Admin Console → Security → Network to verify the setting manually.")
     else:
         print(f"⚠️  Could not retrieve geography setting: HTTP {resp.status_code}")
         print(f"    {resp.text[:200]}")
@@ -247,16 +481,26 @@ except Exception as e:
 
 # COMMAND ----------
 
+EXPECTED_MIN_ROWS = {
+    "energy_assets":           50,
+    "meter_readings":       5_000,
+    "outage_events":          200,
+    "maintenance_work_orders":200,
+    "regulatory_reports":      50,
+    "policy_documents":        20,
+}
+
 print("Table row counts:")
 all_ok = True
 
-for table_name in TABLES:
+for table_name, min_rows in EXPECTED_MIN_ROWS.items():
     fqn = f"{CATALOG}.{SCHEMA_E}.{table_name}"
     try:
         count = spark.table(fqn).count()
-        icon  = "✅" if count > 0 else "⚠️ "
-        print(f"  {icon} {table_name}: {count:,} rows")
-        if count == 0:
+        ok    = count >= min_rows
+        icon  = "✅" if ok else "⚠️ "
+        print(f"  {icon} {table_name}: {count:,} rows (min expected: {min_rows:,})")
+        if not ok:
             all_ok = False
     except Exception as e:
         print(f"  ❌ {table_name}: {e}")
@@ -271,8 +515,8 @@ if all_ok:
     print("  2. Open Lab 01: session1_platform_admin/labs/01_workspace_ai_settings.py")
     print(f"  3. Confirm endpoint names: PT={PT_EP}, VS={VS_EP}")
 else:
-    print("⚠️  One or more tables are empty or missing.")
-    print(f"   Upload CSVs to {DATA_PATH}/ and re-run Step 2.")
+    print("⚠️  One or more tables are below the expected row count.")
+    print("   Re-run Step 2 to regenerate the synthetic data.")
 
 # COMMAND ----------
 
