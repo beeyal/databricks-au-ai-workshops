@@ -158,7 +158,7 @@ except Exception as e:
 alert_sql = f"""
 SELECT
     COUNT(*) AS negative_feedback_count,
-    COLLECT_LIST(user_identity.email) AS users_who_gave_negative
+    ARRAY_AGG(user_identity.email) AS users_who_gave_negative
 FROM system.access.audit
 WHERE service_name = 'aibiGenie'
   AND action_name  = 'updateConversationMessageFeedback'

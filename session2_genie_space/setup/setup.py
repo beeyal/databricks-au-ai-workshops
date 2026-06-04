@@ -6,10 +6,11 @@
 # MAGIC </div>
 # MAGIC
 # MAGIC **Run this notebook once as a workspace admin before Session 2.**
-# MAGIC It loads the AEMO sample data into Unity Catalog and adds column comments.
-# MAGIC The labs will create the Genie Space.
+# MAGIC It loads the AEMO sample data into Unity Catalog, adds column comments,
+# MAGIC and creates the derived objects (metric view, materialized view, UC function)
+# MAGIC that Lab 01 demonstrates.  The labs will create the Genie Space itself.
 # MAGIC
-# MAGIC Expected runtime: ~5 minutes
+# MAGIC Expected runtime: ~8 minutes
 
 # COMMAND ----------
 
@@ -227,15 +228,190 @@ for tbl, min_rows in expected.items():
 
 print()
 if all_ok:
-    print("✅ All tables loaded. Ready for Session 2 labs.")
-    print()
-    print("Next steps:")
-    print("  1. Open Lab 01: session2_genie_space/labs/01_genie_space_setup.py")
-    print("  2. Run Step 1 (column comments) — already done here, will be a no-op")
-    print("  3. Create the Genie Space via UI and paste the Space ID into the widget")
+    print("✅ All tables loaded. Continuing to create derived objects...")
 else:
     print("⚠️  Some tables are empty or missing.")
     print(f"   Upload CSVs to {DATA_PATH}/ and re-run this notebook.")
+    print("   Derived objects (Steps 6–8) will fail if source tables are absent.")
+
+# COMMAND ----------
+
+# MAGIC %md
+# MAGIC ## Step 6: Create view — NEM spot price KPIs
+# MAGIC
+# MAGIC Creates a pre-aggregated view that exposes avg price, peak price, and interval count
+# MAGIC by region and trading day. Genie queries hit this view instead of re-scanning the
+# MAGIC full `spot_prices` table every time, reducing latency and scan cost for "what was the
+# MAGIC average spot price in NSW last week?" style questions.
+# MAGIC
+# MAGIC > **Note on metric views:** Unity Catalog metric views (`CREATE VIEW ... WITH METRICS LANGUAGE YAML`)
+# MAGIC > are a Private Preview feature as of mid-2026 and are not available in all workspaces.
+# MAGIC > This setup uses a standard `CREATE VIEW` with an equivalent SQL definition so it works
+# MAGIC > reliably across all workshop environments.  When metric views reach GA, the YAML block
+# MAGIC > would replace the GROUP BY here, allowing Genie and AI/BI dashboards to compose
+# MAGIC > dimensions and measures dynamically without hard-coded aggregations.
+
+# COMMAND ----------
+
+METRIC_VIEW_FQN = f"{CATALOG}.{SCHEMA}.nem_spot_metrics"
+
+# Standard view — logically equivalent to a metric view with dimensions (region_id, trading_date)
+# and measures (avg_spot_price, peak_spot_price, interval_count).
+# Used in place of WITH METRICS YAML syntax for broad runtime compatibility.
+METRIC_VIEW_SQL = f"""
+CREATE OR REPLACE VIEW {METRIC_VIEW_FQN}
+COMMENT 'NEM spot price KPIs by region and trading day.
+  avg_spot_price  = average RRP in $/MWh (normal range $50-$200).
+  peak_spot_price = maximum RRP in $/MWh (market cap $15,300/MWh).
+  interval_count  = number of 30-minute trading intervals in the group.
+  Intended dimensions: region_id, trading_date.
+  Equivalent to a metric view once that feature reaches GA in this workspace.'
+AS
+SELECT
+    region_id,
+    DATE(settlement_date)   AS trading_date,
+    ROUND(AVG(rrp), 2)      AS avg_spot_price,
+    ROUND(MAX(rrp), 2)      AS peak_spot_price,
+    COUNT(*)                AS interval_count
+FROM {CATALOG}.{SCHEMA}.spot_prices
+GROUP BY region_id, DATE(settlement_date)
+"""
+
+try:
+    spark.sql(METRIC_VIEW_SQL)
+    count = spark.table(METRIC_VIEW_FQN).count()
+    print(f"✅ nem_spot_metrics created — {count:,} rows")
+except Exception as e:
+    print(f"❌ nem_spot_metrics: {e}")
+
+# COMMAND ----------
+
+# MAGIC %md
+# MAGIC ## Step 7: Create materialized view — daily dispatch summary
+# MAGIC
+# MAGIC Pre-aggregates `dispatch_intervals` (5-minute, potentially millions of rows) into
+# MAGIC a daily summary by region and fuel type.  Genie queries hit this view instead of
+# MAGIC the raw table, dramatically reducing scan cost for "how much solar generated
+# MAGIC yesterday?" style questions.
+
+# COMMAND ----------
+
+MV_FQN = f"{CATALOG}.{SCHEMA}.daily_dispatch_summary"
+
+MV_SQL = f"""
+CREATE MATERIALIZED VIEW IF NOT EXISTS {MV_FQN}
+COMMENT 'Daily NEM dispatch summary by region and fuel type.
+  total_mwh  = SUM(dispatch_mw)/12 converts 5-minute MW readings to MWh.
+  avg_dispatch_mw = average MW output across all dispatch intervals for the day.'
+AS
+SELECT
+    DATE(settlement_date)          AS dispatch_date,
+    region_id,
+    fuel_type,
+    ROUND(SUM(dispatch_mw) / 12, 1) AS total_mwh,
+    ROUND(AVG(dispatch_mw), 1)      AS avg_dispatch_mw
+FROM {CATALOG}.{SCHEMA}.dispatch_intervals
+GROUP BY DATE(settlement_date), region_id, fuel_type
+"""
+
+try:
+    spark.sql(MV_SQL)
+    # Count rows to confirm the MV was populated (serverless MVs refresh synchronously)
+    count = spark.table(MV_FQN).count()
+    print(f"✅ daily_dispatch_summary created — {count:,} rows")
+except Exception as e:
+    print(f"❌ daily_dispatch_summary: {e}")
+
+# COMMAND ----------
+
+# MAGIC %md
+# MAGIC ## Step 8: Create UC function — market cap exposure calculator
+# MAGIC
+# MAGIC A SQL table-valued function that returns interval count, avg RRP, and max RRP
+# MAGIC for a given region above a configurable price threshold.  Participants call it
+# MAGIC in Lab 01 to demonstrate UC Functions as a Genie tool.
+# MAGIC
+# MAGIC Usage:
+# MAGIC ```sql
+# MAGIC SELECT * FROM workshop_au.aemo.calculate_market_cap_exposure('NSW1', 300.0);
+# MAGIC ```
+
+# COMMAND ----------
+
+FUNC_FQN = f"{CATALOG}.{SCHEMA}.calculate_market_cap_exposure"
+
+FUNC_SQL = f"""
+CREATE OR REPLACE FUNCTION {FUNC_FQN}(
+    region_id_param   STRING  COMMENT 'NEM region to analyse. One of: NSW1, VIC1, QLD1, SA1, TAS1.',
+    threshold_param   DOUBLE  DEFAULT 300.0
+        COMMENT 'RRP threshold in $/MWh above which an interval is considered a cap-exposure event. Defaults to $300/MWh.'
+)
+RETURNS TABLE (
+    interval_count  BIGINT  COMMENT 'Number of 30-minute intervals with RRP above the threshold.',
+    avg_rrp         DOUBLE  COMMENT 'Average RRP across those high-price intervals ($/MWh).',
+    max_rrp         DOUBLE  COMMENT 'Maximum RRP observed — peak cap-exposure event ($/MWh).'
+)
+COMMENT 'Returns market cap exposure metrics for a NEM region above a configurable RRP threshold.
+Example: SELECT * FROM {FUNC_FQN}(\\\'NSW1\\\', 300.0)'
+RETURN
+    SELECT
+        COUNT(*)            AS interval_count,
+        ROUND(AVG(rrp), 2)  AS avg_rrp,
+        ROUND(MAX(rrp), 2)  AS max_rrp
+    FROM {CATALOG}.{SCHEMA}.spot_prices
+    WHERE region_id = region_id_param
+      AND rrp > threshold_param
+"""
+
+try:
+    spark.sql(FUNC_SQL)
+    # Smoke-test: call the function with default threshold on NSW1
+    test_df = spark.sql(f"SELECT * FROM {FUNC_FQN}('NSW1', 300.0)")
+    row = test_df.collect()[0]
+    print(f"✅ calculate_market_cap_exposure created")
+    print(f"   Smoke test NSW1 >$300/MWh → {row['interval_count']} intervals, "
+          f"avg ${row['avg_rrp']}/MWh, max ${row['max_rrp']}/MWh")
+except Exception as e:
+    print(f"❌ calculate_market_cap_exposure: {e}")
+
+# COMMAND ----------
+
+# MAGIC %md
+# MAGIC ## Setup complete — summary
+
+# COMMAND ----------
+
+print("=" * 60)
+print("Session 2 setup summary")
+print("=" * 60)
+print()
+print("Base tables:")
+for tbl in ["spot_prices", "dispatch_intervals", "market_notices",
+            "generator_registration", "settlement_amounts", "constraint_sets"]:
+    try:
+        count = spark.table(f"{CATALOG}.{SCHEMA}.{tbl}").count()
+        print(f"  ✅ {tbl}: {count:,} rows")
+    except Exception as e:
+        print(f"  ❌ {tbl}: {e}")
+
+print()
+print("Derived objects (Lab 01 demos):")
+for obj, kind in [
+    ("nem_spot_metrics",              "metric view / view"),
+    ("daily_dispatch_summary",        "materialized view"),
+    ("calculate_market_cap_exposure", "UC function"),
+]:
+    try:
+        spark.sql(f"DESCRIBE {CATALOG}.{SCHEMA}.{obj}")
+        print(f"  ✅ {obj} ({kind})")
+    except Exception as e:
+        print(f"  ❌ {obj}: {e}")
+
+print()
+print("Next steps:")
+print("  1. Run Step 9 (below) to grant participant access")
+print("  2. Open Lab 01: session2_genie_space/labs/01_genie_space_setup.py")
+print("  3. Create the Genie Space via UI and paste the Space ID into the widget")
 
 # COMMAND ----------
 
@@ -254,10 +430,11 @@ else:
 
 # MAGIC %md
 # MAGIC ---
-# MAGIC ## Step 6: Grant participant access
+# MAGIC ## Step 9: Grant participant access
 # MAGIC
 # MAGIC Enter participant emails as a comma-separated list. The script grants:
 # MAGIC - `USE CATALOG` + `USE SCHEMA` + `SELECT` on the AEMO schema (so Genie can query tables)
+# MAGIC - `EXECUTE` on all functions in the schema (so participants can call `calculate_market_cap_exposure`)
 # MAGIC - `CREATE` permission on the schema (so participants can create their own Genie Spaces)
 
 # COMMAND ----------
@@ -276,6 +453,7 @@ else:
         f"GRANT USE CATALOG ON CATALOG {CATALOG} TO",
         f"GRANT USE SCHEMA ON SCHEMA {CATALOG}.{SCHEMA} TO",
         f"GRANT SELECT ON SCHEMA {CATALOG}.{SCHEMA} TO",
+        f"GRANT EXECUTE ON SCHEMA {CATALOG}.{SCHEMA} TO",        # needed to call calculate_market_cap_exposure
         f"GRANT CREATE TABLE ON SCHEMA {CATALOG}.{SCHEMA} TO",  # needed to create Genie Space assets
     ]
 
@@ -294,7 +472,8 @@ else:
     print(f"\n{ok} grants applied ({err} errors)")
     print()
     print("Participants can now:")
-    print(f"  • Query all tables in {CATALOG}.{SCHEMA}")
+    print(f"  • Query all tables and views in {CATALOG}.{SCHEMA}")
+    print(f"  • Call calculate_market_cap_exposure() and other UC functions")
     print(f"  • Create Genie Spaces backed by those tables")
     print(f"  • Run Lab 01–05")
 

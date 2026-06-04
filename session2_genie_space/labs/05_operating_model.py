@@ -7,9 +7,9 @@
 # MAGIC
 # MAGIC | | |
 # MAGIC |---|---|
-# MAGIC | ⏱️ **Duration** | 20 minutes |
+# MAGIC | ⏱️ **Duration** | 27 minutes |
 # MAGIC | **Prerequisites** | Labs 01–04 complete — space configured, benchmarks run, monitoring reviewed |
-# MAGIC | **Covers** | Exploratory vs Certified spaces, certification checklist, space registry |
+# MAGIC | **Covers** | Exploratory vs Certified spaces, RBAC/ABAC data protection, certification checklist, space registry |
 # MAGIC
 # MAGIC ---
 # MAGIC
@@ -56,7 +56,207 @@ print(f"Owner: {OWNER or '(not set)'}")
 
 # MAGIC %md
 # MAGIC ---
-# MAGIC ## Step 1: Run the certification checklist
+# MAGIC ## Step 1: Protecting sensitive data in Genie — RBAC and ABAC
+# MAGIC
+# MAGIC > *"Every Genie query runs in the exact permission and security context as if the user manually ran SQL."*
+# MAGIC
+# MAGIC This is both the security guarantee and the operational implication: whatever Unity Catalog enforces for a user in SQL, Genie enforces automatically. You do not need to re-implement security logic inside Genie — you configure it once in UC and it applies everywhere, including Genie.
+# MAGIC
+# MAGIC ### Two layers to configure
+# MAGIC
+# MAGIC | Layer | Controls | Configured where |
+# MAGIC |---|---|---|
+# MAGIC | **Space-level RBAC** | Who can open the Genie Space | Share button on the space |
+# MAGIC | **UC data-level RBAC/ABAC** | What rows and columns a user sees inside the space | Unity Catalog — column masks, row filters, GRANT/REVOKE |
+# MAGIC
+# MAGIC Both must be set. A user who has CAN RUN on the space but no UC SELECT on the underlying tables will get an empty result set, not an error message — which is confusing. Always configure both layers together.
+# MAGIC
+# MAGIC ---
+# MAGIC
+# MAGIC ### 1a. Column masking (ABAC)
+# MAGIC
+# MAGIC Column masking lets you return a masked value instead of the real value, based on the user's group membership or attributes. Genie respects column masks transparently — masked columns appear in answers but their values are replaced by the mask output.
+# MAGIC
+# MAGIC **What this means for Genie:**
+# MAGIC - A business user asking "show me settlement amounts for Region 1" will see the masked value (e.g. `****`) if a column mask is applied to `total_aud` for their group
+# MAGIC - The LLM sees only what the SQL returns — it cannot infer the real value
+# MAGIC - Genie's data sampling (used to provide query hints to the LLM) also respects masks — masked column values are excluded from samples
+# MAGIC
+# MAGIC **🖱️ UI:** Catalog Explorer → `workshop_au.aemo.settlement_amounts` → Schema tab → column `total_aud` → Column mask → + Add mask function
+# MAGIC
+# MAGIC **⚡ Automated** — create and apply a column mask:
+
+# COMMAND ----------
+
+# Column masking example for settlement_amounts.total_aud
+# The mask function returns NULL for users who are NOT in the market-ops-admin group.
+# Members of market-ops-admin see the real value; everyone else sees NULL.
+#
+# Prerequisites:
+#   - settlement_amounts table must exist in workshop_au.aemo
+#   - workshop_au.aemo.mask_settlement_amount function must be created first
+#   - APPLY COLUMN MASK requires table owner or MODIFY privilege
+
+# Step 1: Create the mask function
+mask_fn_sql = f"""
+CREATE OR REPLACE FUNCTION {CATALOG}.{SCHEMA}.mask_settlement_amount(amount DOUBLE)
+RETURNS DOUBLE
+RETURN CASE
+    WHEN is_member('market-ops-admin') THEN amount
+    ELSE NULL
+END
+"""
+
+# Step 2: Apply it to the column
+apply_mask_sql = f"""
+ALTER TABLE {CATALOG}.{SCHEMA}.settlement_amounts
+ALTER COLUMN total_aud
+SET MASK {CATALOG}.{SCHEMA}.mask_settlement_amount
+"""
+
+print("Column mask SQL (review before running):\n")
+print(mask_fn_sql)
+print(apply_mask_sql)
+print("\nUncomment to apply:")
+# spark.sql(mask_fn_sql)
+# spark.sql(apply_mask_sql)
+# print("✅ Column mask applied to settlement_amounts.total_aud")
+
+# COMMAND ----------
+
+# Verify column masks on AEMO tables
+# {CATALOG}.information_schema.column_masks shows masks applied within that catalog.
+# system.information_schema is a global view available only to metastore admins;
+# use the catalog-scoped information_schema for reliable results in workshop context.
+try:
+    masks = spark.sql(f"""
+        SELECT table_name, column_name, mask_function_name
+        FROM {CATALOG}.information_schema.column_masks
+        WHERE table_catalog = '{CATALOG}' AND table_schema = '{SCHEMA}'
+        ORDER BY table_name, column_name
+    """)
+    count = masks.count()
+    if count > 0:
+        print(f"✅ {count} column mask(s) active on {CATALOG}.{SCHEMA}:")
+        display(masks)
+    else:
+        print(f"No column masks currently applied to {CATALOG}.{SCHEMA}")
+        print("This is expected if settlement_amounts is not yet in the lab schema.")
+except Exception as e:
+    print(f"Note: {e}")
+
+# COMMAND ----------
+
+# MAGIC %md
+# MAGIC ---
+# MAGIC ### 1b. Row-level security (ABAC)
+# MAGIC
+# MAGIC Row filters restrict which rows a user can see. Genie generates SQL that hits the underlying table — the filter applies automatically, and the user only receives rows they are permitted to see.
+# MAGIC
+# MAGIC **AEMO use case:** operational staff in a specific region should only query data for their region. Rather than creating one Genie Space per region, create one space with a row filter on `region_id` that evaluates the user's region group membership.
+# MAGIC
+# MAGIC **🖱️ UI:** Catalog Explorer → `workshop_au.aemo.spot_prices` → Schema tab → Row filter → + Add filter function
+# MAGIC
+# MAGIC **⚡ Automated** — create and apply a row filter:
+
+# COMMAND ----------
+
+# Row filter example for spot_prices
+# Users in 'region-nsw-team' see only NSW rows; users in 'region-vic-team' see only VIC.
+# Members of 'market-ops-admin' see all regions.
+#
+# is_member() evaluates the current user's group membership at query time.
+
+row_filter_fn_sql = f"""
+CREATE OR REPLACE FUNCTION {CATALOG}.{SCHEMA}.filter_spot_prices_by_region(region_id STRING)
+RETURNS BOOLEAN
+RETURN
+    is_member('market-ops-admin')
+    OR (is_member('region-nsw-team') AND region_id = 'NSW1')
+    OR (is_member('region-vic-team') AND region_id = 'VIC1')
+    OR (is_member('region-qld-team') AND region_id = 'QLD1')
+    OR (is_member('region-sa-team')  AND region_id = 'SA1')
+"""
+
+apply_filter_sql = f"""
+ALTER TABLE {CATALOG}.{SCHEMA}.spot_prices
+SET ROW FILTER {CATALOG}.{SCHEMA}.filter_spot_prices_by_region ON (region_id)
+"""
+
+print("Row filter SQL (review before running):\n")
+print(row_filter_fn_sql)
+print(apply_filter_sql)
+print("\nUncomment to apply:")
+# spark.sql(row_filter_fn_sql)
+# spark.sql(apply_filter_sql)
+# print("✅ Row filter applied to spot_prices")
+
+# COMMAND ----------
+
+# Verify row filters on AEMO tables
+# {CATALOG}.information_schema.row_filters shows filters applied within that catalog.
+# Use the catalog-scoped information_schema — system.information_schema requires
+# metastore admin and returns zero rows for non-admins in standard workshop setups.
+try:
+    filters = spark.sql(f"""
+        SELECT table_name, filter_function_name
+        FROM {CATALOG}.information_schema.row_filters
+        WHERE table_catalog = '{CATALOG}' AND table_schema = '{SCHEMA}'
+        ORDER BY table_name
+    """)
+    count = filters.count()
+    if count > 0:
+        print(f"✅ {count} row filter(s) active on {CATALOG}.{SCHEMA}:")
+        display(filters)
+    else:
+        print(f"No row filters currently applied to {CATALOG}.{SCHEMA}")
+except Exception as e:
+    print(f"Note: {e}")
+
+# COMMAND ----------
+
+# MAGIC %md
+# MAGIC ---
+# MAGIC ### 1c. Prompt injection risk — the one gap UC cannot close
+# MAGIC
+# MAGIC Column masks and row filters protect the **data returned by SQL**. They do not protect against a user typing sensitive data into their Genie question.
+# MAGIC
+# MAGIC **Example risk:** a user asks "Why is the settlement amount for DUID TORRB3 lower than $42,000 this week?" — they have just injected a value that the LLM now processes, even if `total_aud` is masked.
+# MAGIC
+# MAGIC **Mitigations available now:**
+# MAGIC
+# MAGIC | Mitigation | Where to configure |
+# MAGIC |---|---|
+# MAGIC | Space instructions — tell users not to include specific values | Genie Space → Configure → Instructions |
+# MAGIC | AI Gateway input guardrails (PII detection) | Session 1 — AI Gateway topic |
+# MAGIC | Restrict space to users who already have data access | Share → CAN RUN → named groups only |
+# MAGIC
+# MAGIC **🖱️ UI:** Configure → Instructions → Add text instruction → paste:
+# MAGIC > "Do not include specific dollar amounts, generator identifiers, or meter IDs in your questions. Ask about trends, comparisons, and categories instead."
+# MAGIC
+# MAGIC This does not prevent the question — it guides user behaviour. For stronger enforcement, use AI Gateway input guardrails (covered in Session 1).
+
+# COMMAND ----------
+
+# MAGIC %md
+# MAGIC ---
+# MAGIC ### 1d. Recommended permission model for AEMO
+# MAGIC
+# MAGIC | Role | Space access | UC data access | Notes |
+# MAGIC |---|---|---|---|
+# MAGIC | Data Engineer | CAN MANAGE (all spaces) | Full SELECT + column mask bypass | Builds and certifies spaces |
+# MAGIC | Data Analyst | CAN MANAGE (Exploratory) / CAN RUN (Certified) | SELECT — subject to masks and filters | Cannot promote to Certified |
+# MAGIC | Market Operations Staff | CAN RUN (Certified spaces only) | SELECT — filtered to their region via row filter | Never sees Exploratory spaces |
+# MAGIC | Line Manager | CAN RUN (Certified spaces only) | SELECT — masked sensitive columns | Same as Market Ops Staff |
+# MAGIC | Executive | CAN RUN (designated Certified spaces) | SELECT — aggregated views only (use metric views) | Separate space recommended |
+# MAGIC
+# MAGIC > "Can create spaces?" is a recommended policy, not a system-enforced restriction. Databricks does not currently have a workspace-level toggle to prevent specific users from creating Genie Spaces. Enforce this through team process: only data engineers and analysts should have workspace access, and only data engineers should have CAN MANAGE on Certified spaces.
+
+# COMMAND ----------
+
+# MAGIC %md
+# MAGIC ---
+# MAGIC ## Step 2: Run the certification checklist
 # MAGIC
 # MAGIC **⚡ Automated** — checks every certification requirement and prints PASS / FAIL / WARN
 
@@ -211,7 +411,7 @@ else:
 
 # MAGIC %md
 # MAGIC ---
-# MAGIC ## Step 2: Create the Space Registry
+# MAGIC ## Step 3: Create the Space Registry
 # MAGIC
 # MAGIC Track all Genie Spaces across the organisation — their status, owner, and certification history.
 # MAGIC
@@ -312,29 +512,21 @@ display(spark.sql(f"SELECT * FROM {CATALOG}.{SCHEMA_GOV}.genie_space_registry OR
 
 # MAGIC %md
 # MAGIC ---
-# MAGIC ## Step 3: Governance — who can create spaces and when?
+# MAGIC ## Step 4: Governance — who can create spaces and when?
 # MAGIC
-# MAGIC **🖱️ Recommended permission model for AEMO:**
-# MAGIC
-# MAGIC | Role | Can create spaces? | Access Certified spaces | Access Exploratory spaces |
-# MAGIC |---|---|---|---|
-# MAGIC | Data Engineer | Yes (Exploratory + Certified) | CAN MANAGE | CAN MANAGE |
-# MAGIC | Data Analyst | Yes (Exploratory only) | CAN RUN | CAN MANAGE |
-# MAGIC | Business User | No | CAN RUN | No access |
-# MAGIC | Line Manager | No | CAN RUN | No access |
-# MAGIC
-# MAGIC > **Note:** "Can create spaces?" is a recommended policy, not a system-enforced restriction. Databricks does not currently have a workspace-level toggle to prevent specific users from creating Genie Spaces. Enforce this through team process: only data engineers and analysts should have workspace access, and only data engineers should have the CAN MANAGE permission on Certified spaces.
+# MAGIC See the role table in Step 1d above for the full recommended model.
 # MAGIC
 # MAGIC **What this means in practice:**
 # MAGIC - Business users never see an Exploratory space — they only access spaces the data team has certified
 # MAGIC - Data analysts can experiment freely in Exploratory spaces; they must involve a data engineer to promote to Certified
 # MAGIC - The registry table (`genie_space_registry`) is the source of truth for what's Certified
+# MAGIC - Row filters and column masks in UC apply automatically — no per-space reconfiguration needed
 
 # COMMAND ----------
 
 # MAGIC %md
 # MAGIC ---
-# MAGIC ## Step 4: Certification promotion workflow
+# MAGIC ## Step 5: Certification promotion workflow
 # MAGIC
 # MAGIC When a space is ready to move from Exploratory → Certified:
 
@@ -370,31 +562,7 @@ print("Review the checklist above, then uncomment promote_to_certified() to cert
 
 # MAGIC %md
 # MAGIC ---
-# MAGIC ## ✅ Lab 05 Checkpoint
-# MAGIC - [ ] Certification checklist run — score noted
-# MAGIC - [ ] Space registry table created
-# MAGIC - [ ] This space registered (EXPLORATORY or CERTIFIED)
-# MAGIC - [ ] Governance model understood — business users only access Certified spaces
-# MAGIC - [ ] Promotion workflow understood
-# MAGIC
-# MAGIC ---
-# MAGIC
-# MAGIC ## 🎯 Session 2 — All 5 Labs Complete
-# MAGIC
-# MAGIC | Lab | Topic | Time |
-# MAGIC |---|---|---|
-# MAGIC | 01 | Create space + UC metadata + Knowledge Store | 40 min |
-# MAGIC | 02 | Benchmarks + golden queries + text instructions | 35 min |
-# MAGIC | 03 | Run benchmarks + Monitor tab + rollout | 30 min |
-# MAGIC | 04 | Monitoring + cost + feedback alert + dashboard | 25 min |
-# MAGIC | 05 | Operating model + permissions + admin settings | 20 min |
-# MAGIC | | **Total** | **~2.5 hours** |
-
-# COMMAND ----------
-
-# MAGIC %md
-# MAGIC ---
-# MAGIC ## Step 5: Permissions — bulk grant access
+# MAGIC ## Step 6: Permissions — bulk grant access
 # MAGIC
 # MAGIC **🖱️ UI:** Share button (top right of Genie Space)
 # MAGIC
@@ -473,7 +641,7 @@ if SPACE_ID:
 
 # MAGIC %md
 # MAGIC ---
-# MAGIC ## Step 6: UC permissions — what the space inherits
+# MAGIC ## Step 7: UC permissions — what the space inherits
 # MAGIC
 # MAGIC > *"Every Genie query runs in the exact permission and security context as if the user manually ran SQL."*
 # MAGIC > *(Slide 18 — End-to-End Security Model)*
@@ -527,7 +695,7 @@ print("\nUncomment and run to apply (ensure GROUP_NAME is an account-level UC gr
 
 # MAGIC %md
 # MAGIC ---
-# MAGIC ## Step 7: Workspace AI feature settings — admin checklist
+# MAGIC ## Step 8: Workspace AI feature settings — admin checklist
 # MAGIC
 # MAGIC **🖱️ UI:** Workspace Settings → AI features
 # MAGIC
@@ -596,7 +764,7 @@ print(f"     Workspace Settings → AI + Machine Learning → AI-assisted featur
 
 # MAGIC %md
 # MAGIC ---
-# MAGIC ## Step 8: Geography enforcement — data residency check
+# MAGIC ## Step 9: Geography enforcement — data residency check
 # MAGIC
 # MAGIC The single most important compliance setting for AEMO.
 # MAGIC
@@ -624,13 +792,18 @@ except Exception as e:
 # MAGIC ---
 # MAGIC ## ✅ Lab 05 Full Checklist
 # MAGIC
+# MAGIC **Data protection (RBAC/ABAC):**
+# MAGIC - [ ] Column masks reviewed — sensitive columns protected for non-admin groups
+# MAGIC - [ ] Row filters reviewed — regional or team-based access scoping in place
+# MAGIC - [ ] Prompt injection risk acknowledged — space instructions added
+# MAGIC
 # MAGIC **Space quality:**
 # MAGIC - [ ] Certification checklist run — all items passing
 # MAGIC - [ ] Space registered in genie_space_registry table
 # MAGIC - [ ] Status set to CERTIFIED (or action items noted for Exploratory)
 # MAGIC
 # MAGIC **Permissions:**
-# MAGIC - [ ] Space-level permissions set (CAN RUN for business users)
+# MAGIC - [ ] Space-level permissions set (CAN RUN for business users, group-based)
 # MAGIC - [ ] UC permissions set (USE SCHEMA + SELECT on aemo schema)
 # MAGIC - [ ] Named owner has CAN MANAGE
 # MAGIC
@@ -649,5 +822,5 @@ except Exception as e:
 # MAGIC | 02 | Benchmarks + golden queries + text instructions | 35 min |
 # MAGIC | 03 | Run benchmarks + Monitor tab + rollout | 30 min |
 # MAGIC | 04 | Monitoring + cost + feedback alert + dashboard | 25 min |
-# MAGIC | 05 | Operating model + permissions + admin settings | 20 min |
+# MAGIC | 05 | Operating model + RBAC/ABAC + permissions + admin | 27 min |
 # MAGIC | | **Total** | **~2.5 hours** |
