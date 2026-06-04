@@ -9,12 +9,12 @@
 # MAGIC |---|---|
 # MAGIC | ⏱️ **Duration** | 30–35 minutes |
 # MAGIC | **Role** | Workspace Admin |
-# MAGIC | **Data residency** | All LLM traffic stays in AU East via FMAPI claude-haiku-4-5 (AU East regional endpoint — distinct from default PPT routing which is cross-geo for other models) |
+# MAGIC | **Model** | `databricks-claude-haiku-4-5` via FMAPI pay-per-token. Note: this model requires cross-geo processing to be enabled on the workspace — see Section 2 for details. |
 # MAGIC | **Cluster** | DBR 14.3 LTS or later |
 # MAGIC | **SDK version** | `databricks-sdk>=0.28` (installed in Section 0) |
 # MAGIC
 # MAGIC **By the end of this lab you will have:**
-# MAGIC - [ ] Verified that the prerequisite PT serving endpoint exists and is Ready
+# MAGIC - [ ] Verified that the prerequisite serving endpoint exists and is Ready
 # MAGIC - [ ] Configured an AI Gateway route on that endpoint (rate limits, guardrails, payload logging)
 # MAGIC - [ ] Enabled payload logging to a Delta table for regulatory compliance audit evidence
 # MAGIC - [ ] Set per-endpoint and per-user QPM rate limits (60 QPM / 20 QPM)
@@ -59,9 +59,9 @@
 # MAGIC **Task 3 — Verify the prerequisite serving endpoint**
 # MAGIC
 # MAGIC Navigate: Left sidebar → Serving → **Serving Endpoints** tab
-# MAGIC You should see: An endpoint named `au-east-claude-haiku` (or the name your facilitator provided) with status **Ready**.
+# MAGIC You should see: An endpoint named `au_east_llm_inregion` (or the name your facilitator provided) with status **Ready**.
 # MAGIC If the endpoint does not exist or is not Ready, do not proceed — ask your facilitator.
-# MAGIC The endpoint is backed by `databricks-claude-haiku-4-5` (FMAPI pay-per-token, AU East, in-region).
+# MAGIC The endpoint is backed by `databricks-claude-haiku-4-5` (FMAPI pay-per-token).
 
 # COMMAND ----------
 
@@ -109,9 +109,11 @@ except ImportError:
 
 # COMMAND ----------
 
-# Widget-based configuration — set these before running further cells
+# Widget-based configuration — set these before running further cells.
+# pt_endpoint must match the endpoint name created by the facilitator's setup.py script.
+# Default: 'au_east_llm_inregion' (matches session1_platform_admin/setup/setup.py and cleanup.py).
 dbutils.widgets.text("workspace_url",    "https://<your-workspace>.azuredatabricks.net", "Workspace URL (no trailing slash)")
-dbutils.widgets.text("pt_endpoint",      "au-east-claude-haiku",                         "PT serving endpoint name (prerequisite)")
+dbutils.widgets.text("pt_endpoint",      "au_east_llm_inregion",                         "PT serving endpoint name (prerequisite)")
 dbutils.widgets.text("catalog",          "workshop_au",                                  "Catalog name (for payload logs)")
 dbutils.widgets.text("schema",           "ai_governance",                                "Schema name (for payload logs)")
 
@@ -173,15 +175,16 @@ print(f"Auth type            : {w.config.auth_type}")
 # COMMAND ----------
 
 # Configuration variables used throughout the lab
-PT_ENDPOINT_NAME   = PT_ENDPOINT_W          # pre-existing serving endpoint (created by setup.py or Lab 01)
+PT_ENDPOINT_NAME   = PT_ENDPOINT_W          # pre-existing serving endpoint (created by setup.py)
 CATALOG_NAME       = CATALOG_W
 SCHEMA_NAME        = SCHEMA_W
-PAYLOAD_TABLE_PREFIX = "ai_gw_payloads"     # Delta table prefix; full path: CATALOG.SCHEMA.ai_gw_payloads_payload_logs
+PAYLOAD_TABLE_PREFIX = "ai_gw_payloads"     # Delta table prefix; Databricks appends '_payload'
+                                             # Full path: CATALOG.SCHEMA.ai_gw_payloads_payload
 
 print("Configuration summary:")
 print(f"  PT serving endpoint  : {PT_ENDPOINT_NAME}")
-print(f"  AI model (FMAPI PPT) : databricks-claude-haiku-4-5  (AU East, in-region)")
-print(f"  Payload log table    : {CATALOG_NAME}.{SCHEMA_NAME}.{PAYLOAD_TABLE_PREFIX}_payload_logs")
+print(f"  AI model (FMAPI PPT) : databricks-claude-haiku-4-5")
+print(f"  Payload log table    : {CATALOG_NAME}.{SCHEMA_NAME}.{PAYLOAD_TABLE_PREFIX}_payload")
 
 # COMMAND ----------
 
@@ -208,7 +211,7 @@ print(f"  Payload log table    : {CATALOG_NAME}.{SCHEMA_NAME}.{PAYLOAD_TABLE_PRE
 # MAGIC   AI Gateway (V1 config on serving endpoint)
 # MAGIC        |  checks: rate limit -> input guardrail -> PII detector -> safety filter
 # MAGIC        v  (if all pass)
-# MAGIC   Model serving endpoint  <-- backed by databricks-claude-haiku-4-5 (FMAPI, AU East)
+# MAGIC   Model serving endpoint  <-- backed by databricks-claude-haiku-4-5 (FMAPI PPT)
 # MAGIC        |
 # MAGIC        v  response passes back through output guardrail
 # MAGIC   Application receives response (or 400 if blocked)
@@ -222,62 +225,89 @@ print(f"  Payload log table    : {CATALOG_NAME}.{SCHEMA_NAME}.{PAYLOAD_TABLE_PRE
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC ## Section 2: Verify the Prerequisite Serving Endpoint
+# MAGIC ## Section 2: Preflight — Verify the Prerequisite Serving Endpoint
 # MAGIC
-# MAGIC Lab 02 configures an AI Gateway route on an existing serving endpoint. The endpoint must already exist and be in Ready state. This section verifies it.
+# MAGIC Lab 02 configures an AI Gateway route on an existing serving endpoint. The endpoint must already exist and be in Ready state before any other section runs. This section hard-stops with a clear error if it is missing.
 # MAGIC
 # MAGIC **Why a serving endpoint is the prerequisite:**
-# MAGIC AI Gateway V1 attaches as a configuration layer (`ai_gateway` block) on a serving endpoint. The serving endpoint is what holds the model connection (FMAPI pay-per-token for Claude Haiku 4.5 in AU East). The gateway config adds the rate limits, guardrails, and logging on top.
+# MAGIC AI Gateway V1 attaches as a configuration layer (`ai_gateway` block) on a serving endpoint. The serving endpoint holds the model connection (FMAPI pay-per-token for Claude Haiku 4.5). The gateway config adds rate limits, guardrails, and logging on top.
 # MAGIC
-# MAGIC **Model used in this lab:** `databricks-claude-haiku-4-5` — FMAPI pay-per-token (PPT). All tokens are processed within the Australia East Azure region.
+# MAGIC **Model used in this lab:** `databricks-claude-haiku-4-5` — FMAPI pay-per-token (PPT).
 # MAGIC
-# MAGIC > **Note on "Provisioned Throughput":** Claude Haiku 4.5 is NOT available on Databricks Provisioned Throughput (dedicated model units) in any region. "PT" in this lab context refers to the pay-per-token FMAPI endpoint that uses the australiaeast region — not dedicated throughput capacity. The correct term is FMAPI pay-per-token (PPT).
+# MAGIC > **Cross-geo note:** FMAPI Pay-Per-Token models — including `databricks-claude-haiku-4-5` — are marked with `*` in the Databricks AU East FMAPI availability matrix, meaning they require cross-geo processing to be enabled on the workspace. If your workspace has geography enforcement set to the strict mode that blocks all cross-geo traffic, you must allow `databricks-claude-haiku-4-5` as an exception, or use a Provisioned Throughput endpoint configured explicitly for AU East. Lab 05 covers geography enforcement settings in detail.
 # MAGIC
-# MAGIC > **AU East FMAPI clarification:** `databricks-claude-haiku-4-5` has an AU East regional endpoint available via FMAPI — all LLM traffic in this lab stays in-region. This is distinct from the default FMAPI Pay-Per-Token routing used by other models (e.g. `databricks-meta-llama-*`) which routes through US data centres. Lab 01's quick-ref notation "FMAPI Pay-Per-Token ❌ cross-geo" refers to that default routing for other models, not to claude-haiku-4-5 which has its own AU East regional path.
+# MAGIC > **Note on "Provisioned Throughput":** The endpoint name `au_east_llm_inregion` used in this lab refers to the FMAPI pay-per-token endpoint backed by `databricks-claude-haiku-4-5`. Despite the name, it is not a dedicated Provisioned Throughput (reserved capacity) endpoint. "PT" in the endpoint name is the facilitator's naming convention — the underlying billing is pay-per-token.
 # MAGIC
-# MAGIC > **Cross-geo models:** If geography enforcement is ON in your workspace, cross-geo models (e.g. `databricks-meta-llama-*`) will not appear in the serving endpoint selector. If it is OFF, they appear but routing traffic to them violates AEMO's data residency requirements. Always use `databricks-claude-haiku-4-5` or `databricks-claude-sonnet-4-6` for data classified above Public.
+# MAGIC > **Cross-geo models and geography enforcement:** If geography enforcement is ON in strict mode, cross-geo models will not appear in the serving endpoint selector. Work with your facilitator to confirm the workspace geography policy before this lab.
 
 # COMMAND ----------
 
-def verify_serving_endpoint(w: WorkspaceClient, endpoint_name: str) -> bool:
+# PREFLIGHT CHECK — must pass before any other section runs.
+# This cell raises a clear ValueError if the endpoint does not exist or is not Ready.
+# It sets _lab02_endpoint_ready = True on success so downstream cells can gate on it.
+
+def preflight_check_endpoint(w: WorkspaceClient, endpoint_name: str) -> bool:
     """
-    Check that a serving endpoint exists and is in Ready state.
-    Returns True if ready, False otherwise.
-    Raises ValueError if the endpoint does not exist at all.
+    Verify that a serving endpoint exists and is in Ready state.
+
+    Raises ValueError immediately if the endpoint does not exist — do not
+    catch this exception in the lab. A missing endpoint means the facilitator
+    setup script (setup.py) did not run or used a different endpoint name.
+
+    Returns True if Ready, False if the endpoint exists but is not yet Ready
+    (e.g. still updating). In the False case the cell prints a wait message
+    and downstream cells skip their API calls until this check is re-run.
     """
+    print(f"Preflight: checking endpoint '{endpoint_name}'...")
+
     try:
         ep = w.serving_endpoints.get(name=endpoint_name)
-    except Exception as e:
+    except Exception as exc:
         raise ValueError(
-            f"Serving endpoint '{endpoint_name}' not found.\n"
-            f"  Check the pt_endpoint widget value and confirm the endpoint exists in the Serving UI.\n"
-            f"  Original error: {e}"
-        )
+            f"\n"
+            f"  PREFLIGHT FAILED: serving endpoint '{endpoint_name}' not found.\n"
+            f"\n"
+            f"  Possible causes:\n"
+            f"    1. The facilitator setup.py has not been run yet.\n"
+            f"    2. The endpoint was created with a different name.\n"
+            f"       setup.py default is 'au_east_llm_inregion'. Check the pt_endpoint widget.\n"
+            f"    3. You are connected to the wrong workspace.\n"
+            f"\n"
+            f"  Resolution:\n"
+            f"    - Ask your facilitator to confirm the endpoint name and re-run setup.py.\n"
+            f"    - Update the pt_endpoint widget at the top of this notebook to match.\n"
+            f"    - Check Left sidebar → Serving → Serving Endpoints for the correct name.\n"
+            f"\n"
+            f"  Original SDK error: {exc}"
+        ) from exc
 
     state = ep.state.ready.value if ep.state and ep.state.ready else "UNKNOWN"
     served_entities = ep.config.served_entities if ep.config else []
     model_names = [se.entity_name for se in served_entities if se.entity_name] if served_entities else []
 
-    print(f"Endpoint name  : {ep.name}")
-    print(f"State          : {state}")
-    print(f"Models served  : {model_names}")
+    print(f"  Endpoint name  : {ep.name}")
+    print(f"  State          : {state}")
+    print(f"  Models served  : {model_names or ['(system FMAPI endpoint — model listed at account level)']}")
 
     if state == "READY":
-        print("Prerequisite check PASSED: endpoint is Ready.")
+        print("  Preflight PASSED: endpoint is Ready. Proceed with Section 3.")
         return True
     else:
-        print(f"WARNING: Endpoint state is '{state}' — not Ready. Wait for it to become Ready before proceeding.")
+        print(
+            f"\n  WARNING: endpoint state is '{state}' — not Ready.\n"
+            f"  Do not proceed with Sections 3-6 until the endpoint reaches Ready state.\n"
+            f"  Check Left sidebar → Serving → Serving Endpoints for error details.\n"
+            f"  Re-run this cell once the endpoint is Ready."
+        )
         return False
 
 
-_lab02_endpoint_ready = verify_serving_endpoint(w, PT_ENDPOINT_NAME)
+_lab02_endpoint_ready = preflight_check_endpoint(w, PT_ENDPOINT_NAME)
 
-if not _lab02_endpoint_ready:
-    print(
-        "\nThe serving endpoint is not Ready. Do not proceed with Sections 3-6.\n"
-        "Check Left sidebar → Serving → Serving Endpoints for error details.\n"
-        "Ask your facilitator if the endpoint is still being created."
-    )
+# Hard-stop: do not let participants run Section 3 if the endpoint is not Ready.
+# The ValueError from a missing endpoint already stops execution.
+# For a not-Ready endpoint we print a clear message — the downstream gate
+# (_lab02_endpoint_ready check) prevents the PUT call from running on a broken endpoint.
 
 # COMMAND ----------
 
@@ -328,6 +358,12 @@ if not _lab02_endpoint_ready:
 # MAGIC Click Create.
 # MAGIC ```
 # MAGIC If you configure via the UI, skip to Section 6 (end-to-end test).
+# MAGIC
+# MAGIC **Gateway name for Labs 03-05:** After this section runs, the AI Gateway route is active on
+# MAGIC the endpoint `au_east_llm_inregion` (or whatever PT_ENDPOINT_NAME is set to). Labs 03-05
+# MAGIC reference this same endpoint name — they do not need a separate "route name". All gateway
+# MAGIC configuration (rate limits, guardrails, payload logging) is attached to the serving endpoint
+# MAGIC and is accessible via `PUT/GET /api/2.0/serving-endpoints/{name}/ai-gateway`.
 
 # COMMAND ----------
 
@@ -381,15 +417,19 @@ def build_gateway_config(
     return AiGatewayConfig(
         # Usage tracking: per-request metrics -> system.ai_gateway.usage (Beta, AU East in-region).
         # Columns include: endpoint_name, requester, input_tokens, output_tokens, latency_ms,
-        #   request_tags (MAP), databricks_user_id, and more.
+        #   status_code, request_tags (MAP), destination_model, event_time, and more.
         # ~1 minute propagation delay before rows appear.
         usage_tracking_config=AiGatewayUsageTrackingConfig(enabled=True),
 
-        # Payload logging: full request + response JSON -> {catalog}.{schema}.{prefix}_payload_logs.
+        # Payload logging: full request + response JSON -> {catalog}.{schema}.{prefix}_payload.
+        # Note: the table suffix is '_payload' (not '_payload_logs') — Databricks appends '_payload'.
         # Table is auto-created on the first logged request.
-        # Schema includes: request_id, timestamp_ms, request (JSON), response (JSON),
-        #   status_code (400 = blocked by guardrail), databricks_user_id, request_metadata (MAP).
-        # Use auto_capture_config on the serving endpoint is deprecated for AI Gateway endpoints.
+        # Key columns: databricks_request_id (PK), request_time (TIMESTAMP), requester (STRING),
+        #   status_code (400 = blocked by guardrail), request (JSON), response (JSON),
+        #   client_request_id (STRING), execution_duration_ms (BIGINT).
+        # NOTE: columns named 'timestamp_ms', 'databricks_user_id', 'request_metadata' do NOT exist.
+        #   Use 'request_time', 'requester', and 'client_request_id' respectively.
+        # auto_capture_config on the serving endpoint is deprecated for AI Gateway endpoints.
         # Always use inference_table_config inside the ai_gateway block.
         inference_table_config=AiGatewayInferenceTableConfig(
             enabled=True,
@@ -399,7 +439,7 @@ def build_gateway_config(
         ),
 
         # PII BLOCK: request rejected (HTTP 400) if TFN, Medicare, ABN, name, address, etc. detected.
-        # PII detection runs within Databricks infrastructure; data does not leave AU East.
+        # PII detection runs within Databricks infrastructure.
         # NMI is NOT a built-in type — add it via invalid_keywords in Section 3c if needed.
         guardrails=AiGatewayGuardrails(
             input=AiGatewayGuardrailParameters(
@@ -447,7 +487,7 @@ if _SDK_ENUM_AVAILABLE:
     )
     print("AiGatewayConfig object built successfully.")
     print(f"  Usage tracking  : enabled -> system.ai_gateway.usage")
-    print(f"  Payload logging : enabled -> {CATALOG_NAME}.{SCHEMA_NAME}.{PAYLOAD_TABLE_PREFIX}_payload_logs")
+    print(f"  Payload logging : enabled -> {CATALOG_NAME}.{SCHEMA_NAME}.{PAYLOAD_TABLE_PREFIX}_payload")
     print(f"  PII guardrail   : BLOCK on input and output")
     print(f"  Safety filter   : ON on input and output")
     print(f"  Rate limits     : 60 QPM endpoint-wide, 20 QPM per user")
@@ -465,6 +505,12 @@ else:
 # MAGIC > **ACTION REQUIRED:** If the cell prints `"Endpoint not ready — skipping apply"`, go back to Section 2, wait for the endpoint to reach Ready state, then re-run Section 2 and this cell. Do NOT proceed to Section 6 until the gateway config has been applied (you will see `"Gateway config applied successfully."`).
 # MAGIC
 # MAGIC > **If you prefer to apply via the UI:** Use the Task 2 instructions in the UI Tour section at the top of this notebook. If you configure via the UI, the `_lab02_gw_result` variable will not be set, and the final checkpoint in the lab summary will show `[TODO]` for "Gateway config applied" — that is expected. The Section 6 tests will still work.
+# MAGIC
+# MAGIC **API path note:** `PUT /api/2.0/serving-endpoints/{name}/ai-gateway` is the correct path for
+# MAGIC applying or updating an AI Gateway config. Do NOT use `GET /api/2.0/serving-endpoints/{name}/ai-gateway`
+# MAGIC as a dedicated read path — on FMAPI system endpoints (including `databricks-claude-haiku-4-5`) that
+# MAGIC sub-path returns HTTP 404 ENDPOINT_NOT_FOUND. Instead, fetch the full endpoint object via
+# MAGIC `GET /api/2.0/serving-endpoints/{name}` and extract the `ai_gateway` block — see `_get_existing_gateway_config` below.
 
 # COMMAND ----------
 
@@ -474,18 +520,17 @@ def _get_existing_gateway_config(workspace_url: str, headers: dict, endpoint_nam
     Returns an empty dict if no gateway config is set yet.
     Used before any PUT to avoid wiping settings not being changed.
 
-    Uses the dedicated GET /api/2.0/serving-endpoints/{name}/ai-gateway endpoint which
-    returns only the gateway config (not the full endpoint payload). This is more efficient
-    than fetching the full endpoint object and avoids downloading served entities, config
-    versions, and state on every update call.
+    IMPORTANT: Uses GET /api/2.0/serving-endpoints/{name} and extracts the 'ai_gateway' block.
+    Do NOT use the dedicated GET /api/2.0/serving-endpoints/{name}/ai-gateway sub-path —
+    it returns HTTP 404 ENDPOINT_NOT_FOUND on FMAPI system endpoints (e.g. databricks-claude-haiku-4-5)
+    and is not reliable across all endpoint types. The full endpoint GET is reliable everywhere.
     """
-    url = f"{workspace_url}/api/2.0/serving-endpoints/{endpoint_name}/ai-gateway"
+    url = f"{workspace_url}/api/2.0/serving-endpoints/{endpoint_name}"
     resp = requests.get(url, headers=headers, timeout=30)
     if resp.status_code == 404:
-        # 404 means the endpoint has no AI Gateway config yet (not that the endpoint is missing).
         return {}
     resp.raise_for_status()
-    return resp.json()
+    return resp.json().get("ai_gateway", {})
 
 
 def apply_gateway_config_rest(
@@ -506,6 +551,11 @@ def apply_gateway_config_rest(
 
     This function is the REST equivalent of the SDK path in Section 3a.
     Use this if the SDK enum import failed or as a reference for automation scripts.
+
+    Field names in the payload use snake_case matching the Databricks REST API spec.
+    The 'guardrails.input.pii.behavior' field accepts: "BLOCK" or "MASK".
+    The 'rate_limits[].key' field accepts: "endpoint", "user", "service_principal", "user_group".
+    The 'rate_limits[].renewal_period' field accepts: "minute" (only supported value).
     """
     url = f"{workspace_url}/api/2.0/serving-endpoints/{endpoint_name}/ai-gateway"
 
@@ -516,6 +566,8 @@ def apply_gateway_config_rest(
             "catalog_name": catalog,
             "schema_name": schema,
             "table_name_prefix": table_prefix,
+            # Databricks appends '_payload' to this prefix.
+            # Full table name: {catalog}.{schema}.{table_prefix}_payload
         },
         "guardrails": {
             "input":  {"pii": {"behavior": "BLOCK"}, "safety": True},
@@ -528,13 +580,16 @@ def apply_gateway_config_rest(
     }
 
     resp = requests.put(url, headers=headers, json=payload, timeout=60)
-    resp.raise_for_status()
+    if not resp.ok:
+        raise RuntimeError(
+            f"PUT /api/2.0/serving-endpoints/{endpoint_name}/ai-gateway failed.\n"
+            f"  HTTP {resp.status_code}: {resp.text[:500]}"
+        )
     return resp.json()
 
 
 # Apply the config via REST (works regardless of SDK version).
 # Automatically runs if the endpoint is confirmed Ready in Section 2.
-# If the endpoint is not yet Ready, this cell prints a reminder and skips the call.
 if _lab02_endpoint_ready:
     print(f"Applying AI Gateway config to endpoint '{PT_ENDPOINT_NAME}'...")
     _lab02_gw_result = apply_gateway_config_rest(
@@ -631,7 +686,7 @@ print("NMI keyword blocking function defined -- optional, uncomment if required 
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC ## Section 4: Enable Payload Logging (Delta Table, AU East)
+# MAGIC ## Section 4: Enable Payload Logging (Delta Table)
 # MAGIC
 # MAGIC Payload logging stores the full request and response JSON for every call through the gateway. It is the primary audit artefact for regulatory evidence — it answers "what exactly was sent to the model, and what did the model say back?"
 # MAGIC
@@ -639,15 +694,21 @@ print("NMI keyword blocking function defined -- optional, uncomment if required 
 # MAGIC
 # MAGIC | Column | Type | Description |
 # MAGIC |---|---|---|
-# MAGIC | `request_id` | STRING | Unique per request |
-# MAGIC | `timestamp_ms` | LONG | Unix epoch milliseconds |
+# MAGIC | `databricks_request_id` | STRING | Unique per request (primary key). Note: this is NOT `request_id` — use `databricks_request_id`. |
+# MAGIC | `request_time` | TIMESTAMP | UTC timestamp when the request was received. Note: this is NOT `timestamp_ms` — use `request_time` directly. |
+# MAGIC | `request_date` | DATE | UTC date partition column (use for efficient date-range filtering). |
 # MAGIC | `request` | STRING (JSON) | Full prompt payload sent to the model |
 # MAGIC | `response` | STRING (JSON) | Full completion response |
 # MAGIC | `status_code` | INT | 200 = success; 400 = blocked by guardrail |
-# MAGIC | `databricks_user_id` | STRING | Databricks user or service principal identity |
-# MAGIC | `request_metadata` | MAP<STRING,STRING> | Contains `databricks-request-tag` values for chargeback |
-# MAGIC | `execution_duration_ms` | LONG | End-to-end latency including guardrail processing |
+# MAGIC | `requester` | STRING | Databricks user or service principal identity. Note: this is NOT `databricks_user_id`. |
+# MAGIC | `execution_duration_ms` | BIGINT | End-to-end latency including guardrail processing |
 # MAGIC | `sampling_fraction` | DOUBLE | Always 1.0 for AI Gateway endpoints (no sampling) |
+# MAGIC | `client_request_id` | STRING | Optional user-provided request ID from the request body |
+# MAGIC | `logging_error_codes` | ARRAY<STRING> | Populated if the payload could not be logged (e.g. MAX_REQUEST_SIZE_EXCEEDED) |
+# MAGIC
+# MAGIC > **Columns that do NOT exist in this table:** `timestamp_ms`, `databricks_user_id`, `request_metadata`. Earlier documentation referenced these names — they are incorrect. Use `request_time`, `requester`, and `client_request_id` respectively.
+# MAGIC
+# MAGIC > **Table naming:** The inference table is created with the suffix `_payload` (NOT `_payload_logs`). With `table_name_prefix = "ai_gw_payloads"`, the full table name is `{catalog}.{schema}.ai_gw_payloads_payload`. Querying `ai_gw_payloads_payload_logs` will return TABLE_OR_VIEW_NOT_FOUND.
 # MAGIC
 # MAGIC > **Do not use `auto_capture_config`** on the serving endpoint object for AI Gateway-enabled endpoints. That field is deprecated. Use `inference_table_config` inside the `ai_gateway` block, which is what Section 3b configures.
 # MAGIC
@@ -662,24 +723,41 @@ print("NMI keyword blocking function defined -- optional, uncomment if required 
 # Verify payload logging is active by querying the Delta table.
 # Run this cell AFTER at least one test call in Section 6.
 
-_payload_table = f"{CATALOG_NAME}.{SCHEMA_NAME}.{PAYLOAD_TABLE_PREFIX}_payload_logs"
+_payload_table = f"{CATALOG_NAME}.{SCHEMA_NAME}.{PAYLOAD_TABLE_PREFIX}_payload"
 print(f"Payload log table: {_payload_table}")
+print()
+print("Table naming reminder:")
+print(f"  table_name_prefix = '{PAYLOAD_TABLE_PREFIX}'")
+print(f"  Databricks appends '_payload' -> full name: {_payload_table}")
+print()
 print("Run the SQL cell below after making test calls in Section 6.")
 
 # COMMAND ----------
 
 # MAGIC %sql
 # MAGIC -- Run after Section 6 test calls to confirm payload logging is active.
-# MAGIC -- Replace 'workshop_au.ai_governance.ai_gw_payloads_payload_logs' if you changed the catalog/schema/prefix.
+# MAGIC --
+# MAGIC -- Table naming:
+# MAGIC --   table_name_prefix = 'ai_gw_payloads'
+# MAGIC --   Databricks appends '_payload' -> full table: workshop_au.ai_governance.ai_gw_payloads_payload
+# MAGIC --   Do NOT use 'ai_gw_payloads_payload_logs' -- that table does not exist.
+# MAGIC --
+# MAGIC -- Column names verified against actual table schema:
+# MAGIC --   request_time    (TIMESTAMP) -- NOT 'timestamp_ms'
+# MAGIC --   requester       (STRING)    -- NOT 'databricks_user_id'
+# MAGIC --   request_date    (DATE)      -- use for efficient date-range partitioning
+# MAGIC --   databricks_request_id (STRING) -- primary key, NOT 'request_id'
+# MAGIC --
+# MAGIC -- If you changed catalog/schema/prefix in the widgets, adjust the table name below.
 # MAGIC SELECT
-# MAGIC   request_id,
-# MAGIC   from_unixtime(timestamp_ms / 1000) AS request_time,
+# MAGIC   databricks_request_id,
+# MAGIC   request_time,
 # MAGIC   status_code,
 # MAGIC   execution_duration_ms,
-# MAGIC   databricks_user_id,
-# MAGIC   request_metadata
-# MAGIC FROM workshop_au.ai_governance.ai_gw_payloads_payload_logs
-# MAGIC ORDER BY timestamp_ms DESC
+# MAGIC   requester,
+# MAGIC   client_request_id
+# MAGIC FROM workshop_au.ai_governance.ai_gw_payloads_payload
+# MAGIC ORDER BY request_time DESC
 # MAGIC LIMIT 10
 
 # COMMAND ----------
@@ -768,7 +846,8 @@ print("Do not change these before running Lab 03.")
 # MAGIC %md
 # MAGIC ## Section 6: Test the Gateway End-to-End
 # MAGIC
-# MAGIC Four tests confirm the gateway is working. Run them once the config from Section 3b has been applied and the endpoint is in Ready state.
+# MAGIC Four tests confirm the gateway is working. They run automatically in the cell below — no
+# MAGIC uncommenting required. Run this section after Section 3b has been applied and the endpoint is Ready.
 # MAGIC
 # MAGIC | Test | What it checks | Expected result |
 # MAGIC |---|---|---|
@@ -778,12 +857,20 @@ print("Do not change these before running Lab 03.")
 # MAGIC | Safety filter | Harmful content prompt is blocked | HTTP 400 or 403 |
 # MAGIC
 # MAGIC **UI alternative:** Navigate to the endpoint in the AI Gateway tab and use the built-in Playground. Try a prompt containing a TFN: "My TFN is 645 942 679" — you should see a guardrail block error instead of a model response.
+# MAGIC
+# MAGIC **Cross-geo reminder:** If your workspace blocks cross-geo traffic and `databricks-claude-haiku-4-5`
+# MAGIC requires cross-geo, Test 1 and Test 2 will return HTTP 403 with a geography enforcement error —
+# MAGIC not an endpoint or gateway error. If that happens, check the geography enforcement setting with
+# MAGIC your facilitator before retrying.
 
 # COMMAND ----------
 
-# Test 1: Basic connectivity
+# Test 1: Basic connectivity — sends a real request through the gateway to the model
 def test_basic_connectivity(workspace_url: str, token: str, endpoint_name: str) -> bool:
-    """Send a minimal prompt and verify a 200 response."""
+    """
+    Send a minimal prompt and verify a 200 response.
+    Invocation URL uses /serving-endpoints/{name}/invocations (no /api/2.0/ prefix).
+    """
     url = f"{workspace_url}/serving-endpoints/{endpoint_name}/invocations"
     resp = requests.post(
         url,
@@ -801,6 +888,9 @@ def test_basic_connectivity(workspace_url: str, token: str, endpoint_name: str) 
     else:
         print(f"FAIL  Basic connectivity: HTTP {resp.status_code}")
         print(f"      Response: {resp.text[:300]}")
+        if resp.status_code == 403:
+            print("      NOTE: 403 may indicate geography enforcement is blocking cross-geo traffic.")
+            print("      Check workspace geography settings with your facilitator.")
         return False
 
 
@@ -811,7 +901,10 @@ CUSTOM_PROMPT = (
 )
 
 def test_interactive_prompt(workspace_url: str, token: str, endpoint_name: str, prompt: str) -> bool:
-    """Send a domain-relevant prompt and print the response."""
+    """
+    Send a domain-relevant prompt and print the response.
+    This test confirms the full gateway path (input guardrail -> model -> output guardrail) is working.
+    """
     url = f"{workspace_url}/serving-endpoints/{endpoint_name}/invocations"
     resp = requests.post(
         url,
@@ -836,7 +929,10 @@ def test_interactive_prompt(workspace_url: str, token: str, endpoint_name: str, 
 # Using structurally valid numbers ensures the PII detector engages regardless of whether it uses
 # format-only or checksum-aware detection.
 def test_pii_blocking(workspace_url: str, token: str, endpoint_name: str) -> bool:
-    """Send a prompt containing Australian PII and expect a 400 block response."""
+    """
+    Send a prompt containing Australian PII and expect a 400 block response.
+    HTTP 400 from the gateway means the input guardrail fired before the prompt reached the model.
+    """
     url = f"{workspace_url}/serving-endpoints/{endpoint_name}/invocations"
     pii_prompt = (
         "My TFN is 645 942 679 and my Medicare number is 2123 45671 1. "
@@ -864,7 +960,11 @@ def test_pii_blocking(workspace_url: str, token: str, endpoint_name: str) -> boo
 
 # Test 4: Safety filter
 def test_safety_filter(workspace_url: str, token: str, endpoint_name: str) -> bool:
-    """Send a clearly harmful prompt and expect a block response."""
+    """
+    Send a clearly harmful prompt and expect a block response.
+    HTTP 400 or 403 from the gateway means the safety filter fired.
+    Some models return 200 with a refusal message — also accepted as PASS.
+    """
     url = f"{workspace_url}/serving-endpoints/{endpoint_name}/invocations"
     resp = requests.post(
         url,
@@ -892,31 +992,37 @@ def test_safety_filter(workspace_url: str, token: str, endpoint_name: str) -> bo
         return False
 
 
-# Run all four tests.
-# Uncomment after the gateway config from Section 3b has been applied and the endpoint is Ready.
+# Run all four tests — executes automatically when the endpoint is Ready and gateway config is applied.
+# If the gateway config has not been applied yet (Section 3b skipped), tests 1 and 2 will succeed
+# (raw endpoint is reachable) but tests 3 and 4 may fail (no guardrails active yet).
+if _lab02_endpoint_ready:
+    print(f"Running endpoint tests against: {PT_ENDPOINT_NAME}\n")
+    print("-" * 55)
+    _lab02_test_results = {}
+    _lab02_test_results["basic_connectivity"] = test_basic_connectivity(WORKSPACE_URL, DATABRICKS_TOKEN, PT_ENDPOINT_NAME)
+    print()
+    _lab02_test_results["interactive_prompt"] = test_interactive_prompt(WORKSPACE_URL, DATABRICKS_TOKEN, PT_ENDPOINT_NAME, CUSTOM_PROMPT)
+    print()
+    _lab02_test_results["pii_blocking"]       = test_pii_blocking(WORKSPACE_URL, DATABRICKS_TOKEN, PT_ENDPOINT_NAME)
+    print()
+    _lab02_test_results["safety_filter"]      = test_safety_filter(WORKSPACE_URL, DATABRICKS_TOKEN, PT_ENDPOINT_NAME)
 
-# print(f"Running endpoint tests against: {PT_ENDPOINT_NAME}\n")
-# print("-" * 55)
-# _lab02_test_results = {}
-# _lab02_test_results["basic_connectivity"] = test_basic_connectivity(WORKSPACE_URL, DATABRICKS_TOKEN, PT_ENDPOINT_NAME)
-# print()
-# _lab02_test_results["interactive_prompt"] = test_interactive_prompt(WORKSPACE_URL, DATABRICKS_TOKEN, PT_ENDPOINT_NAME, CUSTOM_PROMPT)
-# print()
-# _lab02_test_results["pii_blocking"]       = test_pii_blocking(WORKSPACE_URL, DATABRICKS_TOKEN, PT_ENDPOINT_NAME)
-# print()
-# _lab02_test_results["safety_filter"]      = test_safety_filter(WORKSPACE_URL, DATABRICKS_TOKEN, PT_ENDPOINT_NAME)
-#
-# print()
-# print("=" * 55)
-# print("  Test Summary")
-# print("=" * 55)
-# for _tname, _passed in _lab02_test_results.items():
-#     print(f"  {'PASS' if _passed else 'FAIL'}  {_tname}")
-# print()
-# _all_passed = all(_lab02_test_results.values())
-# print("All tests passed." if _all_passed else "Some tests failed -- review output above.")
-
-print("Test functions defined -- uncomment the run block above after Section 3b is applied.")
+    print()
+    print("=" * 55)
+    print("  Test Summary")
+    print("=" * 55)
+    for _tname, _passed in _lab02_test_results.items():
+        print(f"  {'PASS' if _passed else 'FAIL'}  {_tname}")
+    print()
+    _all_passed = all(_lab02_test_results.values())
+    print("All tests passed." if _all_passed else "Some tests failed -- review output above.")
+    if not _all_passed and not _lab02_test_results.get("pii_blocking"):
+        print()
+        print("PII blocking failed — most likely cause: Section 3b has not been run yet.")
+        print("Run Section 3b (apply_gateway_config_rest), then re-run this cell.")
+else:
+    _lab02_test_results = {}
+    print("Endpoint not Ready — skipping tests. Re-run Section 2 once the endpoint is Ready, then re-run this cell.")
 
 # COMMAND ----------
 
@@ -1008,6 +1114,10 @@ def print_gateway_compliance_summary(workspace_url: str, headers: dict, endpoint
     Fetch the AI Gateway config and print a compliance summary.
     Returns True if all required controls are active, False otherwise.
     Suitable for CI/CD assertions and audit evidence screenshots.
+
+    Fetches from GET /api/2.0/serving-endpoints/{name} (full endpoint object)
+    and extracts the ai_gateway block. This path works for all endpoint types
+    including FMAPI system endpoints.
     """
     url = f"{workspace_url}/api/2.0/serving-endpoints/{endpoint_name}"
     resp = requests.get(url, headers=headers, timeout=30)
@@ -1036,7 +1146,7 @@ def print_gateway_compliance_summary(workspace_url: str, headers: dict, endpoint
 
     print(f"  [{_tick(usage.get('enabled'))}]  Usage tracking        : {'ENABLED' if usage.get('enabled') else 'DISABLED'}")
     if itc.get("enabled"):
-        tbl = f"{itc.get('catalog_name')}.{itc.get('schema_name')}.{itc.get('table_name_prefix')}_payload_logs"
+        tbl = f"{itc.get('catalog_name')}.{itc.get('schema_name')}.{itc.get('table_name_prefix')}_payload"
         print(f"  [PASS]  Payload logging       : ENABLED -> {tbl}")
     else:
         print("  [FAIL]  Payload logging       : DISABLED")
@@ -1073,10 +1183,15 @@ def print_gateway_compliance_summary(workspace_url: str, headers: dict, endpoint
     return all_ok
 
 
-# Uncomment after the gateway config from Section 3b has been applied.
-# _compliant = print_gateway_compliance_summary(WORKSPACE_URL, HEADERS, PT_ENDPOINT_NAME)
-
-print("Compliance check function defined -- uncomment after Section 3b is applied.")
+# Run compliance check automatically if the gateway config was applied.
+_lab02_gw_applied = "_lab02_gw_result" in dir() and isinstance(_lab02_gw_result, dict)  # noqa: F821
+if _lab02_gw_applied:
+    print("Running compliance check...")
+    print()
+    _compliant = print_gateway_compliance_summary(WORKSPACE_URL, HEADERS, PT_ENDPOINT_NAME)
+else:
+    print("Compliance check skipped — gateway config not yet applied.")
+    print("Run Section 3b first, then re-run this cell.")
 
 # COMMAND ----------
 
@@ -1091,7 +1206,6 @@ print("=" * 60)
 print()
 
 # Use namespaced flags to avoid collision with variables from other labs or earlier notebooks.
-# _lab02_gw_result is set in Section 3b if uncommented and successful.
 _lab02_gw_applied  = "_lab02_gw_result" in dir() and isinstance(_lab02_gw_result, dict)  # noqa: F821
 _lab02_tests_ran   = "_lab02_test_results" in dir() and isinstance(_lab02_test_results, dict)  # noqa: F821
 _lab02_tests_ok    = _lab02_tests_ran and all(_lab02_test_results.values())  # noqa: F821
@@ -1112,14 +1226,14 @@ for section, description, done in outcomes:
 
 print()
 if not _lab02_gw_applied:
-    print("  Note: Gateway config not yet applied. Uncomment the call in Section 3b and run it.")
+    print("  Note: Gateway config not yet applied. Run Section 3b.")
 if not _lab02_tests_ran:
-    print("  Note: Tests not yet run. Uncomment the test block in Section 6 and run it.")
+    print("  Note: Tests did not run. Re-run Section 6 after Section 3b is complete.")
 
 print()
 print("-" * 60)
 print("  Next lab : 03_rate_limits_guardrails.py")
-print("  Prereq   : This lab complete with 60 QPM / 20 QPM limits active on the endpoint.")
+print(f"  Prereq   : This lab complete with 60 QPM / 20 QPM limits active on '{PT_ENDPOINT_NAME}'.")
 print("-" * 60)
 
 # COMMAND ----------
@@ -1128,13 +1242,14 @@ print("-" * 60)
 # MAGIC <div style="background: #E8F4F1; padding: 16px; border-radius: 8px; border-left: 4px solid #00A86B">
 # MAGIC <h3 style="color: #006B45; margin: 0 0 8px 0">Lab 02 Complete</h3>
 # MAGIC <ul>
-# MAGIC <li>Verified prerequisite PT serving endpoint (databricks-claude-haiku-4-5, FMAPI PPT, AU East)</li>
+# MAGIC <li>Verified prerequisite serving endpoint (databricks-claude-haiku-4-5, FMAPI PPT)</li>
 # MAGIC <li>Configured AI Gateway V1 on the endpoint: usage tracking, payload logging, PII BLOCK guardrails, safety filter, rate limits</li>
-# MAGIC <li>Payload logs written to workshop_au.ai_governance.ai_gw_payloads_payload_logs (Delta, AU East)</li>
+# MAGIC <li>Payload logs written to workshop_au.ai_governance.ai_gw_payloads_payload (Delta; suffix is _payload not _payload_logs; primary key is databricks_request_id not request_id)</li>
 # MAGIC <li>Rate limits: 60 QPM endpoint-wide, 20 QPM per user (Lab 03 burst tests expect these values)</li>
 # MAGIC <li>PII BLOCK active for TFN, Medicare, ABN (built-in); NMI blocking available via keyword config (Section 3c)</li>
-# MAGIC <li>Four end-to-end tests verified: connectivity, custom prompt, PII blocking, safety filter</li>
+# MAGIC <li>Four end-to-end tests run automatically: connectivity, custom prompt, PII blocking, safety filter</li>
 # MAGIC </ul>
+# MAGIC <p><strong>Cross-geo note:</strong> databricks-claude-haiku-4-5 requires cross-geo processing to be enabled. If tests returned HTTP 403, check geography enforcement settings with your facilitator before Lab 03.</p>
 # MAGIC <p><strong>Next:</strong> Lab 03: Rate Limits and Guardrails Deep-Dive — burst testing, 429 handling, AU PII pattern verification</p>
 # MAGIC </div>
 # MAGIC
@@ -1145,7 +1260,7 @@ print("-" * 60)
 # MAGIC | Create serving endpoint (with gateway config) | POST | `/api/2.0/serving-endpoints` |
 # MAGIC | Get endpoint config (includes ai_gateway block) | GET | `/api/2.0/serving-endpoints/{name}` |
 # MAGIC | Replace gateway config (rate limits, guardrails, logging) | PUT | `/api/2.0/serving-endpoints/{name}/ai-gateway` |
-# MAGIC | Get gateway config only | GET | `/api/2.0/serving-endpoints/{name}/ai-gateway` |
+# MAGIC | Get gateway config only | GET | `/api/2.0/serving-endpoints/{name}` then extract `ai_gateway` key — the dedicated `/ai-gateway` sub-path returns ENDPOINT_NOT_FOUND on FMAPI system endpoints |
 # MAGIC | Invoke endpoint (OpenAI-compatible) | POST | `/serving-endpoints/{name}/invocations` |
 # MAGIC | List all endpoints | GET | `/api/2.0/serving-endpoints` |
 # MAGIC | Delete endpoint | DELETE | `/api/2.0/serving-endpoints/{name}` |
@@ -1155,3 +1270,4 @@ print("-" * 60)
 # MAGIC - `auto_capture_config` on the serving endpoint object is **deprecated** for AI Gateway endpoints. Use `inference_table_config` inside the `ai_gateway` block.
 # MAGIC - `system.access.audit` records admin **config changes** (service_name: `serverlessRealTimeInference`, action: `putInferenceEndpointAiGateway`). It does NOT record individual inference requests. Per-request data lives in `system.ai_gateway.usage` and the payload log Delta table.
 # MAGIC - `system.ai_gateway.usage` is available in AU East, is in Beta status, and requires account admin to enable the `ai_gateway` system schema before first use.
+# MAGIC - The payload log table primary key is `databricks_request_id` (not `request_id`). The table name suffix is `_payload` (not `_payload_logs`). The user identity column is `requester` (not `databricks_user_id`). The timestamp column is `request_time` (TIMESTAMP, not `timestamp_ms` LONG). There is no `request_metadata` column — request tags are written to `system.ai_gateway.usage.request_tags` instead.

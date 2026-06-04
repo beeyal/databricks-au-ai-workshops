@@ -26,10 +26,6 @@ SCHEMA_GOV = dbutils.widgets.get("schema_governance")
 PT_EP      = dbutils.widgets.get("pt_endpoint")
 VS_EP      = dbutils.widgets.get("vs_endpoint")
 
-# Safe defaults for summary cell — overwritten by Step 2 if that cell runs first
-energy_tables = []
-found_any     = False
-
 print(f"Catalog          : {CATALOG}")
 print(f"Energy schema    : {CATALOG}.{SCHEMA_E}")
 print(f"Governance schema: {CATALOG}.{SCHEMA_GOV}")
@@ -129,6 +125,9 @@ except Exception as e:
     results.append(("❌", "meter_readings", str(e)[:120]))
 
 # ── outage_events ─────────────────────────────────────────────────────────────
+# NOTE: MAKE_INTERVAL returns a microsecond-resolution interval and cannot be added
+# to a DATE. The TIMESTAMP() call converts the DATE to a timestamp first; the interval
+# addition is then applied to the resulting TIMESTAMP value on the next line.
 try:
     fqn = f"{CATALOG}.{SCHEMA_E}.outage_events"
     spark.sql(f"""
@@ -146,8 +145,8 @@ try:
             END                                                          AS cause_category,
             TIMESTAMP(DATE_ADD('2024-01-01', CAST(FLOOR(RAND(id) * 365) AS INT)))
                                                                          AS start_time,
-            TIMESTAMP(DATE_ADD('2024-01-01', CAST(FLOOR(RAND(id) * 365) AS INT))
-                + MAKE_INTERVAL(0, 0, 0, 0, CAST(FLOOR(30 + RAND(id+1)*330) AS INT), 0, 0))
+            TIMESTAMP(DATE_ADD('2024-01-01', CAST(FLOOR(RAND(id) * 365) AS INT)))
+                + MAKE_INTERVAL(0, 0, 0, 0, CAST(FLOOR(30 + RAND(id+1)*330) AS INT), 0, 0)
                                                                          AS end_time,
             CAST(10 + FLOOR(RAND(id + 2) * 590) AS INT)                 AS affected_customers,
             ROUND(1 + RAND(id + 3) * 119, 2)                            AS saidi_minutes,
@@ -414,7 +413,18 @@ if participants:
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC ## Step 5: Check geography enforcement
+# MAGIC ## Step 5: Check endpoint availability
+# MAGIC
+# MAGIC Verifies that the pay-per-token serving endpoint and Vector Search endpoint named in the
+# MAGIC widgets actually exist in this workspace. If either is missing, the step prints which
+# MAGIC endpoints ARE available so you can either create the named endpoint or update the widget
+# MAGIC defaults before running the labs.
+# MAGIC
+# MAGIC **AU East cross-Geo note:** Pay-per-token Foundation Model API endpoints marked with `*`
+# MAGIC in the Databricks docs require cross-Geo processing to be enabled on the workspace.
+# MAGIC This includes models such as Claude Haiku/Sonnet and Llama 3.3 70B Instruct.
+# MAGIC If geography enforcement is active (Step 6), confirm with your account team that the
+# MAGIC model you plan to use is available in-region before the workshop.
 
 # COMMAND ----------
 
@@ -424,28 +434,85 @@ HOST    = spark.conf.get("spark.databricks.workspaceUrl")
 TOKEN   = dbutils.notebook.entry_point.getDbutils().notebook().getContext().apiToken().get()
 HEADERS = {"Authorization": f"Bearer {TOKEN}", "Content-Type": "application/json"}
 
-# NOTE: Geography enforcement can be checked via three different API layers, each targeting a
-# different control surface. This step uses the workspace settings API path for a quick
-# pre-workshop smoke test. The labs use different, more specific paths:
+def _get_endpoint(path):
+    """Return (ok, data_or_error_str) for a GET against the serving API."""
+    resp = requests.get(f"https://{HOST}{path}", headers=HEADERS, timeout=15)
+    if resp.status_code == 200:
+        return True, resp.json()
+    return False, f"HTTP {resp.status_code}: {resp.text[:200]}"
+
+# ── Pay-per-token serving endpoint ────────────────────────────────────────────
+pt_ok, pt_data = _get_endpoint(f"/api/2.0/serving-endpoints/{PT_EP}")
+if pt_ok:
+    state = pt_data.get("state", {}).get("ready", "UNKNOWN")
+    print(f"✅ PT endpoint '{PT_EP}' found — state: {state}")
+else:
+    print(f"⚠️  PT endpoint '{PT_EP}' not found: {pt_data}")
+    print()
+    # List available serving endpoints to help the admin pick one
+    list_ok, list_data = _get_endpoint("/api/2.0/serving-endpoints")
+    if list_ok:
+        endpoints = list_data.get("endpoints", [])
+        print(f"   Available serving endpoints in this workspace ({len(endpoints)} total):")
+        for ep in endpoints:
+            state = ep.get("state", {}).get("ready", "?")
+            print(f"     • {ep['name']} [{state}]")
+    print()
+    print("   ACTION REQUIRED: Either —")
+    print(f"     (a) Create a serving endpoint named '{PT_EP}' pointing to a foundation model, OR")
+    print(f"     (b) Update the 'pt_endpoint' widget to match an existing endpoint name above.")
+    print("   Labs that reference this endpoint by name will fail until this is resolved.")
+
+print()
+
+# ── Vector Search endpoint ────────────────────────────────────────────────────
+vs_ok, vs_data = _get_endpoint(f"/api/2.0/vector-search/endpoints/{VS_EP}")
+if vs_ok:
+    state = vs_data.get("endpoint_status", {}).get("state", "UNKNOWN")
+    print(f"✅ VS endpoint '{VS_EP}' found — state: {state}")
+else:
+    print(f"⚠️  VS endpoint '{VS_EP}' not found: {vs_data}")
+    print()
+    list_ok, list_data = _get_endpoint("/api/2.0/vector-search/endpoints")
+    if list_ok:
+        vs_eps = list_data.get("endpoints", [])
+        print(f"   Available Vector Search endpoints in this workspace ({len(vs_eps)} total):")
+        for ep in vs_eps:
+            state = ep.get("endpoint_status", {}).get("state", "?")
+            print(f"     • {ep['name']} [{state}]")
+    print()
+    print("   ACTION REQUIRED: Either —")
+    print(f"     (a) Create a Vector Search endpoint named '{VS_EP}', OR")
+    print(f"     (b) Update the 'vs_endpoint' widget to match an existing endpoint name above.")
+
+# COMMAND ----------
+
+# MAGIC %md
+# MAGIC ## Step 6: Check geography enforcement
+
+# COMMAND ----------
+
+# NOTE: Geography enforcement does not have a single reliable public API path across all
+# workspace tiers. This step uses the typed settings API path for a quick pre-workshop
+# smoke test. The labs use different approaches:
 #
-#   setup.py (here):  workspace settings API — enforce_workspace_feature_on_network_setting
-#                     A workspace-admin-accessible API for the network enforcement setting.
-#                     May return 404 in some workspace configurations (handled below).
+#   setup.py (here):  typed settings API — enforce_workspace_feature_on_network_setting
+#                     May return 404 or RESOURCE_DOES_NOT_EXIST on some workspace tiers.
+#                     Handled below — a 404 here does not block the labs.
 #
-#   Lab 01:           account-level CSP API — shield_csp_enforcement_account_setting
-#                     Checks the Compliance Security Profile at the account level.
-#                     Requires Account Admin token; returns 403 for workspace-only admins.
+#   Lab 01:           No API call. Documents that there is no confirmed public REST API to
+#                     read or set the geography enforcement toggle. Directs admins to verify
+#                     via Account Console → Workspaces → Security and compliance tab.
+#                     Audit evidence is available via system.access.audit
+#                     (action_name = 'updateWorkspaceConfiguration').
 #
 #   Lab 05:           workspace conf key — enableDataProcessingWithinGeography
-#                     The authoritative programmatic signal for the Account Console toggle
-#                     "Enforce data processing within workspace Geography for Designated Services".
-#                     This is the recommended check for Labs and automation scripts.
+#                     Attempted via workspace_conf.get_status() — valid on some workspace
+#                     tiers, returns BadRequest on others. Falls back to CANNOT_VERIFY
+#                     with a clear message to verify via Account Console UI.
 #
-# All three check geography enforcement but at different API layers. Lab 05 Section 2 provides
-# the authoritative check using the workspace conf key.
-#
-# If this path returns 404, verify the setting manually in the UI and proceed — it does not
-# block the labs from running.
+# If this path returns 404 or RESOURCE_DOES_NOT_EXIST, verify the setting manually in the UI
+# and proceed — it does not block the labs from running.
 setting_url = (
     f"https://{HOST}/api/2.0/settings/types/"
     f"enforce_workspace_feature_on_network_setting/names/default"
@@ -477,7 +544,7 @@ except Exception as e:
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC ## Step 6: Smoke test — row counts
+# MAGIC ## Step 7: Smoke test — row counts
 
 # COMMAND ----------
 
@@ -514,6 +581,10 @@ if all_ok:
     print("  1. Share the catalog/schema names with participants")
     print("  2. Open Lab 01: session1_platform_admin/labs/01_workspace_ai_settings.py")
     print(f"  3. Confirm endpoint names: PT={PT_EP}, VS={VS_EP}")
+    if not pt_ok or not vs_ok:
+        print()
+        print("  ⚠️  One or both endpoints were not found (see Step 5 above).")
+        print("     Resolve endpoint names before participants run Labs 02–04.")
 else:
     print("⚠️  One or more tables are below the expected row count.")
     print("   Re-run Step 2 to regenerate the synthetic data.")

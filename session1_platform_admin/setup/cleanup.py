@@ -14,6 +14,7 @@
 # MAGIC **What this does NOT remove:**
 # MAGIC - The `workshop_au` catalog (may be shared with other workshops — set `drop_catalog=true` to also remove it)
 # MAGIC - The `ai_governance` schema itself
+# MAGIC - The serving endpoint itself (only the AI Gateway overlay is cleared)
 # MAGIC
 # MAGIC ⚠️ **`dry_run = true` by default** — prints what would be deleted without doing anything.
 # MAGIC Set to `false` to actually delete.
@@ -30,15 +31,15 @@ dbutils.widgets.text("revoke_emails",    "",                     "Emails to revo
 dbutils.widgets.dropdown("drop_catalog", "false", ["true", "false"], "Drop workshop_au catalog when empty")
 dbutils.widgets.dropdown("dry_run",      "true",  ["true", "false"], "Dry run (true = preview only)")
 
-CATALOG    = dbutils.widgets.get("catalog")
-SCHEMA_E   = dbutils.widgets.get("schema_energy")
-SCHEMA_GOV = dbutils.widgets.get("schema_governance")
-PT_EP      = dbutils.widgets.get("pt_endpoint")
+CATALOG      = dbutils.widgets.get("catalog")
+SCHEMA_E     = dbutils.widgets.get("schema_energy")
+SCHEMA_GOV   = dbutils.widgets.get("schema_governance")
+PT_EP        = dbutils.widgets.get("pt_endpoint")
 DROP_CATALOG = dbutils.widgets.get("drop_catalog") == "true"
-DRY_RUN    = dbutils.widgets.get("dry_run") == "true"
+DRY_RUN      = dbutils.widgets.get("dry_run") == "true"
 
-raw_emails   = dbutils.widgets.get("revoke_emails")
-revoke_list  = [e.strip().lower() for e in raw_emails.split(",") if e.strip()]
+raw_emails  = dbutils.widgets.get("revoke_emails")
+revoke_list = [e.strip().lower() for e in raw_emails.split(",") if e.strip()]
 
 # Initialise summary variables so the summary cell is safe to run even if
 # earlier cells were interrupted or skipped.
@@ -108,7 +109,7 @@ do(
 # MAGIC ---
 # MAGIC ## Step 2: Disable AI Gateway on the pay-per-token endpoint
 # MAGIC
-# MAGIC Session 1 Lab 02 creates AI Gateway routes on the `au_east_llm_inregion` endpoint.
+# MAGIC Session 1 Lab 02 creates AI Gateway routes on the configured endpoint.
 # MAGIC After cleanup, those routes would otherwise remain active — payload logging would
 # MAGIC continue writing to a dropped schema, and future workshop runs on the same workspace
 # MAGIC could see route conflicts.
@@ -121,20 +122,20 @@ do(
 
 gw_url = f"https://{HOST}/api/2.0/serving-endpoints/{PT_EP}/ai-gateway"
 
-def _reset_ai_gateway():
-    # PUT with an empty AiGatewayConfig resets all routes, rate limits, and guardrails.
+if DRY_RUN:
+    print(f"  [DRY RUN] Would: Reset AI Gateway config on endpoint '{PT_EP}' (PUT empty config)")
+else:
     resp = requests.put(gw_url, headers=HEADERS, json={}, timeout=30)
     if resp.status_code in (200, 204):
         print(f"  ✅ AI Gateway config cleared on endpoint: {PT_EP}")
     elif resp.status_code == 404:
-        print(f"  ✅ Endpoint {PT_EP} not found — nothing to reset (may already be deleted)")
+        print(f"  ✅ Endpoint '{PT_EP}' not found — nothing to reset (may already be deleted or renamed)")
+    elif resp.status_code == 400:
+        # Some workspaces return 400 when the gateway was never configured — treat as a no-op
+        print(f"  ✅ AI Gateway not configured on endpoint '{PT_EP}' — nothing to clear")
+        print(f"     (HTTP 400: {resp.text[:120]})")
     else:
         print(f"  ⚠️  HTTP {resp.status_code}: {resp.text[:200]}")
-
-do(
-    f"Reset AI Gateway config on endpoint '{PT_EP}' (PUT empty config)",
-    _reset_ai_gateway,
-)
 
 # COMMAND ----------
 
@@ -247,11 +248,11 @@ if DRY_RUN:
     print("  2. Re-run all cells")
 else:
     print("Removed:")
-    if 'energy_tables' in dir() and energy_tables:
+    if energy_tables:
         print(f"  • {len(energy_tables)} table(s) in {CATALOG}.{SCHEMA_E}")
     print(f"  • Schema {CATALOG}.{SCHEMA_E}")
     print(f"  • AI Gateway config on endpoint {PT_EP} (routes/guardrails/rate limits cleared)")
-    if 'found_any' in dir() and found_any:
+    if found_any:
         print(f"  • Workshop tables in {CATALOG}.{SCHEMA_GOV}")
     if revoke_list:
         print(f"  • UC grants for {len(revoke_list)} user(s)")

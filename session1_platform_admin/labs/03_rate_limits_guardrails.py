@@ -52,11 +52,11 @@
 # MAGIC
 # MAGIC **Inference table (payload log)**
 # MAGIC ```
-# MAGIC Navigate: Left sidebar → Catalog → workshop_au → ai_governance → ai_gw_payloads_payload_logs
+# MAGIC Navigate: Left sidebar → Catalog → workshop_au → ai_governance → ai_gw_payloads_payload
 # MAGIC You should see: request/response JSON per row; status_code column shows 200 (passed) vs 400 (blocked by guardrail).
 # MAGIC ```
 # MAGIC
-# MAGIC > The table name prefix is `ai_gw_payloads` — set in Lab 02's `PAYLOAD_TABLE_NAME` variable. The full table name is `ai_gw_payloads_payload_logs`.
+# MAGIC > The table name prefix is `ai_gw_payloads` — set in Lab 02's `PAYLOAD_TABLE_NAME` variable. The full table name is `ai_gw_payloads_payload`.
 
 # COMMAND ----------
 
@@ -749,15 +749,18 @@ import re
 NMI_PATTERN   = r'\\b\\d{{10}}\\b'
 DOB_KEYWORDS  = ["born", "dob", "date of birth", "d.o.b"]
 ASSET_PATTERN = r'\\b[A-Z]{{2,6}}-[A-Z]{{2,4}}-\\d{{3,6}}\\b'  # e.g. BRSW-TL-042
+MONTHS = {{"January","February","March","April","May","June",
+           "July","August","September","October","November","December"}}
 
 prompt_lower = prompt.lower()
 
 tokens    = [t for t in prompt.split() if t.isalpha()]
 has_nmi   = bool(re.search(NMI_PATTERN, prompt))
 has_dob   = any(kw in prompt_lower for kw in DOB_KEYWORDS)
-# Skip first token (sentence-starter) and all-uppercase tokens (acronyms like NMI, DNSP)
+# Skip first token (sentence-starter), all-uppercase tokens (acronyms like NMI, DNSP),
+# and calendar month names (e.g. "April" in "for April 2024" is not a person name)
 has_name  = any(
-    token[0].isupper() and len(token) > 1 and not token.isupper()
+    token[0].isupper() and len(token) > 1 and not token.isupper() and token not in MONTHS
     for token in tokens[1:]
 )
 has_asset = bool(re.search(ASSET_PATTERN, prompt))
@@ -802,15 +805,23 @@ print("  A BLOCK return value from the function produces HTTP 400 to the caller.
 
 import re
 
+# Calendar months are excluded from the person-name heuristic to avoid false positives
+# when a NMI appears alongside a date range (e.g. "for April 2024").
+_MONTHS = {
+    "January", "February", "March", "April", "May", "June",
+    "July", "August", "September", "October", "November", "December",
+}
+
 def detect_aemo_pii_local(prompt: str) -> dict:
     """
     Local replica of the UC function logic — for testing before endpoint attachment.
     Returns the same structure the UC function would return.
 
-    has_name heuristic: skip the first word of the prompt (sentence-starter bias) and
-    exclude all-uppercase tokens (acronyms like NMI, DNSP, SCADA) — both produce false
-    positives with the naive isupper()[0] check. Only mixed-case tokens following the
-    first word are treated as potential person names.
+    has_name heuristic: skip the first word of the prompt (sentence-starter bias),
+    exclude all-uppercase tokens (acronyms like NMI, DNSP, SCADA), and exclude
+    calendar month names — all three produce false positives with the naive
+    isupper()[0] check. Only mixed-case tokens that are not months are treated as
+    potential person names.
     """
     NMI_PATTERN   = r'\b\d{10}\b'
     DOB_KEYWORDS  = ["born", "dob", "date of birth", "d.o.b"]
@@ -821,9 +832,9 @@ def detect_aemo_pii_local(prompt: str) -> dict:
 
     has_nmi   = bool(re.search(NMI_PATTERN, prompt))
     has_dob   = any(kw in prompt_lower for kw in DOB_KEYWORDS)
-    # Skip first token (sentence-starter) and all-uppercase tokens (acronyms)
+    # Skip first token (sentence-starter), all-uppercase tokens (acronyms), and month names
     has_name  = any(
-        token[0].isupper() and len(token) > 1 and not token.isupper()
+        token[0].isupper() and len(token) > 1 and not token.isupper() and token not in _MONTHS
         for token in tokens[1:]
     )
     has_asset = bool(re.search(ASSET_PATTERN, prompt))

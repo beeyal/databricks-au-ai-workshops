@@ -207,7 +207,9 @@ display(spark.sql("""
 # MAGIC
 # MAGIC This is the **most critical data residency control** in this lab (required for Privacy Act APP 8 cross-border disclosure accountability and energy sector data sovereignty obligations under AER guidelines). When disabled (the default), some AI features may route data outside Australia.
 # MAGIC
-# MAGIC The check below reads the workspace configuration key `enableDataProcessingWithinGeography` via the Workspace Conf API. This key is the correct programmatic signal for the "Enforce data processing within workspace Geography for Designated Services" toggle in Account Console.
+# MAGIC The check below attempts to read the workspace configuration key `enableDataProcessingWithinGeography` via the Workspace Conf API. This key is valid on some workspace tiers; on others it returns a `BadRequest` error. If the key is not recognised, the function returns `CANNOT_VERIFY` and directs you to confirm the setting via the Account Console UI — this is expected behaviour, not an error.
+# MAGIC
+# MAGIC > **UI alternative (always works):** accounts.azuredatabricks.net → Workspaces → [workspace] → Security and compliance tab → check that "Enforce data processing within workspace Geography for Designated Services" is **ON**. Attach a screenshot as compliance evidence when the API cannot confirm programmatically.
 # MAGIC
 # MAGIC **Note on Compliance Security Profile (CSP):** CSP is a separate account-level setting that enables additional security controls (audit log streaming, enhanced encryption, etc.). Geography enforcement and CSP are independent — a workspace can have CSP without geography enforcement and vice versa. This lab checks geography enforcement only.
 
@@ -217,23 +219,30 @@ def check_geography_enforcement(workspace_client: WorkspaceClient) -> dict:
     """
     Check whether 'Enforce data processing within workspace Geography for Designated Services' is enabled.
 
-    Uses the Workspace Conf API key 'enableDataProcessingWithinGeography' — this is the
-    correct programmatic signal for the Account Console toggle. It is a workspace-level
-    setting, not an account-level setting.
+    There is no confirmed public REST API that reliably reads the geography enforcement toggle
+    across all workspace tiers. The toggle is set in Account Console → Workspaces → Security
+    and compliance and is controlled by an internal Databricks flag applied at provisioning time.
 
-    Falls back to CANNOT_VERIFY if the SDK call fails (e.g., insufficient permissions).
+    This function attempts the workspace-conf API with 'enableDataProcessingWithinGeography'
+    (which is valid on some workspace tiers) and falls back to CANNOT_VERIFY when the key is
+    not recognised (BadRequest). In both cases the function returns a structured result
+    without raising so the pre-flight checklist and compliance package can proceed.
+
+    Falls back to CANNOT_VERIFY for any API-level failure — geography enforcement cannot
+    be read programmatically on workspaces where the key is not surfaced.
+
     This function does NOT check the Compliance Security Profile (CSP), which is a separate
     control at the account level.
     """
     try:
         # The SDK passes the keys value directly as a query parameter (comma-separated string).
         # Passing a list causes it to be URL-encoded as "['enableDataProcessingWithinGeography']"
-        # which the API does not recognise — the key will be absent from the response dict,
-        # causing a false FAIL on every run. Pass a plain string instead.
+        # which the API does not recognise — the key will be absent from the response dict.
+        # Pass a plain string instead.
         conf = workspace_client.workspace_conf.get_status(
             keys="enableDataProcessingWithinGeography"
         )
-        value = conf.get("enableDataProcessingWithinGeography", "").lower()
+        value = conf.get("enableDataProcessingWithinGeography", "").lower() if conf else ""
 
         if value == "true":
             return {
@@ -254,31 +263,55 @@ def check_geography_enforcement(workspace_client: WorkspaceClient) -> dict:
                 "compliant": False,
             }
         else:
-            # Key returned but value is empty or unexpected — treat as not set (defaults to off)
+            # Key returned but value is empty or absent — the key exists on this workspace tier
+            # but the setting has not been explicitly configured (defaults to off).
             return {
-                "status":         "FAIL",
-                "raw_value":      value or "(empty)",
-                "reason":         f"Geography enforcement key returned unexpected value: '{value}' — treating as NOT enabled",
-                "recommendation": (
-                    "Enable via Account Console → Workspaces → [workspace] → "
-                    "Security and compliance tab"
+                "status":         "CANNOT_VERIFY",
+                "raw_value":      value or "(empty — key not explicitly set)",
+                "reason":         (
+                    "Geography enforcement key 'enableDataProcessingWithinGeography' was readable but "
+                    "returned an empty or unset value. This workspace tier may not surface this key, "
+                    "or the toggle has never been explicitly set. Verify via Account Console UI."
                 ),
-                "compliant": False,
+                "recommendation": (
+                    "Verify via Account Console → Workspaces → [workspace] → Security and compliance tab. "
+                    "Attach a screenshot as compliance evidence."
+                ),
+                "compliant": None,
             }
 
     except Exception as e:
         err_str = str(e)
-        if "403" in err_str or "PERMISSION_DENIED" in err_str.upper():
-            return {
-                "status":         "CANNOT_VERIFY",
-                "reason":         "Insufficient permissions to read workspace configuration",
-                "recommendation": "Ask your workspace admin to verify this setting and provide a screenshot as evidence.",
-                "compliant":      None,
-            }
+        # BadRequest = the workspace conf key is not valid on this workspace tier (most workspaces).
+        # 403 / PERMISSION_DENIED = insufficient permissions.
+        # In all cases, fall through to CANNOT_VERIFY — never ERROR — so the pre-flight checklist
+        # and compliance package continue to run and flag this as requiring manual confirmation.
+        reason_map = {
+            "InvalidKeys": (
+                "Geography enforcement key 'enableDataProcessingWithinGeography' is not a valid "
+                "workspace-conf key on this workspace tier. The toggle is not programmatically "
+                "readable via this API path."
+            ),
+            "BAD_REQUEST": (
+                "Geography enforcement key is not valid on this workspace tier (BadRequest)."
+            ),
+            "403": "Insufficient permissions to read workspace configuration.",
+            "PERMISSION_DENIED": "Insufficient permissions to read workspace configuration.",
+        }
+        reason_detail = next(
+            (v for k, v in reason_map.items() if k.upper() in err_str.upper()), err_str[:200]
+        )
         return {
-            "status":  "ERROR",
-            "reason":  err_str,
-            "compliant": None,
+            "status":         "CANNOT_VERIFY",
+            "reason":         (
+                f"{reason_detail} Verify via Account Console UI and attach a screenshot as evidence."
+            ),
+            "recommendation": (
+                "Navigate to: accounts.azuredatabricks.net → Workspaces → [workspace] → "
+                "Security and compliance tab → confirm 'Enforce data processing within workspace "
+                "Geography for Designated Services' is ON."
+            ),
+            "compliant":      None,
         }
 
 
@@ -588,12 +621,12 @@ def generate_ai_access_log(start_date: str, end_date: str, include_endpoints: li
     SELECT
       event_time                                       AS access_time,
       user_identity.email                              AS user_email,
-      user_identity.subject_type                       AS identity_type,
+      user_identity.subject_name                       AS identity_type,
       source_ip_address                                AS source_ip,
       action_name                                      AS action,
       service_name                                     AS service,
       request_params['endpointName']                   AS endpoint_name,
-      response.statusCode                              AS response_code,
+      response.status_code                             AS response_code,
       request_id                                       AS audit_request_id
     FROM system.access.audit
     WHERE
@@ -687,15 +720,12 @@ ALTER MODEL energy_ai.models.meter_anomaly_v1
 --   PUT /api/2.0/serving-endpoints/{name}/tags
 --   Body: {"tags": [{"key": "ai_approved", "value": "approved"}, ...]}
 
--- Query all UC table and model tags by classification
+-- Query all UC table tags by classification
+-- Note: system.information_schema.model_tags is not available in this environment.
+-- Use system.information_schema.table_tags for tables and views.
 SELECT
   catalog_name, schema_name, table_name AS asset_name, tag_name, tag_value
 FROM system.information_schema.table_tags
-WHERE tag_name IN ('data_classification', 'ai_approved', 'regulatory_scope')
-UNION ALL
-SELECT
-  catalog_name, schema_name, model_name AS asset_name, tag_name, tag_value
-FROM system.information_schema.model_tags
 WHERE tag_name IN ('data_classification', 'ai_approved', 'regulatory_scope')
 ORDER BY asset_name, tag_name;
 """

@@ -28,7 +28,7 @@
 # MAGIC **Browse the system catalog:**
 # MAGIC ```
 # MAGIC Navigate: Left sidebar → Catalog icon → system → ai_gateway → usage → Sample Data tab
-# MAGIC You should see: columns including endpoint_name, databricks_user_id, input_tokens, output_tokens, status_code, request_tags, guardrail_action.
+# MAGIC You should see: columns including endpoint_name, requester, input_tokens, output_tokens, status_code, request_tags, destination_model.
 # MAGIC ```
 # MAGIC
 # MAGIC **AI Gateway usage dashboard:**
@@ -101,24 +101,34 @@ display(spark.sql("DESCRIBE system.ai_gateway.usage"))
 
 # COMMAND ----------
 
+# Note: system.ai_gateway.usage populates once AI Gateway traffic flows through your endpoint.
+# The queries below may return 0 rows until participants have run Labs 02 and 03.
+# If you see 0 rows, confirm that:
+#   1. The AI Gateway endpoint from Lab 02 is in a READY state.
+#   2. At least one request (from Lab 02 or Lab 03) has been sent through the endpoint.
+#   3. Approximately 15 minutes have elapsed since the first request (system table latency).
+# The schema (DESCRIBE above) is always visible regardless of whether rows exist yet.
+
+# COMMAND ----------
+
 # Recent requests: date, endpoint, team, project, token counts — last 7 days
 recent_requests = spark.sql("""
   SELECT
-    DATE(timestamp)                                       AS request_date,
+    DATE(event_time)                                      AS request_date,
     endpoint_name,
-    model_name,
+    destination_model,
     request_tags['team']                                  AS team,
     request_tags['project']                               AS project,
     COUNT(*)                                              AS request_count,
     SUM(input_tokens)                                     AS total_input_tokens,
     SUM(output_tokens)                                    AS total_output_tokens,
     SUM(input_tokens + output_tokens)                     AS total_tokens,
-    ROUND(AVG(execution_time_ms), 0)                      AS avg_latency_ms,
+    ROUND(AVG(latency_ms), 0)                             AS avg_latency_ms,
     SUM(CASE WHEN status_code = 200 THEN 1 ELSE 0 END)   AS successful_requests,
     SUM(CASE WHEN status_code = 429 THEN 1 ELSE 0 END)   AS rate_limited_requests,
     SUM(CASE WHEN status_code = 400 THEN 1 ELSE 0 END)   AS blocked_requests
   FROM system.ai_gateway.usage
-  WHERE timestamp >= CURRENT_TIMESTAMP - INTERVAL 7 DAYS
+  WHERE event_time >= CURRENT_TIMESTAMP - INTERVAL 7 DAYS
   GROUP BY 1, 2, 3, 4, 5
   ORDER BY request_date DESC, total_tokens DESC
 """)
@@ -130,14 +140,14 @@ display(recent_requests)
 # Top users by token consumption — last 30 days
 top_users = spark.sql("""
   SELECT
-    databricks_user_id                                    AS user_id,
+    requester                                             AS user_id,
     COUNT(*)                                              AS request_count,
     SUM(input_tokens + output_tokens)                     AS total_tokens,
-    ROUND(AVG(execution_time_ms), 0)                      AS avg_latency_ms,
+    ROUND(AVG(latency_ms), 0)                             AS avg_latency_ms,
     COUNT(DISTINCT endpoint_name)                         AS endpoints_used,
-    MAX(DATE(timestamp))                                  AS last_seen
+    MAX(DATE(event_time))                                 AS last_seen
   FROM system.ai_gateway.usage
-  WHERE timestamp >= CURRENT_TIMESTAMP - INTERVAL 30 DAYS
+  WHERE event_time >= CURRENT_TIMESTAMP - INTERVAL 30 DAYS
   GROUP BY 1
   ORDER BY total_tokens DESC
   LIMIT 20
@@ -150,13 +160,13 @@ display(top_users)
 # Daily trend — useful for capacity planning and spike detection
 daily_trend = spark.sql("""
   SELECT
-    DATE(timestamp)                                          AS usage_date,
+    DATE(event_time)                                         AS usage_date,
     endpoint_name,
     SUM(input_tokens + output_tokens)                        AS total_tokens,
     COUNT(*)                                                 AS request_count,
     SUM(CASE WHEN status_code = 429 THEN 1 ELSE 0 END)      AS rate_limited
   FROM system.ai_gateway.usage
-  WHERE timestamp >= CURRENT_TIMESTAMP - INTERVAL 30 DAYS
+  WHERE event_time >= CURRENT_TIMESTAMP - INTERVAL 30 DAYS
   GROUP BY 1, 2
   ORDER BY 1, 2
 """)
@@ -165,20 +175,25 @@ display(daily_trend)
 
 # COMMAND ----------
 
-# Guardrail hit analysis — understand what is being blocked and why
+# Blocked request analysis — understand what is being blocked and by whom
+# Note: system.ai_gateway.usage does not expose guardrail_action or guardrail_type columns.
+# Use status_code = 400 (blocked) and status_code = 429 (rate limited) to identify non-success traffic.
 guardrail_hits = spark.sql("""
   SELECT
-    DATE(timestamp)                              AS event_date,
+    DATE(event_time)                             AS event_date,
     endpoint_name,
-    guardrail_action                             AS action,
-    guardrail_type                               AS guardrail,
+    CASE
+      WHEN status_code = 400 THEN 'BLOCKED (400)'
+      WHEN status_code = 429 THEN 'RATE_LIMITED (429)'
+      ELSE CONCAT('OTHER (', CAST(status_code AS STRING), ')')
+    END                                          AS outcome,
     COUNT(*)                                     AS hit_count,
-    COUNT(DISTINCT databricks_user_id)           AS unique_users
+    COUNT(DISTINCT requester)                    AS unique_users
   FROM system.ai_gateway.usage
   WHERE
-    timestamp >= CURRENT_TIMESTAMP - INTERVAL 30 DAYS
-    AND guardrail_action IS NOT NULL
-  GROUP BY 1, 2, 3, 4
+    event_time >= CURRENT_TIMESTAMP - INTERVAL 30 DAYS
+    AND status_code != 200
+  GROUP BY 1, 2, 3
   ORDER BY 1 DESC, hit_count DESC
 """)
 
@@ -222,7 +237,7 @@ serving_calls = spark.sql("""
     action_name,
     user_identity.email             AS user_email,
     request_params['endpointName']  AS endpoint_name,
-    response.statusCode            AS response_code,
+    response.status_code           AS response_code,
     COUNT(*)                        AS call_count
   FROM system.access.audit
   WHERE
@@ -248,7 +263,7 @@ genie_usage = spark.sql("""
   FROM system.access.audit
   WHERE
     event_time >= CURRENT_TIMESTAMP - INTERVAL 7 DAYS
-    AND service_name = 'databricksGenie'
+    AND service_name = 'aibiGenie'
   GROUP BY 1, 2, 3, 4
   ORDER BY 1 DESC, query_count DESC
 """)
@@ -287,7 +302,7 @@ gateway_changes = spark.sql("""
     user_identity.email             AS changed_by,
     action_name,
     request_params['endpointName']  AS endpoint_name,
-    response.statusCode            AS result_code,
+    response.status_code           AS result_code,
     request_params                  AS change_details
   FROM system.access.audit
   WHERE
@@ -351,26 +366,26 @@ create_view_sql = f"""
 CREATE OR REPLACE VIEW {CATALOG_NAME}.{SCHEMA_NAME}.ai_gateway_cost_attribution AS
 WITH usage_base AS (
   SELECT
-    DATE(timestamp)                                     AS usage_date,
+    DATE(event_time)                                    AS usage_date,
     endpoint_name,
-    model_name,
+    destination_model,
     COALESCE(request_tags['team'],        'untagged')   AS team,
     COALESCE(request_tags['project'],     'untagged')   AS project,
     COALESCE(request_tags['environment'], 'unknown')    AS environment,
-    databricks_user_id                                  AS user_id,
+    requester                                           AS user_id,
     COUNT(*)                                            AS request_count,
     SUM(CASE WHEN status_code = 200 THEN input_tokens  ELSE 0 END) AS input_tokens,
     SUM(CASE WHEN status_code = 200 THEN output_tokens ELSE 0 END) AS output_tokens,
     SUM(CASE WHEN status_code = 429 THEN 1 ELSE 0 END)  AS rate_limited_requests,
     SUM(CASE WHEN status_code = 400 THEN 1 ELSE 0 END)  AS blocked_requests,
-    AVG(CASE WHEN status_code = 200 THEN execution_time_ms END) AS avg_latency_ms
+    AVG(CASE WHEN status_code = 200 THEN latency_ms END) AS avg_latency_ms
   FROM system.ai_gateway.usage
   GROUP BY 1, 2, 3, 4, 5, 6, 7
 )
 SELECT
   usage_date,
   endpoint_name,
-  model_name,
+  destination_model,
   team,
   project,
   environment,
@@ -436,14 +451,14 @@ print("Cost attribution export is commented out — uncomment after view is crea
 # Identify requests without team/project tags — these cannot be attributed to a cost centre
 untagged_requests = spark.sql("""
   SELECT
-    DATE(timestamp)                     AS request_date,
+    DATE(event_time)                    AS request_date,
     endpoint_name,
-    databricks_user_id                  AS user_id,
+    requester                           AS user_id,
     COUNT(*)                            AS untagged_request_count,
     SUM(input_tokens + output_tokens)   AS untagged_tokens
   FROM system.ai_gateway.usage
   WHERE
-    timestamp >= CURRENT_TIMESTAMP - INTERVAL 30 DAYS
+    event_time >= CURRENT_TIMESTAMP - INTERVAL 30 DAYS
     AND status_code = 200
     AND (
       request_tags['team']    IS NULL
@@ -470,12 +485,12 @@ print("\nNote: Untagged requests indicate applications not passing the 'databric
 # Daily tokens by team — line chart: X = usage_date, Y = total_tokens, Group by = team
 daily_by_team = spark.sql("""
   SELECT
-    DATE(timestamp)                              AS usage_date,
+    DATE(event_time)                             AS usage_date,
     COALESCE(request_tags['team'], 'untagged')   AS team,
     SUM(input_tokens + output_tokens)            AS total_tokens,
     COUNT(*)                                     AS request_count
   FROM system.ai_gateway.usage
-  WHERE timestamp >= CURRENT_TIMESTAMP - INTERVAL 30 DAYS AND status_code = 200
+  WHERE event_time >= CURRENT_TIMESTAMP - INTERVAL 30 DAYS AND status_code = 200
   GROUP BY 1, 2
   ORDER BY 1, 2
 """)
@@ -493,10 +508,10 @@ endpoint_utilisation = spark.sql("""
     SUM(CASE WHEN status_code = 200 THEN 1 ELSE 0 END)    AS successful,
     SUM(CASE WHEN status_code = 429 THEN 1 ELSE 0 END)    AS rate_limited,
     SUM(CASE WHEN status_code = 400 THEN 1 ELSE 0 END)    AS blocked,
-    ROUND(AVG(execution_time_ms), 0)                       AS avg_latency_ms,
+    ROUND(AVG(latency_ms), 0)                              AS avg_latency_ms,
     ROUND(SUM(CASE WHEN status_code = 200 THEN 1 ELSE 0 END) * 100.0 / COUNT(*), 1) AS success_rate_pct
   FROM system.ai_gateway.usage
-  WHERE timestamp >= CURRENT_TIMESTAMP - INTERVAL 7 DAYS
+  WHERE event_time >= CURRENT_TIMESTAMP - INTERVAL 7 DAYS
   GROUP BY 1
   ORDER BY total_requests DESC
 """)
@@ -506,20 +521,19 @@ display(endpoint_utilisation)
 # COMMAND ----------
 
 # Request outcome breakdown — pie/donut: segments by outcome
+# Note: guardrail_type is not exposed in system.ai_gateway.usage; use status_code to classify outcomes.
 guardrail_summary = spark.sql("""
   SELECT
     CASE
-      WHEN status_code = 200                                   THEN '200 Success'
-      WHEN status_code = 429                                   THEN '429 Rate Limited'
-      WHEN status_code = 400 AND guardrail_type = 'pii'       THEN '400 PII Blocked'
-      WHEN status_code = 400 AND guardrail_type = 'safety'    THEN '400 Safety Blocked'
-      WHEN status_code = 400                                   THEN '400 Other Block'
+      WHEN status_code = 200 THEN '200 Success'
+      WHEN status_code = 429 THEN '429 Rate Limited'
+      WHEN status_code = 400 THEN '400 Blocked'
       ELSE CONCAT(CAST(status_code AS STRING), ' Other')
     END                  AS outcome,
     COUNT(*)             AS request_count,
     ROUND(COUNT(*) * 100.0 / SUM(COUNT(*)) OVER (), 2) AS percentage
   FROM system.ai_gateway.usage
-  WHERE timestamp >= CURRENT_TIMESTAMP - INTERVAL 7 DAYS
+  WHERE event_time >= CURRENT_TIMESTAMP - INTERVAL 7 DAYS
   GROUP BY 1
   ORDER BY request_count DESC
 """)
@@ -576,7 +590,7 @@ def check_daily_budget(budget_config: dict) -> dict:
         SUM(input_tokens + output_tokens) AS total_tokens,
         COUNT(*) AS request_count
       FROM system.ai_gateway.usage
-      WHERE DATE(timestamp) = '{today}' AND status_code = 200
+      WHERE DATE(event_time) = '{today}' AND status_code = 200
     """).collect()[0]
 
     cost     = result["estimated_cost_aud"] or 0.0
@@ -614,7 +628,7 @@ def check_monthly_budget(budget_config: dict) -> dict:
         SUM(input_tokens + output_tokens) AS total_tokens,
         COUNT(*) AS request_count
       FROM system.ai_gateway.usage
-      WHERE DATE(timestamp) >= '{month_start}' AND status_code = 200
+      WHERE DATE(event_time) >= '{month_start}' AND status_code = 200
     """).collect()[0]
 
     cost          = result["estimated_cost_aud"] or 0.0
@@ -717,12 +731,12 @@ except Exception as e:
 REFERENCE_QUERIES = {
     "Top users — last 30 days": """
 SELECT
-  databricks_user_id                            AS user_id,
+  requester                                     AS user_id,
   SUM(input_tokens + output_tokens)             AS total_tokens,
   COUNT(*)                                      AS request_count,
-  ROUND(AVG(execution_time_ms), 0)              AS avg_latency_ms
+  ROUND(AVG(latency_ms), 0)                     AS avg_latency_ms
 FROM system.ai_gateway.usage
-WHERE timestamp >= CURRENT_TIMESTAMP - INTERVAL 30 DAYS
+WHERE event_time >= CURRENT_TIMESTAMP - INTERVAL 30 DAYS
   AND status_code = 200
 GROUP BY 1
 ORDER BY total_tokens DESC
@@ -739,7 +753,7 @@ SELECT
   SUM(input_tokens + output_tokens)              AS total_tokens,
   COUNT(*)                                       AS request_count
 FROM system.ai_gateway.usage
-WHERE DATE(timestamp) >= DATE_TRUNC('month', CURRENT_DATE)
+WHERE DATE(event_time) >= DATE_TRUNC('month', CURRENT_DATE)
   AND status_code = 200
 GROUP BY 1
 ORDER BY est_cost_aud DESC
@@ -747,7 +761,7 @@ ORDER BY est_cost_aud DESC
 
     "Rate limit hit rate — last 7 days": """
 SELECT
-  DATE(timestamp)                                AS usage_date,
+  DATE(event_time)                               AS usage_date,
   endpoint_name,
   COUNT(*)                                       AS total_requests,
   SUM(CASE WHEN status_code = 429 THEN 1 ELSE 0 END) AS rate_limited,
@@ -755,7 +769,7 @@ SELECT
     SUM(CASE WHEN status_code = 429 THEN 1 ELSE 0 END) * 100.0 / COUNT(*), 2
   )                                              AS rate_limited_pct
 FROM system.ai_gateway.usage
-WHERE timestamp >= CURRENT_TIMESTAMP - INTERVAL 7 DAYS
+WHERE event_time >= CURRENT_TIMESTAMP - INTERVAL 7 DAYS
 GROUP BY 1, 2
 ORDER BY 1 DESC, rate_limited_pct DESC
     """,
@@ -767,8 +781,7 @@ SELECT
   COUNT(*)                           AS query_count
 FROM system.access.audit
 WHERE event_time >= CURRENT_TIMESTAMP - INTERVAL 7 DAYS
-  AND service_name = 'databricksGenie'
-  AND action_name  = 'genieConversation'
+  AND service_name = 'aibiGenie'
 GROUP BY 1, 2
 ORDER BY 1 DESC, query_count DESC
     """,
@@ -781,7 +794,7 @@ SELECT
   user_identity.email                AS changed_by,
   action_name,
   request_params['endpointName']     AS endpoint_name,
-  response.statusCode               AS result_code
+  response.status_code              AS result_code
 FROM system.access.audit
 WHERE event_time >= CURRENT_TIMESTAMP - INTERVAL 90 DAYS
   AND service_name = 'serverlessRealTimeInference'
@@ -848,15 +861,14 @@ print("-" * 60)
 # MAGIC
 # MAGIC | Column | Type | Description |
 # MAGIC |---|---|---|
-# MAGIC | `timestamp` | TIMESTAMP | Request timestamp |
+# MAGIC | `event_time` | TIMESTAMP | Request timestamp |
 # MAGIC | `endpoint_name` | STRING | AI Gateway endpoint name |
-# MAGIC | `model_name` | STRING | Underlying model name |
-# MAGIC | `databricks_user_id` | STRING | User or service principal ID |
+# MAGIC | `destination_model` | STRING | Underlying model display name |
+# MAGIC | `requester` | STRING | User email or service principal name |
 # MAGIC | `input_tokens` | LONG | Tokens in the request |
 # MAGIC | `output_tokens` | LONG | Tokens in the response |
-# MAGIC | `execution_time_ms` | LONG | End-to-end latency in milliseconds |
+# MAGIC | `latency_ms` | LONG | End-to-end gateway latency in milliseconds |
 # MAGIC | `status_code` | INTEGER | HTTP response code (200, 400, 429) |
 # MAGIC | `request_tags` | MAP&lt;STRING,STRING&gt; | Tags from `databricks-request-tag` header |
-# MAGIC | `guardrail_action` | STRING | Guardrail decision: BLOCK or PASS |
-# MAGIC | `guardrail_type` | STRING | Which guardrail fired: pii, safety |
+# MAGIC | `routing_information` | STRUCT | Detailed routing attempts (primary + fallback) |
 # MAGIC </div>
