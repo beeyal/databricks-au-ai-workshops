@@ -14,25 +14,14 @@
 
 # COMMAND ----------
 
-dbutils.widgets.text("catalog",      "workshop_au",             "Catalog")
-dbutils.widgets.text("schema",       "aemo",                    "Schema")
-dbutils.widgets.text("data_path",    "dbfs:/tmp/au_workshop/sample_data/aemo", "Path to AEMO CSVs (DBFS or /Workspace/...)")
+dbutils.widgets.text("catalog",      "workshop_au",  "Catalog")
+dbutils.widgets.text("schema",       "aemo",         "Schema")
 
-CATALOG   = dbutils.widgets.get("catalog")
-SCHEMA    = dbutils.widgets.get("schema")
-DATA_PATH = dbutils.widgets.get("data_path")
+CATALOG = dbutils.widgets.get("catalog")
+SCHEMA  = dbutils.widgets.get("schema")
 
 print(f"Catalog : {CATALOG}.{SCHEMA}")
-print(f"Data    : {DATA_PATH}")
-print()
-print("Upload CSVs to the data path before running.")
-print()
-print("Option A — DBFS (standard workspaces):")
-print(f"  databricks fs cp -r ./data/sample_data/aemo/ {DATA_PATH}/")
-print()
-print("Option B — Workspace files (FEVM / DBFS disabled):")
-print("  Change data_path widget to /Workspace/Repos/<your-repo>/data/sample_data/aemo")
-print("  (FEVM and some hardened workspaces disable DBFS — use /Workspace/Repos/... instead)")
+print("Data    : generated via SQL (no CSV files needed)")
 
 # COMMAND ----------
 
@@ -48,37 +37,121 @@ print(f"✅ {CATALOG}.{SCHEMA} ready")
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC ## Step 2: Load AEMO tables from CSV
+# MAGIC ## Step 2: Generate AEMO tables via SQL
+# MAGIC
+# MAGIC No CSV files needed — data is generated directly using SQL functions.
+# MAGIC Safe to re-run (uses CREATE OR REPLACE TABLE).
 
 # COMMAND ----------
 
-# Table definitions: name → (csv_filename, partition_columns)
-TABLES = {
-    "spot_prices":            ("spot_prices.csv",            ["region_id"]),
-    "dispatch_intervals":     ("dispatch_intervals.csv",      ["region_id", "fuel_type"]),
-    "market_notices":         ("market_notices.csv",          []),
-    "generator_registration": ("generator_registration.csv",  ["region_id"]),
-    "settlement_amounts":     ("settlement_amounts.csv",       ["run_type"]),
-    "constraint_sets":        ("constraint_sets.csv",           ["region_affected"]),
+TABLES_SQL = {
+    "spot_prices": f"""
+CREATE OR REPLACE TABLE {CATALOG}.{SCHEMA}.spot_prices AS
+WITH regions AS (SELECT explode(array('NSW1','VIC1','QLD1','SA1','TAS1')) AS region_id),
+dates AS (SELECT date_add('2025-01-01', pos) AS dt FROM (SELECT sequence(0,364) AS seq) LATERAL VIEW posexplode(seq) t AS pos, dt),
+hourly AS (SELECT region_id, timestampadd(MINUTE, h*30, CAST(dt AS TIMESTAMP)) AS settlement_date FROM regions CROSS JOIN dates LATERAL VIEW posexplode(sequence(0,47)) t AS h, hv)
+SELECT region_id, settlement_date,
+  ROUND(CASE region_id
+    WHEN 'NSW1' THEN 85+rand()*80+CASE WHEN hour(settlement_date) BETWEEN 17 AND 21 THEN rand()*200 ELSE 0 END
+    WHEN 'VIC1' THEN 78+rand()*90+CASE WHEN hour(settlement_date) BETWEEN 17 AND 21 THEN rand()*250 ELSE 0 END
+    WHEN 'QLD1' THEN 72+rand()*70+CASE WHEN hour(settlement_date) BETWEEN 8  AND 11 THEN rand()*150 ELSE 0 END
+    WHEN 'SA1'  THEN 65+rand()*120+CASE WHEN rand()<0.05 THEN rand()*500 ELSE 0 END
+    WHEN 'TAS1' THEN 55+rand()*40 END,2) AS rrp,
+  ROUND(rand()*20+5,2) AS raise_6sec, ROUND(rand()*15+3,2) AS lower_6sec,
+  ROUND(CASE region_id WHEN 'NSW1' THEN 8000+rand()*2000 WHEN 'VIC1' THEN 6000+rand()*1500
+    WHEN 'QLD1' THEN 7000+rand()*1800 WHEN 'SA1' THEN 1500+rand()*500 WHEN 'TAS1' THEN 1200+rand()*300 END,0) AS total_demand_mw,
+  ROUND(rand()*500-250,0) AS net_interchange,
+  ROUND(CASE region_id WHEN 'NSW1' THEN 7500+rand()*2000 WHEN 'VIC1' THEN 5500+rand()*1500
+    WHEN 'QLD1' THEN 6500+rand()*1800 WHEN 'SA1' THEN 1400+rand()*600 WHEN 'TAS1' THEN 1100+rand()*400 END,0) AS scheduled_generation
+FROM hourly""",
+
+    "generator_registration": f"""
+CREATE OR REPLACE TABLE {CATALOG}.{SCHEMA}.generator_registration AS
+SELECT concat('UNIT',lpad(cast(id AS STRING),4,'0')) AS duid,
+  CASE (id%20) WHEN 0 THEN 'Bayswater' WHEN 1 THEN 'Eraring' WHEN 2 THEN 'Loy Yang A'
+    WHEN 3 THEN 'Hazelwood' WHEN 4 THEN 'Callide B' WHEN 5 THEN 'Gladstone'
+    WHEN 6 THEN 'Hornsdale Wind Farm' WHEN 7 THEN 'Snowtown Wind Farm'
+    WHEN 8 THEN 'Murchison Wind Farm' WHEN 9 THEN 'Coopers Gap Wind Farm'
+    WHEN 10 THEN 'Darlington Point Solar' WHEN 11 THEN 'Limondale Solar Farm'
+    WHEN 12 THEN 'Bungala Solar One' WHEN 13 THEN 'Gannawarra Solar Farm'
+    WHEN 14 THEN 'Macquarie Wind Farm' WHEN 15 THEN 'Hornsdale Power Reserve'
+    WHEN 16 THEN 'Capital Battery' WHEN 17 THEN 'Warradarge Wind Farm'
+    WHEN 18 THEN 'Taralga Wind Farm' WHEN 19 THEN 'Engie Pelican Point'
+  END AS station_name,
+  concat('PART',lpad(cast(((id%8)+1) AS STRING),3,'0')) AS participant_id,
+  CASE (id%5) WHEN 0 THEN 'NSW1' WHEN 1 THEN 'VIC1' WHEN 2 THEN 'QLD1' WHEN 3 THEN 'SA1' WHEN 4 THEN 'TAS1' END AS region_id,
+  CASE (id%7) WHEN 0 THEN 'coal' WHEN 1 THEN 'coal' WHEN 2 THEN 'gas'
+    WHEN 3 THEN 'wind' WHEN 4 THEN 'solar' WHEN 5 THEN 'hydro' WHEN 6 THEN 'battery' END AS fuel_type,
+  ROUND(200+rand()*1500,0) AS registered_capacity_mw,
+  concat('CONN',lpad(cast(id AS STRING),4,'0')) AS connection_point_id,
+  'GENERATOR' AS dispatch_type, ROUND(5+rand()*20,1) AS max_ramp_rate, ROUND(rand()*50,0) AS min_load
+FROM (SELECT explode(sequence(1,60)) AS id)""",
+
+    "dispatch_intervals": f"""
+CREATE OR REPLACE TABLE {CATALOG}.{SCHEMA}.dispatch_intervals AS
+WITH dates AS (SELECT date_add('2025-10-01',pos) AS dt FROM (SELECT sequence(0,91) AS seq) LATERAL VIEW posexplode(seq) t AS pos,dt),
+intervals AS (SELECT dt, i FROM dates LATERAL VIEW posexplode(sequence(0,287)) t AS i,iv),
+gen AS (SELECT duid,station_name,region_id,fuel_type,registered_capacity_mw FROM {CATALOG}.{SCHEMA}.generator_registration)
+SELECT g.region_id, timestampadd(MINUTE,i.i*5,CAST(i.dt AS TIMESTAMP)) AS settlement_date,
+  g.duid, g.station_name, g.fuel_type,
+  ROUND(CASE g.fuel_type
+    WHEN 'solar' THEN CASE WHEN hour(timestampadd(MINUTE,i.i*5,CAST(i.dt AS TIMESTAMP))) BETWEEN 7 AND 18 THEN g.registered_capacity_mw*(0.2+rand()*0.7) ELSE 0 END
+    WHEN 'wind'  THEN g.registered_capacity_mw*(0.1+rand()*0.8)
+    WHEN 'coal'  THEN g.registered_capacity_mw*(0.6+rand()*0.35)
+    WHEN 'gas'   THEN g.registered_capacity_mw*rand()*(CASE WHEN hour(timestampadd(MINUTE,i.i*5,CAST(i.dt AS TIMESTAMP))) BETWEEN 17 AND 22 THEN 0.9 ELSE 0.3 END)
+    WHEN 'hydro' THEN g.registered_capacity_mw*(0.3+rand()*0.6)
+    ELSE g.registered_capacity_mw*(rand()*0.8) END,1) AS dispatch_mw,
+  ROUND(g.registered_capacity_mw*(0.4+rand()*0.5),1) AS initial_mw,
+  ROUND(g.registered_capacity_mw*(0.7+rand()*0.3),1) AS available_mw,
+  ROUND(5+rand()*15,1) AS ramp_rate, g.region_id AS state
+FROM gen g CROSS JOIN intervals i
+WHERE (g.duid LIKE '%0%' OR g.duid LIKE '%1%')
+LIMIT 500000""",
+
+    "market_notices": f"""
+CREATE OR REPLACE TABLE {CATALOG}.{SCHEMA}.market_notices AS
+SELECT concat('NTC',lpad(cast(id AS STRING),6,'0')) AS notice_id,
+  CASE (id%10) WHEN 0 THEN 'LOR1' WHEN 1 THEN 'LOR2' WHEN 2 THEN 'LOR3'
+    ELSE array('SYSTEM_STRENGTH','INTER_REGIONAL','MARKET_SUSPENSION','ADMINISTERED_PRICE','RESERVE_NOTICE','DIRECTION','ELECTRICITY_STATEMENT')[id%7] END AS notice_type,
+  timestampadd(HOUR,-(id*6),current_timestamp()) AS issue_time,
+  concat('Notice regarding NEM operations in region ',
+    CASE (id%5) WHEN 0 THEN 'NSW1' WHEN 1 THEN 'VIC1' WHEN 2 THEN 'QLD1' WHEN 3 THEN 'SA1' WHEN 4 THEN 'TAS1' END,
+    '. Reserve levels are ',CASE (id%3) WHEN 0 THEN 'below LOR1 threshold.' WHEN 1 THEN 'critically low.' ELSE 'being monitored.' END) AS reason,
+  date_add(current_date(),-(id%60)) AS effective_date,
+  CASE (id%5) WHEN 0 THEN 'NSW1' WHEN 1 THEN 'VIC1' WHEN 2 THEN 'QLD1' WHEN 3 THEN 'SA1' WHEN 4 THEN 'TAS1' END AS region_id,
+  (id%4=0) AS intervention
+FROM (SELECT explode(sequence(1,500)) AS id)""",
+
+    "settlement_amounts": f"""
+CREATE OR REPLACE TABLE {CATALOG}.{SCHEMA}.settlement_amounts AS
+SELECT date_add(date_trunc('week',current_date()),-(id*7)) AS settlement_date,
+  concat('PART',lpad(cast(((id%8)+1) AS STRING),3,'0')) AS participant_id,
+  CASE (id%3) WHEN 0 THEN 'FINAL' WHEN 1 THEN 'REVISED' ELSE 'PRELIMINARY' END AS run_type,
+  ROUND(rand()*5000000-1000000,2) AS energy_amount_aud, ROUND(rand()*500000,2) AS fcas_amount_aud,
+  ROUND(rand()*200000-100000,2) AS interconnector_residue_aud, ROUND(rand()*5700000-1100000,2) AS total_aud,
+  CASE (id%3) WHEN 0 THEN 'FINAL' WHEN 1 THEN 'FINAL' ELSE 'PENDING' END AS settlement_status
+FROM (SELECT explode(sequence(1,500)) AS id)""",
+
+    "constraint_sets": f"""
+CREATE OR REPLACE TABLE {CATALOG}.{SCHEMA}.constraint_sets AS
+SELECT concat('CONSTR_',lpad(cast(id AS STRING),4,'0')) AS constraint_id,
+  CASE (id%3) WHEN 0 THEN 'thermal' WHEN 1 THEN 'voltage' ELSE 'stability' END AS constraint_type,
+  timestampadd(HOUR,-(id*4),current_timestamp()) AS activated_datetime,
+  CASE WHEN id%3=0 THEN NULL ELSE timestampadd(HOUR,-(id*4)+(2+(id%8)),current_timestamp()) END AS deactivated_datetime,
+  concat('Constraint on transmission element due to ',
+    CASE (id%3) WHEN 0 THEN 'thermal loading limits' WHEN 1 THEN 'voltage stability requirements' ELSE 'transient stability limits' END) AS reason,
+  ROUND(200+rand()*1800,0) AS rhs_value,
+  CASE (id%5) WHEN 0 THEN 'NSW1' WHEN 1 THEN 'VIC1' WHEN 2 THEN 'QLD1' WHEN 3 THEN 'SA1' WHEN 4 THEN 'TAS1' END AS region_affected,
+  (id%3=0) AS interconnector
+FROM (SELECT explode(sequence(1,1000)) AS id)""",
 }
 
+print("Generating AEMO tables via SQL (no CSV files needed)...")
 results = []
-for table_name, (csv_file, partitions) in TABLES.items():
-    fqn  = f"{CATALOG}.{SCHEMA}.{table_name}"
-    path = f"{DATA_PATH}/{csv_file}"
+for table_name, sql in TABLES_SQL.items():
+    fqn = f"{CATALOG}.{SCHEMA}.{table_name}"
     try:
-        # Read CSV
-        df = (spark.read.format("csv")
-              .option("header", "true")
-              .option("inferSchema", "true")
-              .load(path))
-
-        # Write as Delta — overwrite so this is safe to re-run
-        writer = df.write.format("delta").mode("overwrite").option("overwriteSchema", "true")
-        if partitions:
-            writer = writer.partitionBy(*partitions)
-        writer.saveAsTable(fqn)
-
+        spark.sql(sql)
         count = spark.table(fqn).count()
         results.append(("✅", table_name, f"{count:,} rows"))
     except Exception as e:
@@ -231,7 +304,7 @@ if all_ok:
     print("✅ All tables loaded. Continuing to create derived objects...")
 else:
     print("⚠️  Some tables are empty or missing.")
-    print(f"   Upload CSVs to {DATA_PATH}/ and re-run this notebook.")
+    print("   Re-run this notebook to regenerate tables.")
     print("   Derived objects (Steps 6–8) will fail if source tables are absent.")
 
 # COMMAND ----------
