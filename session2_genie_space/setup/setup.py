@@ -398,54 +398,10 @@ except Exception as e:
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC ## Step 8: Create UC function — market cap exposure calculator
+# MAGIC ## Step 8: UC function — created in Lab 01
 # MAGIC
-# MAGIC A SQL table-valued function that returns interval count, avg RRP, and max RRP
-# MAGIC for a given region above a configurable price threshold.  Participants call it
-# MAGIC in Lab 01 to demonstrate UC Functions as a Genie tool.
-# MAGIC
-# MAGIC Usage:
-# MAGIC ```sql
-# MAGIC SELECT * FROM workshop_au.aemo.calculate_market_cap_exposure('NSW1', 300.0);
-# MAGIC ```
-
-# COMMAND ----------
-
-FUNC_FQN = f"{CATALOG}.{SCHEMA}.calculate_market_cap_exposure"
-
-FUNC_SQL = f"""
-CREATE OR REPLACE FUNCTION {FUNC_FQN}(
-    region_id_param   STRING  COMMENT 'NEM region to analyse. One of: NSW1, VIC1, QLD1, SA1, TAS1.',
-    threshold_param   DOUBLE  DEFAULT 300.0
-        COMMENT 'RRP threshold in $/MWh above which an interval is considered a cap-exposure event. Defaults to $300/MWh.'
-)
-RETURNS TABLE (
-    interval_count  BIGINT  COMMENT 'Number of 30-minute intervals with RRP above the threshold.',
-    avg_rrp         DOUBLE  COMMENT 'Average RRP across those high-price intervals ($/MWh).',
-    max_rrp         DOUBLE  COMMENT 'Maximum RRP observed — peak cap-exposure event ($/MWh).'
-)
-COMMENT 'Returns market cap exposure metrics for a NEM region above a configurable RRP threshold.
-Example: SELECT * FROM {FUNC_FQN}(\\\'NSW1\\\', 300.0)'
-RETURN
-    SELECT
-        COUNT(*)            AS interval_count,
-        ROUND(AVG(rrp), 2)  AS avg_rrp,
-        ROUND(MAX(rrp), 2)  AS max_rrp
-    FROM {CATALOG}.{SCHEMA}.spot_prices
-    WHERE region_id = region_id_param
-      AND rrp > threshold_param
-"""
-
-try:
-    spark.sql(FUNC_SQL)
-    # Smoke-test: call the function with default threshold on NSW1
-    test_df = spark.sql(f"SELECT * FROM {FUNC_FQN}('NSW1', 300.0)")
-    row = test_df.collect()[0]
-    print(f"✅ calculate_market_cap_exposure created")
-    print(f"   Smoke test NSW1 >$300/MWh → {row['interval_count']} intervals, "
-          f"avg ${row['avg_rrp']}/MWh, max ${row['max_rrp']}/MWh")
-except Exception as e:
-    print(f"❌ calculate_market_cap_exposure: {e}")
+# MAGIC `calculate_market_cap_exposure` is created by participants in Lab 01 Step 4
+# MAGIC as a hands-on exercise. Nothing to do here.
 
 # COMMAND ----------
 
@@ -470,15 +426,15 @@ for tbl in ["spot_prices", "dispatch_intervals", "market_notices",
 print()
 print("Derived objects (Lab 01 demos):")
 for obj, kind in [
-    ("nem_spot_metrics",              "metric view / view"),
-    ("daily_dispatch_summary",        "materialized view"),
-    ("calculate_market_cap_exposure", "UC function"),
+    ("nem_spot_metrics",       "view (spot price KPIs)"),
+    ("daily_dispatch_summary", "view (daily dispatch summary)"),
 ]:
     try:
         spark.sql(f"DESCRIBE {CATALOG}.{SCHEMA}.{obj}")
         print(f"  ✅ {obj} ({kind})")
     except Exception as e:
         print(f"  ❌ {obj}: {e}")
+print(f"  ℹ️  calculate_market_cap_exposure — created by participants in Lab 01")
 
 print()
 print("Next steps:")
