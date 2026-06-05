@@ -725,78 +725,26 @@ test_df.show()
 # MAGIC > (`region_id_param`, `threshold_param`) from the user's question — e.g. "NSW1" from
 # MAGIC > "how exposed is NSW to cap pricing?" — and show the returned table in the chat response.
 # MAGIC
-# MAGIC **⚡ Automated via serialized_space PATCH:**
+# MAGIC
+# MAGIC > **API note (2026-06):** UC Functions cannot be registered in a Genie Space via
+# MAGIC > the `serialized_space` PATCH API — the key is not exposed. Use the UI only.
 
 # COMMAND ----------
 
-# Automated: register the UC function in the Genie space via serialized_space.
-# UC functions with parameters sit under instructions.sql_expressions in the serialized config,
-# using the "uc_function" variant (expression_type = "UC_FUNCTION").
-# The function_name field is the 3-level FQN; parameters are resolved by Genie from context.
-
-if not SPACE_ID:
-    print("Enter Space ID in widget first.")
-else:
-    get_resp = requests.get(
-        f"https://{HOST}/api/2.0/genie/spaces/{SPACE_ID}",
-        headers=HEADERS,
-        params={"include_serialized_space": "true"},
-    )
-    if get_resp.status_code != 200:
-        print(f"❌ Could not read space config: {get_resp.status_code} {get_resp.text[:200]}")
-        print("\nAdd manually in the UI:")
-        print("  Configure → Data → Functions tab → + Add")
-        print(f"  Search: calculate_market_cap_exposure")
-        print(f"  Select: {CATALOG}.{SCHEMA}.calculate_market_cap_exposure")
-    else:
-        import json as _json
-        _decoder = _json.JSONDecoder(strict=False)
-        space = get_resp.json()
-        etag  = space.get("etag")
-        raw   = space.get("serialized_space") or "{}"
-        config, _ = _decoder.raw_decode(raw)
-
-        instructions = config.setdefault("instructions", {})
-        existing_exprs = instructions.setdefault("sql_expressions", [])
-
-        fn_fqn = f"{CATALOG}.{SCHEMA}.calculate_market_cap_exposure"
-        already_present = any(
-            e.get("function_name") == fn_fqn or
-            fn_fqn in str(e.get("expression", ""))
-            for e in existing_exprs
-        )
-
-        if not already_present:
-            existing_exprs.append({
-                "id":              uuid.uuid4().hex,
-                "name":            "Market Cap Exposure",
-                "expression_type": "UC_FUNCTION",
-                "function_name":   fn_fqn,
-                "description":     (
-                    "Returns interval count, average RRP, and peak RRP for a NEM region "
-                    "above a configurable price threshold. Use when asked about price risk, "
-                    "cap exposure, or high-price events for a specific region."
-                ),
-            })
-            print(f"Registering UC function in space: {fn_fqn}")
-        else:
-            print("UC function already registered — skipping duplicate.")
-
-        body = {"serialized_space": _json.dumps(config)}
-        if etag:
-            body["etag"] = etag
-        patch_resp = requests.patch(
-            f"https://{HOST}/api/2.0/genie/spaces/{SPACE_ID}",
-            headers=HEADERS,
-            json=body,
-        )
-        if patch_resp.status_code in (200, 204):
-            print(f"✅ UC function registered in space: {fn_fqn}")
-        else:
-            print(f"API returned {patch_resp.status_code}: {patch_resp.text[:300]}")
-            print("\nAdd manually in the UI:")
-            print("  Configure → Data → Functions tab → + Add")
-            print(f"  Search and select: calculate_market_cap_exposure")
+# UC Functions must be added via the UI — no API path is available.
+print("UC Functions are added via the Genie Space UI only.")
+print()
+print("🖱️  Steps:")
+print("  1. Open your Genie Space")
+print("  2. Click Configure (top navigation)")
+print("  3. Click Data (left sidebar)")
+print("  4. Click the Functions tab")
+print("  5. Click + Add")
+print(f"  6. Search for: calculate_market_cap_exposure")
+print(f"  7. Select: {CATALOG}.{SCHEMA}.calculate_market_cap_exposure")
+print("  8. Click Save")
+print()
+print("Once added, Genie can call this function when asked about market cap exposure or price risk.")
 
 # COMMAND ----------
 

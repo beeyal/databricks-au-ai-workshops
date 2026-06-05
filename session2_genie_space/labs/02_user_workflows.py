@@ -183,6 +183,10 @@ else:
 
 # COMMAND ----------
 
+# API note (2026-06): SQL Expressions cannot be set via the serialized_space PATCH API
+# — the key is not exposed. Enter these manually in the UI.
+# Configure → Instructions → SQL Expressions → + Add
+
 SQL_EXPRESSIONS = [
     {
         "name":        "avg_spot_price_mwh",
@@ -196,39 +200,16 @@ SQL_EXPRESSIONS = [
     },
 ]
 
-# API field path (verified 2026-06-03):
-#   config["instructions"]["sql_expressions"] = [
-#       {"name": <str>, "description": <str>, "expression": <str>}
-#   ]
-space, config = _get_serialized_space(HOST, SPACE_ID, HEADERS)
-
-if "instructions" not in config:
-    config["instructions"] = {}
-
-config["instructions"]["sql_expressions"] = [
-    {"name": e["name"], "description": e["description"], "expression": e["expression"]}
-    for e in SQL_EXPRESSIONS
-]
-
-patch_resp = _patch_space(HOST, SPACE_ID, HEADERS, config)
-if patch_resp.status_code not in (200, 204):
-    print(f"❌ PATCH failed: {patch_resp.status_code}")
-    print(patch_resp.text[:400])
-else:
-    print(f"✅ {len(SQL_EXPRESSIONS)} SQL expressions written")
-    for e in SQL_EXPRESSIONS:
-        print(f"   • {e['name']}: {e['expression'][:60]}...")
-
-    # Verification GET — the API accepts unknown keys inside serialized_space silently.
-    # Re-fetch and confirm the field actually persisted; if it is missing the key name is wrong.
-    _, config_check = _get_serialized_space(HOST, SPACE_ID, HEADERS)
-    persisted = config_check.get("instructions", {}).get("sql_expressions", "NOT FOUND")
-    if persisted == "NOT FOUND":
-        print("\n⚠️  WARNING: 'sql_expressions' key was not found after re-fetching the space.")
-        print("   The API may have silently rejected it. Check the Configure → Instructions → SQL Expressions tab.")
-        print("   If the tab is empty, enter the expressions manually using the UI steps above.")
-    else:
-        print(f"\n✅ Verification GET confirmed: {len(persisted)} expression(s) persisted in the space.")
+print("⚠️  SQL Expressions must be entered via the Genie UI — API not available.")
+print("   Configure → Instructions → SQL Expressions → + Add")
+print()
+for e in SQL_EXPRESSIONS:
+    print(f"{'='*55}")
+    print(f"Name:        {e['name']}")
+    print(f"Description: {e['description']}")
+    print(f"Expression:  {e['expression']}")
+    print()
+print(f"ℹ️  {len(SQL_EXPRESSIONS)} expressions listed above — paste each into the UI.")
 
 # COMMAND ----------
 
