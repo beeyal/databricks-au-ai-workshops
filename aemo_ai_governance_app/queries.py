@@ -29,17 +29,16 @@ from databricks.sdk.service.sql import StatementState
 # ---------------------------------------------------------------------------
 
 def get_client() -> WorkspaceClient:
-    """Return a WorkspaceClient using the logged-in user's token (OBO pattern).
+    """Return a WorkspaceClient.
 
-    In Databricks Apps, X-Forwarded-Access-Token contains the user's OAuth
-    token — using it means SQL queries run as that user, not the app's SP.
-    This avoids needing to grant the SP CAN_USE on every warehouse.
-
-    Falls back to ambient SP credentials, then local profile.
+    Priority order:
+    1. OBO user-forwarded token (X-Forwarded-Access-Token header)
+    2. SDK OAuth using DATABRICKS_CLIENT_ID + DATABRICKS_CLIENT_SECRET (SP)
+    3. Local profile fallback for development
     """
-    host = os.environ.get("DATABRICKS_HOST", "")
+    host = os.environ.get("DATABRICKS_HOST", "").rstrip("/")
 
-    # Try OBO (user-forwarded token) — best option, runs as logged-in user
+    # 1. OBO — user's token forwarded by Databricks Apps
     try:
         user_token = st.context.headers.get("X-Forwarded-Access-Token", "")
         if user_token and host:
@@ -47,11 +46,14 @@ def get_client() -> WorkspaceClient:
     except Exception:
         pass
 
-    # SP ambient credentials (works if SP has warehouse access)
-    if host and os.environ.get("DATABRICKS_CLIENT_ID"):
-        return WorkspaceClient()
+    # 2. SDK resolves credentials from env vars automatically
+    if host:
+        try:
+            return WorkspaceClient(host=host)
+        except Exception:
+            pass
 
-    # Local dev
+    # 3. Local dev
     return WorkspaceClient(profile="dogfood")
 
 
@@ -66,12 +68,33 @@ _TOKEN_TO_DBU = 1 / 1_000_000  # 1 DBU ≈ 1 M tokens (illustrative)
 # SDK statement execution helper
 # ---------------------------------------------------------------------------
 
+@st.cache_resource(show_spinner=False)
+def _get_cached_client(token_hash: str = "") -> WorkspaceClient:
+    """Cache the WorkspaceClient. token_hash busts the cache when the token rotates."""
+    host = os.environ.get("DATABRICKS_HOST", "").rstrip("/")
+    if host:
+        return WorkspaceClient(host=host)
+    return WorkspaceClient(profile="dogfood")
+
+
 def _run_query(sql: str, timeout_secs: int = 50) -> pd.DataFrame:
     """Execute SQL via SDK statement execution and return a DataFrame.
 
-    Returns an empty DataFrame on error so callers degrade gracefully.
+    Uses OBO token when available (so queries run as the logged-in user),
+    otherwise falls back to the SP's ambient credentials.
     """
-    client = get_client()
+    # Get OBO token outside cache so st.context is available
+    host = os.environ.get("DATABRICKS_HOST", "").rstrip("/")
+    try:
+        obo_token = st.context.headers.get("X-Forwarded-Access-Token", "")
+    except Exception:
+        obo_token = ""
+
+    if obo_token and host:
+        client = WorkspaceClient(host=host, token=obo_token)
+    else:
+        # Fall back to SP credentials (needs warehouse access granted)
+        client = _get_cached_client()
     try:
         # wait_timeout must be 0 or 5-50 seconds per API contract
         wait_secs = min(max(timeout_secs, 5), 50)
@@ -620,26 +643,45 @@ def get_access_audit_ai(days: int = 30) -> pd.DataFrame:
 # Group attribution — map users to Databricks groups then aggregate usage
 # ---------------------------------------------------------------------------
 
-@st.cache_data(ttl=1800, show_spinner=False)  # 30-min TTL (group membership changes slowly)
+@st.cache_data(ttl=1800, show_spinner=False)
 def get_user_group_map() -> dict:
-    """Return {email: [group_display_name, ...]} for all workspace users.
+    """Return {email: [group_display_name, ...]} by looking up each active user's groups.
 
-    Fetches all groups and their members via the Groups API.
-    Cached for 30 minutes — refresh the page to pick up membership changes.
+    More efficient than enumerating all groups (dogfood has 49K+ empty groups).
+    Gets the top 200 active users from AI Gateway, then looks up their group memberships.
     """
-    client = get_client()
-    user_groups: dict = {}
+    # Get active users from last 30 days
+    active_df = _run_query("""
+        SELECT DISTINCT LOWER(requester) AS email
+        FROM system.ai_gateway.usage
+        WHERE event_time >= CURRENT_TIMESTAMP() - INTERVAL 30 DAYS
+          AND requester LIKE '%@%'
+        LIMIT 200
+    """)
+    if active_df.empty:
+        return {}
+
+    host = os.environ.get("DATABRICKS_HOST", "").rstrip("/")
     try:
-        for group in client.groups.list(attributes="id,displayName,members"):
-            group_name = group.display_name or "unknown"
-            if not group.members:
-                continue
-            for member in group.members:
-                email = (member.display or "").lower()
-                if "@" in email:
-                    user_groups.setdefault(email, []).append(group_name)
-    except Exception as e:
-        print(f"Group fetch error: {e}")
+        obo_token = st.context.headers.get("X-Forwarded-Access-Token", "")
+    except Exception:
+        obo_token = ""
+
+    if obo_token and host:
+        client = WorkspaceClient(host=host, token=obo_token)
+    else:
+        client = _get_cached_client()
+
+    user_groups: dict = {}
+    for email in active_df["email"].tolist():
+        try:
+            users = list(client.users.list(filter=f"userName eq \"{email}\"", attributes="userName,groups"))
+            for user in users:
+                groups = [g.display for g in (user.groups or []) if g.display]
+                if groups:
+                    user_groups[email] = groups
+        except Exception:
+            continue
     return user_groups
 
 

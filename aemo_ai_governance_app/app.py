@@ -658,7 +658,7 @@ with tab_groups:
     )
 
     with st.spinner("Loading group membership and usage data…"):
-        group_df = q.get_usage_by_group(days=days)
+        group_df = q.get_usage_by_group(days=period_days)
 
     if not group_df.empty:
         # ── KPI row ────────────────────────────────────────────────────────
@@ -723,7 +723,7 @@ with tab_groups:
         )
         if selected_group:
             with st.spinner(f"Loading users in {selected_group}…"):
-                users_df = q.get_top_users_in_group(selected_group, days=days)
+                users_df = q.get_top_users_in_group(selected_group, days=period_days)
             if not users_df.empty:
                 for col in ("requests", "total_tokens", "avg_latency_ms", "rate_limited"):
                     if col in users_df.columns:
