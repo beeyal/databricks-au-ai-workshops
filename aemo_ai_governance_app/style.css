@@ -1,0 +1,1054 @@
+/* ============================================================
+   GridSense Intelligence Hub — AEMO AI Governance App
+   Design System: DM Sans · Navy/Teal · Enterprise Dark Theme
+   ============================================================ */
+
+/* ---------- Google Fonts ---------- */
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&display=swap');
+
+/* ---------- Design Tokens ---------- */
+:root {
+  /* Surfaces */
+  --color-surface:        #0D1421;
+  --color-card:           #1A2745;
+  --color-card-hover:     #1E2E52;
+  --color-card-elevated:  #203058;
+
+  /* Borders */
+  --color-border:         rgba(255, 255, 255, 0.08);
+  --color-border-strong:  rgba(255, 255, 255, 0.14);
+
+  /* Text */
+  --color-text-primary:   #E6EDF3;
+  --color-text-secondary: #8B949E;
+  --color-text-muted:     #6B7280;
+
+  /* Brand accent — AEMO teal-green */
+  --color-accent:         #00A651;
+  --color-accent-bright:  #00C46A;
+  --color-accent-dim:     rgba(0, 166, 81, 0.15);
+  --color-accent-glow:    rgba(0, 166, 81, 0.25);
+
+  /* Semantic */
+  --color-success:        #1B8A4A;
+  --color-success-bg:     rgba(27, 138, 74, 0.12);
+  --color-warning:        #F5A623;
+  --color-warning-bg:     rgba(245, 166, 35, 0.12);
+  --color-danger:         #C0392B;
+  --color-danger-bg:      rgba(192, 57, 43, 0.12);
+  --color-info:           #3B82F6;
+  --color-info-bg:        rgba(59, 130, 246, 0.12);
+
+  /* Shadows */
+  --shadow-card:          0 1px 3px rgba(0,0,0,0.4), 0 4px 12px rgba(0,0,0,0.25);
+  --shadow-card-hover:    0 4px 16px rgba(0,0,0,0.5), 0 0 0 1px var(--color-border-strong);
+  --shadow-elevated:      0 8px 32px rgba(0,0,0,0.6);
+  --shadow-glow:          0 0 20px var(--color-accent-glow);
+
+  /* Radii */
+  --radius-sm:   6px;
+  --radius-md:   10px;
+  --radius-lg:   14px;
+  --radius-xl:   18px;
+  --radius-pill: 999px;
+
+  /* Spacing */
+  --header-height: 64px;
+
+  /* Transitions */
+  --transition-fast:   150ms cubic-bezier(0.4, 0, 0.2, 1);
+  --transition-normal: 250ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* ============================================================
+   RESET & BASE
+   ============================================================ */
+
+*, *::before, *::after {
+  box-sizing: border-box;
+}
+
+html {
+  font-size: 16px;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* ============================================================
+   STREAMLIT OVERRIDES — Strip the demo wrapper
+   ============================================================ */
+
+/* Full-width layout — kill Streamlit's max-width container */
+.main .block-container {
+  max-width: 100% !important;
+  padding: 0 2rem 2rem !important;
+  margin: 0 auto !important;
+}
+
+/* Remove the "Made with Streamlit" footer */
+footer { display: none !important; }
+
+/* Remove deploy button / hamburger menu */
+#MainMenu { display: none !important; }
+header[data-testid="stHeader"] { display: none !important; }
+
+/* Remove the default Streamlit top padding */
+.main > .block-container { padding-top: 1.5rem !important; }
+
+/* Hide sidebar completely — single-page app */
+[data-testid="stSidebar"],
+[data-testid="collapsedControl"] {
+  display: none !important;
+}
+
+/* Expand main content to full width when sidebar hidden */
+.main {
+  margin-left: 0 !important;
+  padding-left: 0 !important;
+}
+
+/* ============================================================
+   GLOBAL BODY & APP BACKGROUND
+   ============================================================ */
+
+body,
+.stApp,
+[data-testid="stAppViewContainer"],
+[data-testid="stMain"] {
+  background-color: var(--color-surface) !important;
+  font-family: 'DM Sans', Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif !important;
+  color: var(--color-text-primary) !important;
+}
+
+/* Streamlit's inner stApp wrapper */
+.stApp > div {
+  background-color: var(--color-surface) !important;
+}
+
+/* ============================================================
+   CUSTOM SCROLLBAR
+   ============================================================ */
+
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(255,255,255,0.12);
+  border-radius: var(--radius-pill);
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(255,255,255,0.22);
+}
+
+/* ============================================================
+   STICKY HEADER
+   ============================================================ */
+
+.gs-header {
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  background: var(--color-card);
+  border-bottom: 1px solid var(--color-border-strong);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  padding: 0 2rem;
+  height: var(--header-height);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  box-shadow: 0 1px 0 var(--color-border), 0 4px 16px rgba(0,0,0,0.3);
+}
+
+.gs-header__brand {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.gs-header__logo {
+  height: 28px;
+  width: auto;
+  object-fit: contain;
+}
+
+.gs-header__title {
+  font-size: 1.0625rem;
+  font-weight: 600;
+  line-height: 1.2;
+  letter-spacing: -0.02em;
+  color: var(--color-text-primary);
+  white-space: nowrap;
+}
+
+.gs-header__subtitle {
+  font-size: 0.6875rem;
+  color: var(--color-text-secondary);
+  line-height: 1.3;
+  letter-spacing: 0.01em;
+}
+
+.gs-header__controls {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+/* ============================================================
+   SECTION HEADERS — left bar accent
+   ============================================================ */
+
+.gs-section-header {
+  display: flex;
+  align-items: center;
+  gap: 0.625rem;
+  margin-bottom: 1rem;
+  margin-top: 0.25rem;
+}
+
+.gs-section-header::before {
+  content: '';
+  display: block;
+  width: 3px;
+  height: 1.125rem;
+  background: var(--color-accent);
+  border-radius: var(--radius-pill);
+  flex-shrink: 0;
+}
+
+.gs-section-header h2,
+.gs-section-header h3,
+.gs-section-title {
+  font-size: 0.8125rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--color-text-secondary);
+  margin: 0;
+}
+
+/* Streamlit native headers — override */
+h1, h2, h3, h4, h5, h6 {
+  font-family: 'DM Sans', Inter, system-ui, sans-serif !important;
+  color: var(--color-text-primary) !important;
+  letter-spacing: -0.015em;
+}
+
+h1 { font-size: 1.375rem !important; font-weight: 700 !important; }
+h2 { font-size: 1.0625rem !important; font-weight: 600 !important; }
+h3 { font-size: 0.9rem !important; font-weight: 600 !important; }
+
+/* ============================================================
+   KPI CARDS
+   ============================================================ */
+
+.gs-kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+}
+
+@media (max-width: 1100px) {
+  .gs-kpi-grid { grid-template-columns: repeat(2, 1fr); }
+}
+
+@media (max-width: 680px) {
+  .gs-kpi-grid { grid-template-columns: 1fr; }
+}
+
+.gs-card {
+  background: var(--color-card);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-card);
+  padding: 1.25rem;
+  position: relative;
+  transition: transform var(--transition-normal),
+              box-shadow var(--transition-normal),
+              border-color var(--transition-normal);
+}
+
+.gs-card:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-card-hover);
+  border-color: var(--color-border-strong);
+}
+
+/* Accent top-line variant */
+.gs-card--accent {
+  border-top: 2px solid var(--color-accent);
+}
+
+.gs-card--warning {
+  border-top: 2px solid var(--color-warning);
+}
+
+.gs-card--danger {
+  border-top: 2px solid var(--color-danger);
+}
+
+.gs-kpi-label {
+  font-size: 0.6875rem;
+  font-weight: 500;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--color-text-secondary);
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+  flex-wrap: wrap;
+  margin-bottom: 0.5rem;
+}
+
+.gs-kpi-value {
+  font-size: 1.75rem;
+  font-weight: 600;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+  color: var(--color-text-primary);
+  letter-spacing: -0.03em;
+  margin-bottom: 0.5rem;
+}
+
+.gs-kpi-hint {
+  font-size: 0.6875rem;
+  color: var(--color-text-muted);
+  margin-top: 0.25rem;
+}
+
+/* Streamlit metric override — repaint the st.metric widget */
+[data-testid="stMetric"] {
+  background: var(--color-card) !important;
+  border: 1px solid var(--color-border) !important;
+  border-radius: var(--radius-lg) !important;
+  box-shadow: var(--shadow-card) !important;
+  padding: 1.25rem !important;
+  transition: transform var(--transition-normal), box-shadow var(--transition-normal) !important;
+}
+
+[data-testid="stMetric"]:hover {
+  transform: translateY(-2px) !important;
+  box-shadow: var(--shadow-card-hover) !important;
+}
+
+[data-testid="stMetricLabel"] {
+  font-size: 0.6875rem !important;
+  font-weight: 500 !important;
+  letter-spacing: 0.07em !important;
+  text-transform: uppercase !important;
+  color: var(--color-text-secondary) !important;
+}
+
+[data-testid="stMetricValue"] {
+  font-size: 1.75rem !important;
+  font-weight: 600 !important;
+  font-variant-numeric: tabular-nums !important;
+  color: var(--color-text-primary) !important;
+  letter-spacing: -0.03em !important;
+}
+
+[data-testid="stMetricDelta"] {
+  font-size: 0.75rem !important;
+  font-weight: 500 !important;
+}
+
+/* ============================================================
+   PILL / BADGE STYLES
+   ============================================================ */
+
+.gs-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  border-radius: var(--radius-pill);
+  padding: 0.25rem 0.75rem;
+  font-size: 0.6875rem;
+  font-weight: 500;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.gs-pill--success {
+  background: var(--color-success-bg);
+  color: #34D399;
+  border: 1px solid rgba(52, 211, 153, 0.2);
+}
+
+.gs-pill--warning {
+  background: var(--color-warning-bg);
+  color: var(--color-warning);
+  border: 1px solid rgba(245, 166, 35, 0.2);
+}
+
+.gs-pill--danger {
+  background: var(--color-danger-bg);
+  color: #F87171;
+  border: 1px solid rgba(248, 113, 113, 0.2);
+}
+
+.gs-pill--info {
+  background: var(--color-info-bg);
+  color: #60A5FA;
+  border: 1px solid rgba(96, 165, 250, 0.2);
+}
+
+.gs-pill--accent {
+  background: var(--color-accent-dim);
+  color: var(--color-accent-bright);
+  border: 1px solid rgba(0, 166, 81, 0.25);
+}
+
+.gs-pill--neutral {
+  background: rgba(255,255,255,0.06);
+  color: var(--color-text-secondary);
+  border: 1px solid var(--color-border);
+}
+
+/* Live status dot */
+.gs-live-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--color-accent);
+  animation: pulse-live 1.6s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+  flex-shrink: 0;
+}
+
+@keyframes pulse-live {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50%       { opacity: 0.5; transform: scale(0.85); }
+}
+
+/* ============================================================
+   TAB NAVIGATION — pill tabs with solid fill on active
+   ============================================================ */
+
+.gs-tabs {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  background: rgba(255,255,255,0.04);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-xl);
+  padding: 3px;
+  margin-bottom: 1.5rem;
+  width: fit-content;
+}
+
+.gs-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  padding: 0.4375rem 1rem;
+  border-radius: calc(var(--radius-xl) - 3px);
+  font-size: 0.8125rem;
+  font-weight: 500;
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  border: 1px solid transparent;
+  background: transparent;
+  transition: all var(--transition-fast);
+  white-space: nowrap;
+  user-select: none;
+}
+
+.gs-tab:hover {
+  color: var(--color-text-primary);
+  background: rgba(255,255,255,0.06);
+}
+
+.gs-tab--active {
+  background: var(--color-accent) !important;
+  color: #ffffff !important;
+  border-color: transparent !important;
+  box-shadow: 0 1px 4px rgba(0,166,81,0.4);
+}
+
+/* Streamlit native tabs override */
+[data-testid="stTabs"] [role="tablist"] {
+  gap: 0.25rem !important;
+  background: rgba(255,255,255,0.04) !important;
+  border: 1px solid var(--color-border) !important;
+  border-radius: var(--radius-xl) !important;
+  padding: 3px !important;
+  width: fit-content !important;
+}
+
+[data-testid="stTabs"] [role="tab"] {
+  border-radius: calc(var(--radius-xl) - 3px) !important;
+  font-family: 'DM Sans', system-ui, sans-serif !important;
+  font-size: 0.8125rem !important;
+  font-weight: 500 !important;
+  color: var(--color-text-secondary) !important;
+  padding: 0.4375rem 1rem !important;
+  border: 1px solid transparent !important;
+  background: transparent !important;
+  transition: all var(--transition-fast) !important;
+}
+
+[data-testid="stTabs"] [role="tab"]:hover {
+  color: var(--color-text-primary) !important;
+  background: rgba(255,255,255,0.06) !important;
+}
+
+[data-testid="stTabs"] [role="tab"][aria-selected="true"] {
+  background: var(--color-accent) !important;
+  color: #ffffff !important;
+  border-color: transparent !important;
+  box-shadow: 0 1px 4px rgba(0,166,81,0.4) !important;
+}
+
+/* Remove the default Streamlit tab underline indicator */
+[data-testid="stTabs"] [role="tab"][aria-selected="true"]::after,
+[data-testid="stTabs"] [role="tablist"]::after {
+  display: none !important;
+  content: none !important;
+}
+
+/* ============================================================
+   CHART CONTAINERS
+   ============================================================ */
+
+.gs-chart-container {
+  background: var(--color-card);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-card);
+  padding: 1.25rem;
+  margin-bottom: 1rem;
+  overflow: hidden;
+}
+
+.gs-chart-container .gs-chart-title {
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--color-text-primary);
+  margin-bottom: 0.25rem;
+  letter-spacing: -0.01em;
+}
+
+.gs-chart-container .gs-chart-subtitle {
+  font-size: 0.6875rem;
+  color: var(--color-text-secondary);
+  margin-bottom: 1rem;
+}
+
+/* Plotly / Altair chart wrappers inside Streamlit */
+[data-testid="stPlotlyChart"],
+[data-testid="stVegaLiteChart"] {
+  background: var(--color-card) !important;
+  border: 1px solid var(--color-border) !important;
+  border-radius: var(--radius-lg) !important;
+  overflow: hidden !important;
+  box-shadow: var(--shadow-card) !important;
+  padding: 0.75rem !important;
+}
+
+/* ============================================================
+   DATA TABLES
+   ============================================================ */
+
+[data-testid="stDataFrame"],
+[data-testid="stTable"] {
+  background: var(--color-card) !important;
+  border: 1px solid var(--color-border) !important;
+  border-radius: var(--radius-lg) !important;
+  overflow: hidden !important;
+  box-shadow: var(--shadow-card) !important;
+}
+
+/* Dataframe header cells */
+[data-testid="stDataFrame"] th,
+[data-testid="stTable"] th {
+  background: rgba(255,255,255,0.04) !important;
+  color: var(--color-text-secondary) !important;
+  font-size: 0.6875rem !important;
+  font-weight: 600 !important;
+  letter-spacing: 0.06em !important;
+  text-transform: uppercase !important;
+  border-bottom: 1px solid var(--color-border-strong) !important;
+  padding: 0.625rem 0.75rem !important;
+}
+
+/* Dataframe body cells */
+[data-testid="stDataFrame"] td,
+[data-testid="stTable"] td {
+  background: transparent !important;
+  color: var(--color-text-primary) !important;
+  font-size: 0.8125rem !important;
+  font-variant-numeric: tabular-nums;
+  border-bottom: 1px solid var(--color-border) !important;
+  padding: 0.5rem 0.75rem !important;
+}
+
+[data-testid="stDataFrame"] tr:last-child td,
+[data-testid="stTable"] tr:last-child td {
+  border-bottom: none !important;
+}
+
+[data-testid="stDataFrame"] tr:hover td,
+[data-testid="stTable"] tr:hover td {
+  background: rgba(255,255,255,0.03) !important;
+}
+
+/* ============================================================
+   DATA NOTE BOXES — governance callouts
+   ============================================================ */
+
+.gs-note {
+  display: flex;
+  gap: 0.625rem;
+  padding: 0.75rem 1rem;
+  border-radius: var(--radius-md);
+  font-size: 0.75rem;
+  line-height: 1.55;
+  margin-bottom: 0.75rem;
+}
+
+.gs-note__icon {
+  flex-shrink: 0;
+  font-size: 0.875rem;
+  margin-top: 0.05rem;
+}
+
+.gs-note__body {
+  flex: 1;
+  color: var(--color-text-primary);
+}
+
+.gs-note__body strong {
+  display: block;
+  font-weight: 600;
+  margin-bottom: 0.125rem;
+}
+
+.gs-note--info {
+  background: var(--color-info-bg);
+  border-left: 3px solid var(--color-info);
+}
+
+.gs-note--warning {
+  background: var(--color-warning-bg);
+  border-left: 3px solid var(--color-warning);
+}
+
+.gs-note--success {
+  background: var(--color-success-bg);
+  border-left: 3px solid var(--color-accent);
+}
+
+.gs-note--danger {
+  background: var(--color-danger-bg);
+  border-left: 3px solid var(--color-danger);
+}
+
+/* Streamlit info/warning/error/success boxes */
+[data-testid="stAlert"] {
+  border-radius: var(--radius-md) !important;
+  border: none !important;
+  font-family: 'DM Sans', system-ui, sans-serif !important;
+  font-size: 0.8125rem !important;
+}
+
+[data-testid="stAlert"][kind="info"] {
+  background: var(--color-info-bg) !important;
+  border-left: 3px solid var(--color-info) !important;
+  color: #93C5FD !important;
+}
+
+[data-testid="stAlert"][kind="warning"] {
+  background: var(--color-warning-bg) !important;
+  border-left: 3px solid var(--color-warning) !important;
+  color: var(--color-warning) !important;
+}
+
+[data-testid="stAlert"][kind="error"] {
+  background: var(--color-danger-bg) !important;
+  border-left: 3px solid var(--color-danger) !important;
+  color: #FCA5A5 !important;
+}
+
+[data-testid="stAlert"][kind="success"] {
+  background: var(--color-success-bg) !important;
+  border-left: 3px solid var(--color-accent) !important;
+  color: #6EE7B7 !important;
+}
+
+/* ============================================================
+   FORM ELEMENTS — select, input, button
+   ============================================================ */
+
+/* Streamlit selectbox */
+[data-testid="stSelectbox"] > div > div,
+[data-testid="stMultiSelect"] > div > div {
+  background: var(--color-card) !important;
+  border: 1px solid var(--color-border-strong) !important;
+  border-radius: var(--radius-md) !important;
+  color: var(--color-text-primary) !important;
+  font-family: 'DM Sans', system-ui, sans-serif !important;
+  font-size: 0.8125rem !important;
+}
+
+[data-testid="stSelectbox"] > div > div:focus-within,
+[data-testid="stMultiSelect"] > div > div:focus-within {
+  border-color: var(--color-accent) !important;
+  box-shadow: 0 0 0 3px var(--color-accent-glow) !important;
+}
+
+/* Streamlit button */
+[data-testid="stButton"] button {
+  font-family: 'DM Sans', system-ui, sans-serif !important;
+  font-size: 0.8125rem !important;
+  font-weight: 500 !important;
+  border-radius: var(--radius-md) !important;
+  transition: all var(--transition-fast) !important;
+}
+
+[data-testid="stButton"] button[kind="primary"] {
+  background: var(--color-accent) !important;
+  border-color: var(--color-accent) !important;
+  color: #ffffff !important;
+}
+
+[data-testid="stButton"] button[kind="primary"]:hover {
+  background: var(--color-accent-bright) !important;
+  border-color: var(--color-accent-bright) !important;
+  box-shadow: var(--shadow-glow) !important;
+}
+
+[data-testid="stButton"] button[kind="secondary"] {
+  background: rgba(255,255,255,0.04) !important;
+  border: 1px solid var(--color-border-strong) !important;
+  color: var(--color-text-primary) !important;
+}
+
+[data-testid="stButton"] button[kind="secondary"]:hover {
+  background: rgba(255,255,255,0.08) !important;
+  border-color: var(--color-border-strong) !important;
+}
+
+/* ============================================================
+   STREAMLIT COLUMNS — transparent background
+   ============================================================ */
+
+[data-testid="stHorizontalBlock"] > div,
+[data-testid="column"] {
+  background: transparent !important;
+}
+
+/* ============================================================
+   EXPANDER
+   ============================================================ */
+
+[data-testid="stExpander"] {
+  background: var(--color-card) !important;
+  border: 1px solid var(--color-border) !important;
+  border-radius: var(--radius-md) !important;
+  box-shadow: var(--shadow-card) !important;
+}
+
+[data-testid="stExpander"] summary {
+  font-family: 'DM Sans', system-ui, sans-serif !important;
+  font-size: 0.875rem !important;
+  font-weight: 500 !important;
+  color: var(--color-text-primary) !important;
+  padding: 0.875rem 1rem !important;
+}
+
+[data-testid="stExpander"] summary:hover {
+  background: rgba(255,255,255,0.04) !important;
+  border-radius: var(--radius-md) !important;
+}
+
+[data-testid="stExpanderDetails"] {
+  padding: 0 1rem 1rem !important;
+  border-top: 1px solid var(--color-border) !important;
+}
+
+/* ============================================================
+   DIVIDER
+   ============================================================ */
+
+hr,
+[data-testid="stDivider"] {
+  border: none !important;
+  border-top: 1px solid var(--color-border) !important;
+  margin: 1rem 0 !important;
+}
+
+/* ============================================================
+   TEXT ELEMENTS
+   ============================================================ */
+
+p, li, span {
+  font-family: 'DM Sans', system-ui, sans-serif !important;
+  color: var(--color-text-primary);
+}
+
+/* Streamlit markdown text */
+[data-testid="stMarkdown"] p {
+  font-size: 0.875rem !important;
+  line-height: 1.6 !important;
+  color: var(--color-text-primary) !important;
+}
+
+/* Code blocks */
+code {
+  font-family: ui-monospace, 'SF Mono', 'Fira Code', Consolas, monospace !important;
+  font-size: 0.75rem !important;
+  background: rgba(255,255,255,0.07) !important;
+  border: 1px solid var(--color-border) !important;
+  border-radius: var(--radius-sm) !important;
+  padding: 0.125rem 0.375rem !important;
+  color: var(--color-accent-bright) !important;
+}
+
+pre, [data-testid="stCode"] {
+  background: rgba(0,0,0,0.3) !important;
+  border: 1px solid var(--color-border) !important;
+  border-radius: var(--radius-md) !important;
+}
+
+/* Caption text */
+[data-testid="stCaption"] {
+  font-size: 0.6875rem !important;
+  color: var(--color-text-muted) !important;
+  font-style: normal !important;
+}
+
+/* ============================================================
+   SPINNER / LOADING
+   ============================================================ */
+
+[data-testid="stSpinner"] {
+  color: var(--color-accent) !important;
+}
+
+/* ============================================================
+   PROGRESS BAR
+   ============================================================ */
+
+[data-testid="stProgress"] > div > div {
+  background: var(--color-accent) !important;
+  border-radius: var(--radius-pill) !important;
+}
+
+[data-testid="stProgress"] > div {
+  background: rgba(255,255,255,0.08) !important;
+  border-radius: var(--radius-pill) !important;
+}
+
+/* ============================================================
+   GENIE / AI PANEL EMBEDDED IFRAME
+   ============================================================ */
+
+.gs-genie-panel {
+  background: var(--color-card);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  box-shadow: var(--shadow-card);
+}
+
+.gs-genie-panel iframe {
+  display: block;
+  width: 100%;
+  min-height: 520px;
+  border: none;
+}
+
+/* ============================================================
+   RISK / STATUS TABLE — custom colored rows
+   ============================================================ */
+
+.gs-risk-row--high   { border-left: 3px solid var(--color-danger); }
+.gs-risk-row--medium { border-left: 3px solid var(--color-warning); }
+.gs-risk-row--low    { border-left: 3px solid var(--color-accent); }
+
+/* ============================================================
+   UTILITY CLASSES
+   ============================================================ */
+
+/* Tabular numbers on any element */
+.tabular { font-variant-numeric: tabular-nums; }
+
+/* Muted / secondary text */
+.text-muted   { color: var(--color-text-muted) !important; }
+.text-secondary { color: var(--color-text-secondary) !important; }
+
+/* Accent text */
+.text-accent  { color: var(--color-accent-bright) !important; }
+
+/* Tiny label */
+.label-micro {
+  font-size: 0.6875rem;
+  font-weight: 500;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--color-text-secondary);
+}
+
+/* Full-bleed helper */
+.full-bleed {
+  margin-left: -2rem;
+  margin-right: -2rem;
+  padding-left: 2rem;
+  padding-right: 2rem;
+}
+
+/* Flex gap helpers */
+.flex-row  { display: flex; align-items: center; }
+.gap-xs    { gap: 0.375rem; }
+.gap-sm    { gap: 0.625rem; }
+.gap-md    { gap: 1rem; }
+
+/* ============================================================
+   BRANDED HEADER (app.py .aemo-header)
+   ============================================================ */
+
+.aemo-header {
+  background: var(--color-card);
+  padding: 1rem 2rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 3px solid var(--color-accent);
+  margin-bottom: 1rem;
+  border-radius: 0 0 var(--radius-md) var(--radius-md);
+  box-shadow: var(--shadow-card);
+}
+
+.aemo-title {
+  color: var(--color-accent);
+  font-size: 1.35rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+.aemo-subtitle {
+  color: var(--color-text-secondary);
+  font-size: 0.8rem;
+  margin-top: 0.15rem;
+}
+
+.aemo-timestamp {
+  color: var(--color-text-secondary);
+  font-size: 0.78rem;
+  text-align: right;
+  line-height: 1.5;
+}
+
+/* ============================================================
+   GENIE SPACE CARDS (gs-genie-*)
+   ============================================================ */
+
+.gs-genie-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 1rem;
+  margin: 0.6rem 0 1.2rem;
+}
+
+@media (max-width: 1100px) {
+  .gs-genie-grid { grid-template-columns: repeat(2, 1fr); }
+}
+
+@media (max-width: 680px) {
+  .gs-genie-grid { grid-template-columns: 1fr; }
+}
+
+.gs-genie-card {
+  background: var(--color-card);
+  border: 1px solid var(--color-border);
+  border-top: 2px solid var(--color-accent);
+  border-radius: var(--radius-lg);
+  padding: 1rem 1.1rem;
+  box-shadow: var(--shadow-card);
+  transition: transform var(--transition-normal), box-shadow var(--transition-normal);
+}
+
+.gs-genie-card:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-card-hover);
+  border-color: var(--color-border-strong);
+  border-top-color: var(--color-accent-bright);
+}
+
+.gs-genie-title {
+  color: var(--color-accent-bright);
+  font-weight: 600;
+  font-size: 0.9rem;
+  margin-bottom: 0.3rem;
+  letter-spacing: -0.01em;
+}
+
+.gs-genie-meta {
+  color: var(--color-text-secondary);
+  font-size: 0.75rem;
+  line-height: 1.45;
+}
+
+/* ============================================================
+   COMPLIANCE / GOVERNANCE CARDS (gs-compliance-*)
+   ============================================================ */
+
+.gs-compliance-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 0.875rem;
+  margin: 0.6rem 0 1.2rem;
+}
+
+@media (max-width: 900px) {
+  .gs-compliance-grid { grid-template-columns: repeat(2, 1fr); }
+}
+
+.gs-compliance-card {
+  border-radius: var(--radius-md);
+  padding: 1rem;
+  text-align: center;
+  box-shadow: var(--shadow-card);
+  transition: transform var(--transition-normal);
+}
+
+.gs-compliance-card:hover {
+  transform: translateY(-2px);
+}
+
+.gs-compliance-ok {
+  background: var(--color-success-bg);
+  border: 1px solid rgba(27, 138, 74, 0.35);
+}
+
+.gs-compliance-warn {
+  background: var(--color-warning-bg);
+  border: 1px solid rgba(245, 166, 35, 0.35);
+}
+
+.gs-compliance-label {
+  color: var(--color-text-secondary);
+  font-size: 0.72rem;
+  font-weight: 500;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  margin-top: 0.4rem;
+}
+
+/* ============================================================
+   PRINT
+   ============================================================ */
+
+@media print {
+  .gs-header { position: static; }
+  .gs-card { break-inside: avoid; }
+  body { background: #ffffff !important; color: #000000 !important; }
+}
