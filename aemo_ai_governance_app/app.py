@@ -127,13 +127,14 @@ def _section(title: str) -> None:
 # ===========================================================================
 # Tab routing
 # ===========================================================================
-tab_overview, tab_usage, tab_genie, tab_gov, tab_budget = st.tabs(
+tab_overview, tab_usage, tab_genie, tab_gov, tab_budget, tab_groups = st.tabs(
     [
         "📊 Overview",
         "🤖 AI Usage",
         "💬 Genie Spaces",
         "🛡️ Governance",
         "💰 Budget & Policies",
+        "👥 Groups & Cost",
     ]
 )
 
@@ -645,3 +646,98 @@ with tab_budget:
         st.dataframe(pd.DataFrame(rate_rows), use_container_width=True, hide_index=True)
     else:
         st.info("No endpoint data — ensure your workspace has AI Gateway endpoints configured.")
+
+
+# ─── GROUPS & COST TAB ────────────────────────────────────────────────────────
+with tab_groups:
+    st.markdown(
+        "<p style='color:#8AADA8;font-size:0.85rem;margin-bottom:1rem'>"
+        "Usage and estimated cost per Databricks group. Users in multiple groups appear in each. "
+        "Cost is estimated from token rates — not actual contracted billing.</p>",
+        unsafe_allow_html=True,
+    )
+
+    with st.spinner("Loading group membership and usage data…"):
+        group_df = q.get_usage_by_group(days=days)
+
+    if not group_df.empty:
+        # ── KPI row ────────────────────────────────────────────────────────
+        total_groups = len(group_df)
+        total_est_cost = group_df["est_cost_usd"].sum()
+        top_group = group_df.iloc[0]["group"] if not group_df.empty else "N/A"
+        top_group_cost = group_df.iloc[0]["est_cost_usd"] if not group_df.empty else 0
+
+        k1, k2, k3, k4 = st.columns(4)
+        k1.metric("Active Groups", total_groups)
+        k2.metric("Total Est. Cost", f"${total_est_cost:,.2f}", help="Estimated USD based on token rates")
+        k3.metric("Top Group", top_group[:30] if top_group != "N/A" else "N/A")
+        k4.metric("Top Group Cost", f"${top_group_cost:,.2f}")
+
+        st.divider()
+
+        # ── Cost by group chart ────────────────────────────────────────────
+        col_chart, col_table = st.columns([3, 2])
+
+        with col_chart:
+            _section("Cost by Group")
+            import plotly.express as px
+            top15 = group_df.head(15).copy()
+            top15["group_short"] = top15["group"].str[:35]
+            fig = px.bar(
+                top15.sort_values("est_cost_usd"),
+                x="est_cost_usd", y="group_short",
+                orientation="h",
+                color="pct_of_total",
+                color_continuous_scale=[[0, "#1A2745"], [0.5, "#00A651"], [1.0, "#F5A623"]],
+                labels={"est_cost_usd": "Est. Cost (USD)", "group_short": "Group", "pct_of_total": "% of Total"},
+                text=top15.sort_values("est_cost_usd")["est_cost_usd"].apply(lambda v: f"${v:,.2f}"),
+            )
+            fig.update_traces(textposition="outside", cliponaxis=False)
+            fig.update_layout(
+                template="plotly_dark",
+                height=max(300, len(top15) * 28 + 60),
+                margin=dict(l=8, r=80, t=8, b=8),
+                coloraxis_showscale=False,
+                yaxis=dict(tickfont=dict(size=11)),
+                xaxis_tickprefix="$",
+            )
+            st.plotly_chart(fig, use_container_width=True)
+
+        with col_table:
+            _section("Group Summary")
+            display = group_df[["group", "members_active", "requests", "total_tokens", "est_cost_usd", "pct_of_total"]].copy()
+            display.columns = ["Group", "Active Users", "Requests", "Tokens", "Est. Cost ($)", "% of Total"]
+            display["Est. Cost ($)"] = display["Est. Cost ($)"].apply(lambda v: f"${v:,.2f}")
+            display["Tokens"] = display["Tokens"].apply(lambda v: f"{int(v):,}")
+            display["Requests"] = display["Requests"].apply(lambda v: f"{int(v):,}")
+            display["% of Total"] = display["% of Total"].apply(lambda v: f"{v:.1f}%")
+            st.dataframe(display, use_container_width=True, hide_index=True)
+
+        # ── Drill into a group ─────────────────────────────────────────────
+        st.divider()
+        _section("Drill into a Group")
+        selected_group = st.selectbox(
+            "Select group to see top users:",
+            options=group_df["group"].tolist(),
+            label_visibility="collapsed",
+        )
+        if selected_group:
+            with st.spinner(f"Loading users in {selected_group}…"):
+                users_df = q.get_top_users_in_group(selected_group, days=days)
+            if not users_df.empty:
+                for col in ("requests", "total_tokens", "avg_latency_ms", "rate_limited"):
+                    if col in users_df.columns:
+                        users_df[col] = pd.to_numeric(users_df[col], errors="coerce").fillna(0)
+                users_df["est_cost_usd"] = (users_df["total_tokens"] / 1_000 * 0.002).round(4)
+                disp = users_df[["user_email", "requests", "total_tokens", "est_cost_usd", "avg_latency_ms", "rate_limited"]].copy()
+                disp.columns = ["User", "Requests", "Tokens", "Est. Cost ($)", "Avg Latency (ms)", "Rate Limited"]
+                disp["Est. Cost ($)"] = disp["Est. Cost ($)"].apply(lambda v: f"${v:,.4f}")
+                disp["Tokens"] = disp["Tokens"].apply(lambda v: f"{int(v):,}")
+                st.dataframe(disp, use_container_width=True, hide_index=True)
+            else:
+                st.info(f"No usage data found for members of '{selected_group}' in the selected period.")
+    else:
+        st.info("No group usage data available. This may mean: no AI Gateway traffic in the selected period, or group membership could not be fetched.")
+        if st.button("🔄 Retry group fetch"):
+            st.cache_data.clear()
+            st.rerun()

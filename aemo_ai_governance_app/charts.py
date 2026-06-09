@@ -65,7 +65,7 @@ LAYOUT = dict(
     font=dict(family=FONT_FAMILY, color="#E6EDF3", size=12),
     paper_bgcolor="#161B22",
     plot_bgcolor="#0D1117",
-    margin=dict(l=16, r=16, t=36, b=16),
+    margin=dict(l=16, r=16, t=64, b=16),
     legend=dict(
         bgcolor="rgba(22,27,34,0.85)",
         bordercolor="#30363D",
@@ -165,7 +165,7 @@ def daily_trend_area(df: pd.DataFrame) -> go.Figure:
         yaxis=dict(title=dict(text="Requests / Users", font=dict(size=11)), gridcolor="#30363D", linecolor="#30363D", tickcolor="#30363D", zerolinecolor="#30363D"),
         yaxis2=dict(title=dict(text="Tokens", font=dict(size=11)), gridcolor="#30363D", linecolor="#30363D", tickcolor="#30363D", zerolinecolor="#30363D"),
         hovermode="x unified",
-        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1, bgcolor="rgba(22,27,34,0.85)", bordercolor="#30363D", borderwidth=1, font=dict(size=11)),
+        legend=dict(orientation="h", yanchor="bottom", y=-0.25, xanchor="center", x=0.5, bgcolor="rgba(22,27,34,0.85)", bordercolor="#30363D", borderwidth=1, font=dict(size=11)),
     )
     return fig
 
@@ -254,7 +254,7 @@ def top_users_bar(df: pd.DataFrame) -> go.Figure:
         barmode="stack",
         xaxis=dict(title=dict(text="Requests", font=dict(size=11)), gridcolor="#30363D", linecolor="#30363D", tickcolor="#30363D", zerolinecolor="#30363D"),
         yaxis=dict(gridcolor="rgba(0,0,0,0)", linecolor="#30363D", tickcolor="#30363D", zerolinecolor="#30363D"),
-        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1, bgcolor="rgba(22,27,34,0.85)", bordercolor="#30363D", borderwidth=1, font=dict(size=11)),
+        legend=dict(orientation="h", yanchor="bottom", y=-0.25, xanchor="center", x=0.5, bgcolor="rgba(22,27,34,0.85)", bordercolor="#30363D", borderwidth=1, font=dict(size=11)),
         bargap=0.20,
     )
     return fig
@@ -466,7 +466,7 @@ def cost_trend_area(df: pd.DataFrame) -> go.Figure:
         title=dict(text="Estimated Cost Trend (USD)", font=dict(size=13), x=0.02, xanchor="left"),
         yaxis=dict(title=dict(text="USD", font=dict(size=11)), tickprefix="$", gridcolor="#30363D", linecolor="#30363D", tickcolor="#30363D", zerolinecolor="#30363D"),
         hovermode="x unified",
-        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1, bgcolor="rgba(22,27,34,0.85)", bordercolor="#30363D", borderwidth=1, font=dict(size=11)),
+        legend=dict(orientation="h", yanchor="bottom", y=-0.25, xanchor="center", x=0.5, bgcolor="rgba(22,27,34,0.85)", bordercolor="#30363D", borderwidth=1, font=dict(size=11)),
     )
     return fig
 
@@ -543,7 +543,7 @@ def guardrail_events_line(df: pd.DataFrame) -> go.Figure:
         title=dict(text="Guardrail Events Over Time", font=dict(size=13), x=0.02, xanchor="left"),
         yaxis=dict(title=dict(text="Events", font=dict(size=11)), gridcolor="#30363D", linecolor="#30363D", tickcolor="#30363D", zerolinecolor="#30363D"),
         hovermode="x unified",
-        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1, bgcolor="rgba(22,27,34,0.85)", bordercolor="#30363D", borderwidth=1, font=dict(size=11)),
+        legend=dict(orientation="h", yanchor="bottom", y=-0.25, xanchor="center", x=0.5, bgcolor="rgba(22,27,34,0.85)", bordercolor="#30363D", borderwidth=1, font=dict(size=11)),
     )
     return fig
 
@@ -654,6 +654,6 @@ def model_latency_box(df: pd.DataFrame) -> go.Figure:
         bargroupgap=0.06,
         yaxis=dict(title=dict(text="Latency (ms)", font=dict(size=11)), gridcolor="#30363D", linecolor="#30363D", tickcolor="#30363D", zerolinecolor="#30363D"),
         xaxis=dict(tickangle=-20, gridcolor="rgba(0,0,0,0)", linecolor="#30363D", tickcolor="#30363D", zerolinecolor="#30363D"),
-        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1, bgcolor="rgba(22,27,34,0.85)", bordercolor="#30363D", borderwidth=1, font=dict(size=11)),
+        legend=dict(orientation="h", yanchor="bottom", y=-0.25, xanchor="center", x=0.5, bgcolor="rgba(22,27,34,0.85)", bordercolor="#30363D", borderwidth=1, font=dict(size=11)),
     )
     return fig

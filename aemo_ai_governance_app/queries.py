@@ -28,25 +28,34 @@ from databricks.sdk.service.sql import StatementState
 # Client singleton
 # ---------------------------------------------------------------------------
 
-@st.cache_resource
 def get_client() -> WorkspaceClient:
-    """Return a cached WorkspaceClient.
+    """Return a WorkspaceClient using the logged-in user's token (OBO pattern).
 
-    In a Databricks Apps runtime (DATABRICKS_RUNTIME_ENV is set by the
-    platform) we call WorkspaceClient() with no arguments — the SDK reads
-    DATABRICKS_HOST and the OAuth token automatically.
+    In Databricks Apps, X-Forwarded-Access-Token contains the user's OAuth
+    token — using it means SQL queries run as that user, not the app's SP.
+    This avoids needing to grant the SP CAN_USE on every warehouse.
 
-    Locally, fall back to the named profile so developers can run the app
-    without touching environment variables.
+    Falls back to ambient SP credentials, then local profile.
     """
-    if os.environ.get("DATABRICKS_RUNTIME_ENV"):
-        # Running inside a Databricks App — use ambient OAuth credentials
+    host = os.environ.get("DATABRICKS_HOST", "")
+
+    # Try OBO (user-forwarded token) — best option, runs as logged-in user
+    try:
+        user_token = st.context.headers.get("X-Forwarded-Access-Token", "")
+        if user_token and host:
+            return WorkspaceClient(host=host, token=user_token)
+    except Exception:
+        pass
+
+    # SP ambient credentials (works if SP has warehouse access)
+    if host and os.environ.get("DATABRICKS_CLIENT_ID"):
         return WorkspaceClient()
-    # Local development — use the named profile
-    return WorkspaceClient(profile="e2-demo-west")
+
+    # Local dev
+    return WorkspaceClient(profile="dogfood")
 
 
-WAREHOUSE_ID = "9d8a677b3c55b8a7"
+WAREHOUSE_ID = os.environ.get("DATABRICKS_WAREHOUSE_ID", "93a682dcf60dae13")
 
 # Cost constants (approximate list-price DBU rates; adjust to contract rates)
 _DBU_COST_USD = 0.07          # Model Serving / AI Gateway DBU → USD (rough)
@@ -57,28 +66,27 @@ _TOKEN_TO_DBU = 1 / 1_000_000  # 1 DBU ≈ 1 M tokens (illustrative)
 # SDK statement execution helper
 # ---------------------------------------------------------------------------
 
-def _run_query(sql: str, timeout_secs: int = 60) -> pd.DataFrame:
+def _run_query(sql: str, timeout_secs: int = 50) -> pd.DataFrame:
     """Execute SQL via SDK statement execution and return a DataFrame.
 
     Returns an empty DataFrame on error so callers degrade gracefully.
     """
     client = get_client()
     try:
+        # wait_timeout must be 0 or 5-50 seconds per API contract
+        wait_secs = min(max(timeout_secs, 5), 50)
         resp = client.statement_execution.execute_statement(
             warehouse_id=WAREHOUSE_ID,
             statement=sql,
-            wait_timeout=f"{timeout_secs}s",
+            wait_timeout=f"{wait_secs}s",
         )
 
-        # Poll if still running (SDK wait_timeout should handle this, but be safe)
-        deadline = time.time() + timeout_secs
-        while resp.status.state in (
-            StatementState.PENDING,
-            StatementState.RUNNING,
-        ):
-            if time.time() > deadline:
-                raise TimeoutError("Query exceeded timeout")
-            time.sleep(1)
+        # Poll if still running after initial wait
+        deadline = time.monotonic() + 120
+        while resp.status.state in (StatementState.PENDING, StatementState.RUNNING):
+            if time.monotonic() > deadline:
+                raise TimeoutError("Query exceeded 120s timeout")
+            time.sleep(3)
             resp = client.statement_execution.get_statement(resp.statement_id)
 
         if resp.status.state != StatementState.SUCCEEDED:
@@ -322,20 +330,32 @@ def get_genie_spaces() -> list[dict]:
     """
     client = get_client()
     try:
-        resp = client.genie.list_spaces()
-        spaces = resp.spaces or []
-        result = []
-        for space in spaces:
-            result.append({
-                "id":          space.space_id or "",
-                "title":       space.title or space.space_id or "Unnamed",
-                "description": space.description or "",
-                "warehouse_id": space.warehouse_id or "",
-                # owner_user_name / creator not returned by list_spaces —
-                # set a placeholder; could be fetched per-space if needed
-                "owner_user_name": "",
-            })
-        return result
+        # Use REST API directly — SDK GenieAPI doesn't have list_spaces()
+        import urllib.request, json as _json
+        host = os.environ.get("DATABRICKS_HOST", "").rstrip("/")
+        try:
+            user_token = st.context.headers.get("X-Forwarded-Access-Token", "")
+        except Exception:
+            user_token = ""
+        token = user_token or os.environ.get("DATABRICKS_TOKEN", "")
+        if not host or not token:
+            cfg = client.config
+            host = cfg.host.rstrip("/")
+            token = cfg.token or ""
+        req = urllib.request.Request(
+            f"{host}/api/2.0/genie/spaces",
+            headers={"Authorization": f"Bearer {token}"},
+        )
+        with urllib.request.urlopen(req, timeout=15) as r:
+            data = _json.loads(r.read())
+        spaces = data.get("spaces", [])
+        return [{
+            "id":            s.get("space_id", ""),
+            "title":         s.get("title", "Unnamed"),
+            "description":   s.get("description", ""),
+            "warehouse_id":  s.get("warehouse_id", ""),
+            "owner_user_name": s.get("owner_user_name", ""),
+        } for s in spaces]
     except Exception as exc:
         st.warning(f"Could not fetch Genie spaces: {exc}")
         return []
@@ -575,28 +595,154 @@ def get_rate_limit_events(days: int = 30) -> pd.DataFrame:
 
 @st.cache_data(ttl=300)
 def get_access_audit_ai(days: int = 30) -> pd.DataFrame:
+    """Use system.access.assistant_events (available on this workspace).
+    Columns: account_id, workspace_id, event_id, event_time, event_date,
+             user_agent, initiated_by
+    """
     sql = f"""
     SELECT
-        CAST(event_time AS DATE)                            AS date,
-        action_name                                         AS action,
-        COALESCE(user_identity.email, 'unknown')            AS user,
+        event_date                                          AS date,
+        COALESCE(initiated_by, 'unknown')                   AS user,
         COUNT(*)                                            AS count
-    FROM system.access.audit
+    FROM system.access.assistant_events
     WHERE event_time >= CURRENT_TIMESTAMP() - INTERVAL {days} DAYS
-      AND (
-          service_name IN (
-              'modelServing', 'aiGateway', 'vectorSearch',
-              'genie', 'aiPlayground', 'databricksSql'
-          )
-          OR action_name LIKE '%Model%'
-          OR action_name LIKE '%Endpoint%'
-          OR action_name LIKE '%Genie%'
-          OR action_name LIKE '%AI%'
-      )
-    GROUP BY 1, 2, 3
+    GROUP BY 1, 2
     ORDER BY 1 DESC, count DESC
+    LIMIT 200
     """
     df = _run_query(sql)
     if not df.empty and "date" in df.columns:
         df["date"] = pd.to_datetime(df["date"])
     return df
+
+
+# ---------------------------------------------------------------------------
+# Group attribution — map users to Databricks groups then aggregate usage
+# ---------------------------------------------------------------------------
+
+@st.cache_data(ttl=1800, show_spinner=False)  # 30-min TTL (group membership changes slowly)
+def get_user_group_map() -> dict:
+    """Return {email: [group_display_name, ...]} for all workspace users.
+
+    Fetches all groups and their members via the Groups API.
+    Cached for 30 minutes — refresh the page to pick up membership changes.
+    """
+    client = get_client()
+    user_groups: dict = {}
+    try:
+        for group in client.groups.list(attributes="id,displayName,members"):
+            group_name = group.display_name or "unknown"
+            if not group.members:
+                continue
+            for member in group.members:
+                email = (member.display or "").lower()
+                if "@" in email:
+                    user_groups.setdefault(email, []).append(group_name)
+    except Exception as e:
+        print(f"Group fetch error: {e}")
+    return user_groups
+
+
+@st.cache_data(ttl=300, show_spinner=False)
+def get_usage_by_group(days: int = 30) -> pd.DataFrame:
+    """Aggregate AI Gateway usage and estimated cost by Databricks group.
+
+    Steps:
+    1. Pull per-requester usage from system.ai_gateway.usage
+    2. Join with group membership map
+    3. Explode (users in multiple groups appear in each)
+    4. Aggregate tokens + estimated cost by group
+
+    Returns columns: group, members_active, requests, input_tokens,
+                     output_tokens, total_tokens, est_cost_usd, pct_of_total
+    """
+    # Get raw per-user usage
+    sql = f"""
+    SELECT
+        LOWER(requester)             AS user_email,
+        requester_type,
+        COUNT(*)                     AS requests,
+        SUM(input_tokens)            AS input_tokens,
+        SUM(output_tokens)           AS output_tokens,
+        SUM(total_tokens)            AS total_tokens
+    FROM system.ai_gateway.usage
+    WHERE event_time >= CURRENT_TIMESTAMP() - INTERVAL {days} DAYS
+      AND status_code = 200
+    GROUP BY 1, 2
+    ORDER BY total_tokens DESC
+    """
+    user_df = _run_query(sql)
+    if user_df.empty:
+        return pd.DataFrame()
+
+    # Numeric coerce
+    for col in ("requests", "input_tokens", "output_tokens", "total_tokens"):
+        if col in user_df.columns:
+            user_df[col] = pd.to_numeric(user_df[col], errors="coerce").fillna(0)
+
+    # Fetch group membership
+    user_group_map = get_user_group_map()
+
+    # Assign groups — users with no group get "Ungrouped"
+    rows = []
+    for _, row in user_df.iterrows():
+        email = str(row.get("user_email", "")).lower()
+        groups = user_group_map.get(email) or ["Ungrouped / Service Principals"]
+        for g in groups:
+            rows.append({
+                "group":         g,
+                "user_email":    email,
+                "requests":      row["requests"],
+                "input_tokens":  row["input_tokens"],
+                "output_tokens": row["output_tokens"],
+                "total_tokens":  row["total_tokens"],
+            })
+
+    if not rows:
+        return pd.DataFrame()
+
+    expanded = pd.DataFrame(rows)
+    grouped = expanded.groupby("group").agg(
+        members_active=("user_email",  "nunique"),
+        requests=       ("requests",    "sum"),
+        input_tokens=   ("input_tokens","sum"),
+        output_tokens=  ("output_tokens","sum"),
+        total_tokens=   ("total_tokens","sum"),
+    ).reset_index()
+
+    # Estimated cost: blended ~$0.002 per 1K tokens (illustrative list-price)
+    grouped["est_cost_usd"] = (grouped["total_tokens"] / 1_000 * 0.002).round(2)
+
+    total_tokens = grouped["total_tokens"].sum()
+    grouped["pct_of_total"] = (
+        (grouped["total_tokens"] / total_tokens * 100).round(1)
+        if total_tokens > 0 else 0
+    )
+
+    return grouped.sort_values("total_tokens", ascending=False).reset_index(drop=True)
+
+
+@st.cache_data(ttl=300, show_spinner=False)
+def get_top_users_in_group(group_name: str, days: int = 30) -> pd.DataFrame:
+    """Return top users within a specific group."""
+    user_group_map = get_user_group_map()
+    members = [email for email, groups in user_group_map.items() if group_name in groups]
+    if not members:
+        return pd.DataFrame()
+
+    placeholders = ", ".join(f"'{e}'" for e in members[:100])
+    sql = f"""
+    SELECT
+        LOWER(requester)     AS user_email,
+        COUNT(*)             AS requests,
+        SUM(total_tokens)    AS total_tokens,
+        ROUND(AVG(latency_ms), 0) AS avg_latency_ms,
+        SUM(CASE WHEN status_code = 429 THEN 1 ELSE 0 END) AS rate_limited
+    FROM system.ai_gateway.usage
+    WHERE event_time >= CURRENT_TIMESTAMP() - INTERVAL {days} DAYS
+      AND LOWER(requester) IN ({placeholders})
+    GROUP BY 1
+    ORDER BY total_tokens DESC
+    LIMIT 20
+    """
+    return _run_query(sql)
