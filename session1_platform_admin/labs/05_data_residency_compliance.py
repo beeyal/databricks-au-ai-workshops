@@ -15,8 +15,8 @@
 # MAGIC
 # MAGIC | Regulation | Requirement | How this lab addresses it |
 # MAGIC |---|---|---|
-# MAGIC | AER Cyber Security Guidelines / NER Chapter 7 | Data processed within permitted Australian jurisdictions | Geography enforcement workspace conf check |
-# MAGIC | NER Chapter 7 | Access logs maintained for all information assets (typically 7-year retention) | Audit log query + evidence package |
+# MAGIC | Industry data governance obligations | Data processed within permitted Australian jurisdictions | Geography enforcement workspace conf check |
+# MAGIC | Data governance obligations | Access logs maintained for all AI assets | Audit log query + evidence package |
 # MAGIC | Privacy Act 1988 | Security of personal information — reasonable steps under APP 11 | Pre-flight checklist script |
 # MAGIC | Privacy Act 1988 | Cross-border disclosure accountability — APP 8 requires reasonable steps before overseas transfer | PII guardrail + geography enforcement |
 # MAGIC
@@ -510,7 +510,7 @@ compliance_package = {
     "assessment_date": REPORT_TIMESTAMP,
     "assessed_by":     "TODO: Name/Role",
     # Named regulatory frameworks applicable to AU energy sector AI deployments
-    "regulatory_frameworks": ["Privacy Act 1988", "AER Cyber Security Guidelines", "NER Chapter 7"],
+    "regulatory_frameworks": ["Privacy Act 1988"],
     "section_1_infrastructure": {
         "workspace_region":                     region_check.get("location", "unknown"),
         "region_verification_source":           region_check.get("source", "unknown"),
@@ -591,7 +591,7 @@ print("Evidence package Delta save: pattern provided above — uncomment to exec
 # MAGIC <h2 style="color: #1B3139; margin: 0">Section 5: Regulatory Compliance Audit Evidence — AI Model Access Logs</h2>
 # MAGIC </div>
 # MAGIC
-# MAGIC NER Chapter 7 requires records of access to information assets. For AI models, `system.access.audit` captures admin-level actions (configuration changes, endpoint creation, permission changes). Confirm the retention period with your legal team — typically 7 years for records supporting regulatory obligations.
+# MAGIC Records of access to AI assets should be retained per your organisation's data governance policy. For AI models, `system.access.audit` captures admin-level actions (configuration changes, endpoint creation, permission changes). Confirm the retention period with your legal team — typically 7 years for records supporting regulatory obligations.
 # MAGIC
 # MAGIC **What is in `system.access.audit` for AI:** Admin and configuration events — endpoint creation, AI Gateway config updates (`putInferenceEndpointAiGateway`), permission changes (`changeInferenceEndpointAcl`). These all appear under `service_name = 'serverlessRealTimeInference'`.
 # MAGIC
@@ -607,7 +607,7 @@ print("Evidence package Delta save: pattern provided above — uncomment to exec
 
 def generate_ai_access_log(start_date: str, end_date: str, include_endpoints: list = None):
     """
-    Generate an AI model admin action log for Privacy Act and NER Chapter 7 compliance audit purposes.
+    Generate an AI model admin action log for Privacy Act and governance audit purposes.
 
     Queries system.access.audit for AI-related service events. Note that per-request
     inference detail is in system.ai_gateway.usage (Beta), not system.access.audit.
@@ -1063,8 +1063,8 @@ print("  7. Schedule the compliance evidence package as a quarterly job")
 # MAGIC | Workspace region confirmation | AER data sovereignty | Azure IMDS / Spark conf | Section 1 output |
 # MAGIC | Geography enforcement evidence | Privacy Act APP 8 / AER guidelines | Account Console screenshot + Section 2 API output | Section 2 output |
 # MAGIC | Feature inventory | Your organisation's compliance obligations | This notebook | Section 3 output (printed table) |
-# MAGIC | AI admin action log (per review period) | NER Chapter 7 (access records) | `system.access.audit` | Section 5 export to CSV |
-# MAGIC | Per-request inference log | NER Chapter 7 (model access detail) | `system.ai_gateway.usage` (Beta) | Query separately — not covered in this lab |
+# MAGIC | AI admin action log (per review period) | access records retention obligation | `system.access.audit` | Section 5 export to CSV |
+# MAGIC | Per-request inference log | model access detail | `system.ai_gateway.usage` (Beta) | Query separately — not covered in this lab |
 # MAGIC | Rate limit configuration | Privacy Act APP 11 (reasonable security steps) | AI Gateway API | Lab 02 `get_endpoint_config` output |
 # MAGIC | Guardrail test evidence | Privacy Act APP 11 / APP 8 | Lab 03 test results | `print_guardrail_report` output |
 # MAGIC | Pre-flight checklist run log | Change management evidence | Delta table | Section 7 in this notebook |

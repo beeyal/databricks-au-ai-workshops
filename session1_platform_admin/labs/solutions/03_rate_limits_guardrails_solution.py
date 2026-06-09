@@ -242,9 +242,9 @@ for tc in NMI_TEST_CASES:
 
 # SOLUTION: Complete keyword filter + Delta logging implementation
 BLOCKED_TERMS = [
-    "AEMC investigation",
+    "[internal investigation reference]",
     "AER enforcement",
-    "AEMO compliance notice",
+    "[compliance notice reference]",
     "CRITICAL-ASSET-TIER1",
     "SECURITY-CLASSIFIED",
     "Project Eucalyptus",
@@ -293,7 +293,7 @@ KEYWORD_TEST_PROMPTS = [
     "AER enforcement action — summarise risks for our network.",
     "What are CRITICAL-ASSET-TIER1 performance benchmarks?",
     "Explain the NEM dispatch process for generators.",
-    "How does the AEMC set rate of return?",
+    "How does the regulator set rate of return for distribution networks?",
     "Update on Project Eucalyptus due diligence findings?",
 ]
 

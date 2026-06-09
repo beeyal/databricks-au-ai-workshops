@@ -13,16 +13,16 @@
 # MAGIC
 # MAGIC ---
 # MAGIC
-# MAGIC **Why this matters for AEMO**
+# MAGIC **Why this matters for regulated workloads**
 # MAGIC
 # MAGIC | Risk | Without controls | With controls |
 # MAGIC |---|---|---|
 # MAGIC | Runaway cost | One misconfigured job exhausts budget in minutes | Per-user QPM + TPM caps prevent this |
-# MAGIC | PII leakage | Customer TFNs, Medicare numbers reach external LLMs | Built-in PII BLOCK guardrail + custom LLM judge for AEMO-specific types |
+# MAGIC | PII leakage | Customer TFNs, Medicare numbers reach external LLMs | Built-in PII BLOCK guardrail + custom LLM judge for energy-sector-specific types |
 # MAGIC | Compliance assertion | No technical evidence of access controls | Rate limits + guardrail config are queryable artefacts in `system.access.audit` |
 # MAGIC | Content risk | Unsafe prompts reach the model | Safety filter rejects before inference — zero token cost for blocked requests |
 # MAGIC
-# MAGIC **Guardrail latency note:** The gateway layer adds less than 50 ms P99 overhead (routing + rule evaluation). A custom LLM-as-judge guardrail adds a separate model call — budget 200–500 ms depending on the judge model. For AEMO's operational tools this is acceptable; for sub-100 ms latency requirements use keyword blocking only.
+# MAGIC **Guardrail latency note:** The gateway layer adds less than 50 ms P99 overhead (routing + rule evaluation). A custom LLM-as-judge guardrail adds a separate model call — budget 200–500 ms depending on the judge model. For operational tools in regulated environments this is acceptable; for sub-100 ms latency requirements use keyword blocking only.
 
 # COMMAND ----------
 
@@ -141,7 +141,7 @@ print(f"User QPM limit (Lab 02 config) : {USER_QPM}")
 # MAGIC | TPM (tokens per minute) | `"tokens"` | Cost control when prompt sizes vary widely (e.g. long regulatory documents) |
 # MAGIC | Both together | `"calls"` + `"tokens"` | Highest assurance — apply both to the same endpoint |
 # MAGIC
-# MAGIC For AEMO, where analysts paste full regulatory documents into prompts, TPM is the more meaningful cost control. QPM catches loops and automation abuse.
+# MAGIC For regulated industries, where analysts paste full regulatory documents into prompts, TPM is the more meaningful cost control. QPM catches loops and automation abuse.
 # MAGIC
 # MAGIC **Tiered access — use separate endpoints per access tier, not per-user overrides:**
 
@@ -601,7 +601,7 @@ print("NMI edge case tests are commented out — safe to run.")
 
 # MAGIC %md
 # MAGIC <div style="border-left: 4px solid #FF3621; padding-left: 16px; margin: 24px 0">
-# MAGIC <h2 style="color: #1B3139; margin: 0">Section 5: Keyword Blocking for AEMO-Specific Terms</h2>
+# MAGIC <h2 style="color: #1B3139; margin: 0">Section 5: Keyword Blocking for Industry-Specific Terms</h2>
 # MAGIC </div>
 # MAGIC
 # MAGIC Some content is not PII but must not reach an LLM — embargoed regulatory investigation codes, M&A terms, security classification markers.
@@ -620,9 +620,9 @@ print("NMI edge case tests are commented out — safe to run.")
 # Terms that should not reach an LLM regardless of whether they contain NER-detectable PII.
 # ACN is included here because built-in NER does not reliably detect it (see Section 4).
 BLOCKED_TERMS = [
-    "AEMC investigation",
+    "[internal investigation reference]",
     "AER enforcement",
-    "AEMO compliance notice",
+    "[compliance notice reference]",
     "CRITICAL-ASSET-TIER1",
     "SECURITY-CLASSIFIED",
     "Project Eucalyptus",
@@ -679,7 +679,7 @@ KEYWORD_TEST_PROMPTS = [
     "Summarise the key risks from the AER enforcement action relating to our distribution network.",
     "What are the performance benchmarks for CRITICAL-ASSET-TIER1 transmission lines?",
     "Explain the NEM dispatch process for generators.",
-    "How does the AEMC set the rate of return for regulated networks?",
+    "How does the regulator set the rate of return for distribution networks?",
     "The network operator with ACN 004 044 937 has applied for network exemption.",
     "What is the process for escalating a Project Eucalyptus due diligence finding?",
 ]
@@ -720,7 +720,7 @@ for prompt in KEYWORD_TEST_PROMPTS:
 
 # MAGIC %md
 # MAGIC <div style="border-left: 4px solid #FF3621; padding-left: 16px; margin: 24px 0">
-# MAGIC <h2 style="color: #1B3139; margin: 0">Section 6: Custom LLM-as-Judge Guardrail for AEMO-Specific PII</h2>
+# MAGIC <h2 style="color: #1B3139; margin: 0">Section 6: Custom LLM-as-Judge Guardrail for Domain-Specific PII</h2>
 # MAGIC </div>
 # MAGIC
 # MAGIC NMI and other operational identifiers cannot be detected by the built-in NER model. For structured detection that goes beyond keyword matching, attach a custom guardrail function as a Unity Catalog function on the endpoint.
@@ -729,7 +729,7 @@ for prompt in KEYWORD_TEST_PROMPTS:
 # MAGIC
 # MAGIC **How it works:** define a UC function that takes the prompt text and returns a structured decision (`BLOCK` or `ALLOW` with a reason). Attach the function to the endpoint via the UI or API. The gateway calls the function synchronously before forwarding to the model.
 # MAGIC
-# MAGIC **Latency budget:** the custom judge adds a separate model call — typically 200–500 ms. For AEMO's administrative tools this is acceptable. For operational dashboards with sub-100 ms requirements, use keyword blocking only.
+# MAGIC **Latency budget:** the custom judge adds a separate model call — typically 200–500 ms. For administrative tools in regulated environments this is acceptable. For operational dashboards with sub-100 ms requirements, use keyword blocking only.
 # MAGIC
 # MAGIC The cell below shows the UC function definition pattern. Attaching it to the endpoint requires the v1 UI (Edit Unity AI Gateway → Guardrails → Custom guardrail → UC function).
 
@@ -776,7 +776,7 @@ if has_nmi and (has_dob or has_name):
     return {{"action": "BLOCK", "trigger_type": "nmi_combined_pii",
              "detail": "NMI combined with personal identifier"}}
 
-return {{"action": "ALLOW", "trigger_type": "none", "detail": "no AEMO-specific PII detected"}}
+return {{"action": "ALLOW", "trigger_type": "none", "detail": "no domain-specific PII detected"}}
 $$
 """
 
@@ -848,7 +848,7 @@ def detect_aemo_pii_local(prompt: str) -> dict:
         return {"action": "BLOCK", "trigger_type": "nmi_combined_pii",
                 "detail": "NMI combined with personal identifier"}
 
-    return {"action": "ALLOW", "trigger_type": "none", "detail": "no AEMO-specific PII detected"}
+    return {"action": "ALLOW", "trigger_type": "none", "detail": "no domain-specific PII detected"}
 
 
 CUSTOM_GUARDRAIL_TEST_CASES = [
@@ -1126,7 +1126,7 @@ print("-" * 65)
 # MAGIC   "input": {
 # MAGIC     "pii": { "behavior": "BLOCK" },
 # MAGIC     "safety": true,
-# MAGIC     "invalid_keywords": ["AEMC investigation", "ACN", "SECURITY-CLASSIFIED"]
+# MAGIC     "invalid_keywords": ["[internal investigation reference]", "ACN", "SECURITY-CLASSIFIED"]
 # MAGIC   },
 # MAGIC   "output": {
 # MAGIC     "pii": { "behavior": "BLOCK" },

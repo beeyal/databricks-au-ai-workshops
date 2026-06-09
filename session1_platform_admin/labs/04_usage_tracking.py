@@ -292,7 +292,7 @@ display(playground_usage)
 
 # COMMAND ----------
 
-# AI Gateway configuration changes — change management audit evidence (NER Chapter 7 / AER Cyber Security Guidelines)
+# AI Gateway configuration changes — change management audit evidence (data governance obligations)
 # AI Gateway config events appear under service_name = 'serverlessRealTimeInference', NOT 'modelServing'.
 # This matches the filter documented in Lab 02 and Lab 05. modelServing covers inference calls and
 # non-AI-Gateway endpoint lifecycle; serverlessRealTimeInference covers AI Gateway config and ACL changes.

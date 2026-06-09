@@ -27,7 +27,7 @@
 # MAGIC | V1 (GA) | Left sidebar → Serving → AI Gateway tab | Yes — BLOCK / MASK on input and output | **Yes** |
 # MAGIC | Unity AI Gateway (Beta) | Left sidebar → AI Gateway (standalone item) | No — endpoint-level safety filter only | No — use V1 for all regulated workloads |
 # MAGIC
-# MAGIC > **Why V1 for regulated workloads:** Unity AI Gateway (Beta) does not yet have centralised PII guardrail policy. Using it for data classified above Public means TFNs, Medicare numbers, and ABNs will not be blocked at the gateway layer. Use V1 (GA) for all AEMO workloads until Beta reaches GA with full guardrail parity.
+# MAGIC > **Why V1 for regulated workloads:** Unity AI Gateway (Beta) does not yet have centralised PII guardrail policy. Using it for data classified above Public means TFNs, Medicare numbers, and ABNs will not be blocked at the gateway layer. Use V1 (GA) for all regulated workloads until Beta reaches GA with full guardrail parity.
 
 # COMMAND ----------
 
@@ -189,7 +189,7 @@ print(f"  Payload log table    : {CATALOG_NAME}.{SCHEMA_NAME}.{PAYLOAD_TABLE_PRE
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC ## Section 1: What Is AI Gateway and Why Does AEMO Need It
+# MAGIC ## Section 1: What Is AI Gateway and Why It Matters
 # MAGIC
 # MAGIC AI Gateway is a governance and control layer that sits in front of one or more model serving endpoints. Every LLM call from an application passes through the gateway — the model never receives a prompt directly.
 # MAGIC
@@ -338,7 +338,7 @@ _lab02_endpoint_ready = preflight_check_endpoint(w, PT_ENDPOINT_NAME)
 # MAGIC > **PII mode: BLOCK vs MASK:**
 # MAGIC > - `BLOCK` — request rejected with HTTP 400 if PII is detected; the model never sees the prompt. Use for data classified above Internal.
 # MAGIC > - `MASK` — detected PII tokens are replaced with `[REDACTED]` and the request proceeds to the model. Use for intermediate sensitivity scenarios where total rejection is too disruptive.
-# MAGIC > - This lab uses `BLOCK` for input and output — the correct setting for AEMO regulated workloads.
+# MAGIC > - This lab uses `BLOCK` for input and output — the correct setting for regulated workloads.
 # MAGIC
 # MAGIC **UI alternative — do this instead of running the code if you prefer:**
 # MAGIC ```
@@ -637,7 +637,7 @@ else:
 # MAGIC
 # MAGIC The `invalid_keywords` list accepts exact strings. For pattern matching, add representative NMI prefixes — the gateway performs substring matching.
 # MAGIC
-# MAGIC > This is optional. The BLOCK guardrail for TFN, Medicare, and ABN is already applied in Section 3b. Add NMI blocking only if AEMO's DLP policy explicitly requires it at the gateway layer.
+# MAGIC > This is optional. The BLOCK guardrail for TFN, Medicare, and ABN is already applied in Section 3b. Add NMI blocking only if your DLP policy explicitly requires it at the gateway layer.
 
 # COMMAND ----------
 
@@ -1183,7 +1183,7 @@ def print_gateway_compliance_summary(workspace_url: str, headers: dict, endpoint
     print()
     if all_ok:
         print("  COMPLIANCE CHECK PASSED: all required controls are active.")
-        print("  Suitable for regulated data per AEMO data residency requirements.")
+        print("  Suitable for regulated data per data residency requirements.")
     else:
         print("  COMPLIANCE CHECK FAILED: one or more controls are missing -- see above.")
     return all_ok
