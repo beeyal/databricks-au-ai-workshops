@@ -91,57 +91,93 @@ def _run_query(sql: str, timeout_secs: int = 50) -> pd.DataFrame:
         obo_token = ""
 
     if obo_token and host:
-        # Explicitly pass empty client_id/secret so SDK uses ONLY the OBO PAT,
-        # not the SP OAuth M2M creds that are also in the environment.
-        from databricks.sdk.config import Config
-        cfg = Config(host=host, token=obo_token, client_id="", client_secret="")
-        client = WorkspaceClient(config=cfg)
+        # Use direct HTTP — avoids SDK seeing both token + CLIENT_ID/SECRET env vars
+        return _run_query_http(sql, host, obo_token, timeout_secs)
     else:
-        # Fall back to SP credentials (needs warehouse access granted)
-        client = _get_cached_client()
+        return _run_query_sdk(sql, timeout_secs)
+
+
+def _run_query_http(sql: str, host: str, token: str, timeout_secs: int = 50) -> pd.DataFrame:
+    """Execute SQL via direct HTTP calls — no SDK auth conflict."""
+    import json as _json
+    import urllib.request as _ur
+    import urllib.error as _ue
+
+    headers = {"Authorization": f"Bearer {token}", "Content-Type": "application/json"}
+    wait_secs = min(max(timeout_secs, 5), 50)
+
+    def _post(path, body):
+        req = _ur.Request(f"{host}{path}", data=_json.dumps(body).encode(), headers=headers)
+        with _ur.urlopen(req, timeout=60) as r:
+            return _json.loads(r.read())
+
+    def _get(path):
+        req = _ur.Request(f"{host}{path}", headers=headers)
+        with _ur.urlopen(req, timeout=30) as r:
+            return _json.loads(r.read())
+
     try:
-        # wait_timeout must be 0 or 5-50 seconds per API contract
+        resp = _post("/api/2.0/sql/statements", {
+            "statement": sql, "warehouse_id": WAREHOUSE_ID,
+            "wait_timeout": f"{wait_secs}s",
+        })
+        stmt_id = resp.get("statement_id")
+        if not stmt_id:
+            raise RuntimeError(f"No statement_id: {resp}")
+
+        deadline = time.monotonic() + 120
+        while resp.get("status", {}).get("state") in ("PENDING", "RUNNING"):
+            if time.monotonic() > deadline:
+                raise TimeoutError("Query exceeded 120s")
+            time.sleep(3)
+            resp = _get(f"/api/2.0/sql/statements/{stmt_id}")
+
+        if resp.get("status", {}).get("state") != "SUCCEEDED":
+            raise RuntimeError(f"Query failed: {resp.get('status', {}).get('error')}")
+
+        manifest = resp.get("manifest", {})
+        cols = [c["name"] for c in manifest.get("schema", {}).get("columns", [])]
+        rows = resp.get("result", {}).get("data_array") or []
+        if not cols:
+            return pd.DataFrame()
+        df = pd.DataFrame(rows, columns=cols)
+        for c in manifest.get("schema", {}).get("columns", []):
+            if c.get("type_name") in ("INT", "LONG", "DOUBLE", "FLOAT", "DECIMAL"):
+                df[c["name"]] = pd.to_numeric(df[c["name"]], errors="coerce")
+        return df
+    except Exception as exc:
+        st.warning(f"Query error: {exc}")
+        return pd.DataFrame()
+
+
+def _run_query_sdk(sql: str, timeout_secs: int = 50) -> pd.DataFrame:
+    """Execute SQL via SDK (SP credentials, no OBO token present)."""
+    client = _get_cached_client()
+    try:
         wait_secs = min(max(timeout_secs, 5), 50)
         resp = client.statement_execution.execute_statement(
-            warehouse_id=WAREHOUSE_ID,
-            statement=sql,
+            warehouse_id=WAREHOUSE_ID, statement=sql,
             wait_timeout=f"{wait_secs}s",
         )
-
-        # Poll if still running after initial wait
         deadline = time.monotonic() + 120
         while resp.status.state in (StatementState.PENDING, StatementState.RUNNING):
             if time.monotonic() > deadline:
-                raise TimeoutError("Query exceeded 120s timeout")
+                raise TimeoutError("Query exceeded 120s")
             time.sleep(3)
             resp = client.statement_execution.get_statement(resp.statement_id)
-
         if resp.status.state != StatementState.SUCCEEDED:
-            error_msg = getattr(resp.status, "error", {})
-            raise RuntimeError(f"Query failed: {error_msg}")
-
-        result = resp.result
-        manifest = resp.manifest
-
-        if not manifest or not manifest.schema or not manifest.schema.columns:
+            raise RuntimeError(f"Query failed: {resp.status.error}")
+        if not resp.manifest or not resp.manifest.schema:
             return pd.DataFrame()
-
-        columns = [col.name for col in manifest.schema.columns]
-
-        if not result or not result.data_array:
-            return pd.DataFrame(columns=columns)
-
-        df = pd.DataFrame(result.data_array, columns=columns)
-
-        # Cast numeric-looking columns
-        for col in manifest.schema.columns:
-            if col.type_name and col.type_name.value in (
-                "INT", "LONG", "DOUBLE", "FLOAT", "DECIMAL",
-            ):
-                df[col.name] = pd.to_numeric(df[col.name], errors="coerce")
-
+        cols = [c.name for c in resp.manifest.schema.columns]
+        rows = resp.result.data_array or [] if resp.result else []
+        if not cols:
+            return pd.DataFrame()
+        df = pd.DataFrame(rows, columns=cols)
+        for c in resp.manifest.schema.columns:
+            if c.type_name and c.type_name.value in ("INT","LONG","DOUBLE","FLOAT","DECIMAL"):
+                df[c.name] = pd.to_numeric(df[c.name], errors="coerce")
         return df
-
     except Exception as exc:
         st.warning(f"Query error: {exc}")
         return pd.DataFrame()
@@ -671,10 +707,8 @@ def get_user_group_map() -> dict:
     except Exception:
         obo_token = ""
 
-    if obo_token and host:
-        from databricks.sdk.config import Config as _Cfg; client = WorkspaceClient(config=_Cfg(host=host, token=obo_token, client_id="", client_secret=""))
-    else:
-        client = _get_cached_client()
+    # Use SDK with only SP creds — Groups API doesn't need user token
+    client = _get_cached_client()
 
     user_groups: dict = {}
     for email in active_df["email"].tolist():
