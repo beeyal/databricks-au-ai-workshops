@@ -25,7 +25,7 @@
 # MAGIC | Version | Navigation path | Centralised PII guardrails | Used in this lab |
 # MAGIC |---|---|---|---|
 # MAGIC | V1 (GA) | Left sidebar → Serving → AI Gateway tab | Yes — BLOCK / MASK on input and output | **Yes** |
-# MAGIC | Unity AI Gateway (Beta) | Left sidebar → AI Gateway (standalone item) | No — endpoint-level safety filter only | No — use V1 for all regulated workloads |
+# MAGIC | Unity AI Gateway (Beta) | Left sidebar → **AI Gateway** (standalone item — preview must be enabled by account admin) | No — endpoint-level safety filter only | No — use V1 for all regulated workloads |
 # MAGIC
 # MAGIC > **Why V1 for regulated workloads:** Unity AI Gateway (Beta) does not yet have centralised PII guardrail policy. Using it for data classified above Public means TFNs, Medicare numbers, and ABNs will not be blocked at the gateway layer. Use V1 (GA) for all regulated workloads until Beta reaches GA with full guardrail parity.
 
@@ -39,7 +39,7 @@
 # MAGIC Navigate: Left sidebar → Serving → click the **AI Gateway** tab at the top of the Serving page.
 # MAGIC You should see: List of existing AI Gateway endpoints and a "+ Create" button (top-right).
 # MAGIC
-# MAGIC > If a standalone **AI Gateway** item appears in the left sidebar instead, that is Unity AI Gateway (Beta). Do not use it for this lab — it lacks the PII guardrails required for regulated workloads.
+# MAGIC > The standalone **AI Gateway** item in the left sidebar is Unity AI Gateway (Beta). It is visible because your account admin has enabled the preview (Account Console → Previews). This lab uses the V1 path (Serving → AI Gateway tab) which has full centralised PII guardrail support — do not use the standalone Beta item for this lab.
 # MAGIC
 # MAGIC ---
 # MAGIC

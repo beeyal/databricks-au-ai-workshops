@@ -36,7 +36,7 @@
 # MAGIC               A 429 is returned to the caller when the limit is exceeded.
 # MAGIC ```
 # MAGIC
-# MAGIC > Rate limits and guardrails live in the v1/GA path (Serving → AI Gateway). The standalone "AI Gateway" left-nav item is v2 Beta and does not yet have centralised guardrail policy. Use v1 for all regulated workloads.
+# MAGIC > Rate limits and guardrails live in the v1/GA path (Serving → AI Gateway). The standalone **AI Gateway** left-nav item is Unity AI Gateway (Beta) — visible when your account admin has enabled the preview. It does not yet have centralised guardrail policy. Use the V1 path (Serving → AI Gateway) for all regulated workloads.
 # MAGIC
 # MAGIC **Guardrails (v1)**
 # MAGIC ```
