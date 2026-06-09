@@ -23,6 +23,7 @@
 
 # COMMAND ----------
 
+# NOTE: Set your workspace URL, catalog, schema, and endpoint name here before running anything else.
 dbutils.widgets.text("workspace_url", "https://<your-workspace>.azuredatabricks.net", "Workspace URL")
 dbutils.widgets.text("catalog",       "workshop_au",          "Catalog name")
 dbutils.widgets.text("schema",        "ai_governance",        "Schema name")
@@ -39,6 +40,7 @@ print(f"GW endpoint    : {GW_ENDPOINT}")
 
 # COMMAND ----------
 
+# NOTE: Checks your access to all four system tables — confirm [OK] for each before proceeding.
 SYSTEM_TABLES = [
     "system.ai_gateway.usage",
     "system.access.audit",
@@ -63,6 +65,7 @@ for table in SYSTEM_TABLES:
 
 # COMMAND ----------
 
+# NOTE: Queries system.access.audit for recent AI events — confirms audit logging is active.
 # Verify audit logging is active and AI events are flowing.
 # Queries system.access.audit for recent AI-related actions.
 try:
@@ -101,17 +104,20 @@ except Exception as e:
 
 # COMMAND ----------
 
+# NOTE: Reference — shows the column names for system.ai_gateway.usage. No action needed.
 # View the full schema of the ai_gateway usage table
 display(spark.sql("DESCRIBE system.ai_gateway.usage"))
 
 # COMMAND ----------
 
+# NOTE: Read this if system.ai_gateway.usage returns 0 rows — lists the three things to check first.
 # Note: system.ai_gateway.usage populates once AI Gateway traffic flows through your endpoint.
 # If you see 0 rows: (1) confirm endpoint is Ready, (2) confirm at least one request was sent,
 # (3) wait ~15 minutes.
 
 # COMMAND ----------
 
+# NOTE: Queries system.ai_gateway.usage — requests by date, team, and token counts for the last 7 days.
 # Recent requests: date, endpoint, team, project, token counts — last 7 days
 recent_requests = spark.sql("""
   SELECT
@@ -138,6 +144,7 @@ display(recent_requests)
 
 # COMMAND ----------
 
+# NOTE: Queries top users by token consumption over 30 days — useful for spotting heavy users.
 # Top users by token consumption — last 30 days
 top_users = spark.sql("""
   SELECT
@@ -158,6 +165,7 @@ display(top_users)
 
 # COMMAND ----------
 
+# NOTE: Daily trend query — use the chart icon to switch to a line chart for capacity planning.
 # Daily trend — capacity planning and spike detection
 daily_trend = spark.sql("""
   SELECT
@@ -176,6 +184,7 @@ display(daily_trend)
 
 # COMMAND ----------
 
+# NOTE: Breaks down non-200 responses by blocked (400) vs rate-limited (429) — guardrail health check.
 # Blocked request analysis — status_code = 400 (blocked by guardrail), 429 (rate limited)
 # Note: guardrail_action and guardrail_type columns are not exposed in system.ai_gateway.usage.
 guardrail_hits = spark.sql("""
@@ -220,6 +229,7 @@ display(guardrail_hits)
 
 # COMMAND ----------
 
+# NOTE: Queries system.access.audit for model serving calls — shows who called which endpoint.
 # Model serving inference calls — last 7 days
 serving_calls = spark.sql("""
   SELECT
@@ -242,6 +252,7 @@ display(serving_calls)
 
 # COMMAND ----------
 
+# NOTE: Queries Genie Space activity from system.access.audit — shows adoption by user over 7 days.
 # Genie Space usage — last 7 days
 genie_usage = spark.sql("""
   SELECT
@@ -262,6 +273,7 @@ display(genie_usage)
 
 # COMMAND ----------
 
+# NOTE: Queries AI Playground usage — flag any regulated-data users who appear here for governance review.
 # AI Playground usage — flag for security review if regulated-data users appear here
 # Note: audit records the activity but NOT the prompt content
 playground_usage = spark.sql("""
@@ -282,6 +294,7 @@ display(playground_usage)
 
 # COMMAND ----------
 
+# NOTE: Queries AI Gateway config changes from audit — use this as change management evidence.
 # AI Gateway configuration changes — change management audit evidence
 # AI Gateway config events appear under service_name = 'serverlessRealTimeInference', NOT 'modelServing'.
 gateway_changes = spark.sql("""
@@ -322,6 +335,7 @@ display(gateway_changes)
 
 # COMMAND ----------
 
+# NOTE: Reference — sets illustrative AUD token rates used in cost attribution calculations below.
 # Token pricing — illustrative blended rates. Update to contracted rates.
 # These are NOT published list prices — for reference only.
 #   databricks-claude-haiku-4-5  : ~$1.00/1M input, ~$5.00/1M output  (Provisioned Throughput)
@@ -334,6 +348,7 @@ print(f"Illustrative blended rates: ${ILLUSTRATIVE_INPUT_RATE_PER_1M}/1M input, 
 
 # COMMAND ----------
 
+# NOTE: Defines the cost attribution view SQL — uncomment spark.sql(create_view_sql) to create it.
 CATALOG_NAME = CATALOG_W
 SCHEMA_NAME  = SCHEMA_W
 
@@ -381,6 +396,7 @@ print(f"Target view: {CATALOG_NAME}.{SCHEMA_NAME}.ai_gateway_cost_attribution")
 
 # COMMAND ----------
 
+# NOTE: Queries the cost attribution view — run after creating the view in the cell above.
 # Monthly cost by team — for internal chargeback and finance reporting
 try:
     cost_by_team = spark.sql(f"""
@@ -401,6 +417,7 @@ except Exception as _e:
 
 # COMMAND ----------
 
+# NOTE: Uncomment to export the monthly cost-by-team table to a UC volume CSV for finance reporting.
 # TODO: Uncomment to export cost attribution to a UC volume for finance reporting
 # from datetime import date as _date
 # spark.sql(f"CREATE VOLUME IF NOT EXISTS {CATALOG_NAME}.{SCHEMA_NAME}.cost_reports")
@@ -412,6 +429,7 @@ print("Cost attribution export is commented out — uncomment after view is crea
 
 # COMMAND ----------
 
+# NOTE: Finds requests missing team/project tags — shows which apps aren't passing the request-tag header.
 # Identify requests without team/project tags — these cannot be attributed to a cost centre
 untagged_requests = spark.sql("""
   SELECT
@@ -446,6 +464,7 @@ print("\nNote: Untagged requests indicate applications not passing the 'databric
 
 # COMMAND ----------
 
+# NOTE: Daily token usage by team — click the chart icon to switch to a line chart view.
 # Daily tokens by team — line chart: X = usage_date, Y = total_tokens, Group by = team
 daily_by_team = spark.sql("""
   SELECT
@@ -463,6 +482,7 @@ display(daily_by_team)
 
 # COMMAND ----------
 
+# NOTE: Endpoint utilisation summary — click chart icon for a bar chart showing success vs rate-limited.
 # Endpoint utilisation — bar chart: X = endpoint_name, Y = total_requests
 endpoint_utilisation = spark.sql("""
   SELECT
@@ -484,6 +504,7 @@ display(endpoint_utilisation)
 
 # COMMAND ----------
 
+# NOTE: Request outcome breakdown — click chart icon for a pie/donut showing success vs blocked vs limited.
 # Request outcome breakdown — pie/donut by outcome
 # Note: guardrail_type is not exposed in system.ai_gateway.usage; use status_code to classify.
 guardrail_summary = spark.sql("""
@@ -517,6 +538,7 @@ display(guardrail_summary)
 
 # COMMAND ----------
 
+# NOTE: Update the TODO email addresses and thresholds to match your organisation before scheduling.
 # TODO: Set your budget thresholds (AUD estimated costs at illustrative token rates)
 BUDGET_CONFIG = {
     "daily_warn_aud":     50.0,
@@ -535,6 +557,7 @@ for key, value in BUDGET_CONFIG.items():
 
 # COMMAND ----------
 
+# NOTE: Runs daily and monthly budget checks against system.ai_gateway.usage and prints a status report.
 from datetime import date
 import calendar
 
@@ -678,6 +701,7 @@ except Exception as e:
 
 # COMMAND ----------
 
+# NOTE: Reference only — prints the five most useful SQL queries for this lab. No changes made.
 REFERENCE_QUERIES = {
     "Top users — last 30 days": """
 SELECT
@@ -773,6 +797,7 @@ for query_name, sql in REFERENCE_QUERIES.items():
 
 # COMMAND ----------
 
+# NOTE: Checkpoint — reference only, shows what you should have verified. No action needed.
 print("=" * 60)
 print("  Lab 03 — Checkpoint Summary")
 print("=" * 60)
@@ -850,6 +875,7 @@ print("-" * 60)
 
 # COMMAND ----------
 
+# NOTE: Reference SQL for split billing by endpoint tag — copy into a SQL cell or spark.sql() to run.
 split_billing_sql = """
 SELECT
   DATE_TRUNC('month', usage_date)                    AS billing_month,

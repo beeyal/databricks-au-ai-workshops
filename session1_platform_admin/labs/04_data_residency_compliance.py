@@ -57,6 +57,7 @@
 
 # COMMAND ----------
 
+# NOTE: Run this — imports only, no side effects. Fails fast if the SDK isn't installed.
 import os
 import json
 import requests
@@ -65,6 +66,7 @@ from databricks.sdk import WorkspaceClient
 
 # COMMAND ----------
 
+# NOTE: Set workspace URL, account ID, catalog, schema, and endpoint name here before running.
 dbutils.widgets.text("workspace_url", "https://<your-workspace>.azuredatabricks.net", "Workspace URL")
 dbutils.widgets.text("account_id",    "<your-account-id>",                            "Account ID")
 dbutils.widgets.text("catalog",       "workshop_au",                                  "Catalog name")
@@ -84,6 +86,7 @@ print(f"GW endpoint     : {GW_ENDPOINT}")
 
 # COMMAND ----------
 
+# NOTE: Loads your PAT and initialises the WorkspaceClient — run before any section below.
 WORKSPACE_URL = WORKSPACE_URL_W
 ACCOUNT_ID    = ACCOUNT_ID_W
 
@@ -114,6 +117,7 @@ print(f"Compliance evidence run timestamp: {REPORT_TIMESTAMP}")
 
 # COMMAND ----------
 
+# NOTE: Attempts IMDS region check — returns "unknown" on serverless; take a screenshot as evidence instead.
 def check_workspace_region_from_host(workspace_url: str) -> dict:
     """
     Attempt to confirm the Azure region via IMDS (only reachable from classic compute nodes).
@@ -140,6 +144,7 @@ for k, v in region_check.items():
 
 # COMMAND ----------
 
+# NOTE: Reads Spark conf tags for cloud provider and cluster ID — faster than IMDS on classic compute.
 # Spark conf tags — set by the Databricks runtime on Azure; fast and reliable cluster-level signal
 try:
     cluster_cloud = spark.conf.get("spark.databricks.clusterUsageTags.clusterCloudProvider", "unknown")
@@ -171,6 +176,7 @@ display(spark.sql("""
 
 # COMMAND ----------
 
+# NOTE: Checks the geography enforcement toggle via API — WARN is expected if you don't have account admin.
 def check_geography_enforcement(workspace_client: WorkspaceClient) -> dict:
     """
     Check whether geography enforcement is enabled via workspace-conf API.
@@ -221,6 +227,7 @@ print(f"\n{icon} {geo_result['reason']}")
 
 # COMMAND ----------
 
+# NOTE: Reference — prints the AI feature residency inventory showing which features are approved for regulated data.
 # Feature inventory — used in the compliance evidence package and final summary.
 # NOT_FLAG_CONTROLLED = feature is governed by endpoint config/AI Gateway rules, not a binary workspace toggle.
 AI_FEATURE_INVENTORY = [
@@ -262,6 +269,7 @@ for f in AI_FEATURE_INVENTORY:
 
 # COMMAND ----------
 
+# NOTE: Assembles and prints the full compliance evidence package — fill in TODO fields before sharing.
 not_approved = [f for f in AI_FEATURE_INVENTORY if not f["approved_for_regulated_data"]]
 
 compliance_package = {
@@ -310,6 +318,7 @@ print(json.dumps(compliance_package, indent=2, default=str))
 
 # COMMAND ----------
 
+# NOTE: Uncomment to persist the compliance evidence package to a Delta table for audit retention.
 CATALOG_NAME = CATALOG_W
 SCHEMA_NAME  = SCHEMA_W
 
@@ -345,6 +354,7 @@ print("Evidence package Delta save: pattern provided above — uncomment to exec
 
 # COMMAND ----------
 
+# NOTE: Queries the last 30 days of AI admin events from system.access.audit for audit evidence.
 def generate_ai_access_log(start_date: str, end_date: str, include_endpoints: list = None):
     """
     Generate an AI model admin action log for Privacy Act and governance audit purposes.
@@ -393,6 +403,7 @@ access_log_df = generate_ai_access_log(AUDIT_START, AUDIT_END)
 
 # COMMAND ----------
 
+# NOTE: Uncomment to export the access log to a UC volume as CSV for offline audit submission.
 # Uncomment to export access log to a Unity Catalog volume (CSV) for offline audit submission
 # spark.sql(f"CREATE VOLUME IF NOT EXISTS {CATALOG_NAME}.{SCHEMA_NAME}.audit_exports")
 # (access_log_df.coalesce(1).write.mode("overwrite").option("header", "true")
@@ -414,6 +425,7 @@ print("Access log export pattern: uncomment to execute after confirming catalog/
 
 # COMMAND ----------
 
+# NOTE: Reference — prints the UC tag schema for AI asset classification. No changes made here.
 AI_TAG_SCHEMA = {
     "data_classification": (["public", "internal", "confidential", "restricted", "secret"], "internal"),
     "data_residency":      (["au-east", "any-au", "global"],                                "au-east"),
@@ -432,6 +444,7 @@ for tag_name, (values, default) in AI_TAG_SCHEMA.items():
 
 # COMMAND ----------
 
+# NOTE: Reference only — copy the ALTER statements into a SQL cell to apply tags to your assets.
 TAG_SQL_EXAMPLES = """
 -- Apply a residency policy tag at the catalog level
 ALTER CATALOG energy_ai
@@ -480,6 +493,7 @@ print(TAG_SQL_EXAMPLES)
 
 # COMMAND ----------
 
+# NOTE: Runs the pre-flight checklist against your endpoint and group — resolve all FAIL items before onboarding.
 def run_preflight_checklist(
     workspace_url: str, headers: dict, workspace_client: WorkspaceClient,
     endpoint_name: str, target_group: str,
@@ -633,6 +647,7 @@ print_preflight_report(preflight_report)
 
 # COMMAND ----------
 
+# NOTE: Uncomment to persist the pre-flight report to Delta as change management evidence.
 # Uncomment to save the pre-flight report to Delta for change management evidence
 # row = {
 #     "check_timestamp":  preflight_report["preflight_timestamp"],
@@ -659,6 +674,7 @@ print("Pre-flight report Delta save: uncomment to execute after configuring cata
 
 # COMMAND ----------
 
+# NOTE: Prints the final compliance summary — read the output and resolve any FAIL or WARN items.
 geo_status  = geo_result.get("status", "UNKNOWN")
 geo_display = {
     "PASS":          "ENABLED [PASS]",
@@ -699,6 +715,7 @@ for f in restricted:
 
 # COMMAND ----------
 
+# NOTE: Checkpoint — reference only, lists everything covered in this lab. No action needed.
 print("=" * 60)
 print("Lab 04 — Checkpoint Summary")
 print("=" * 60)

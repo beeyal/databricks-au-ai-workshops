@@ -25,10 +25,12 @@
 
 # COMMAND ----------
 
+# NOTE: Run this — installs the SDK. Restart the kernel if prompted.
 %pip install "databricks-sdk>=0.28" openai --quiet
 
 # COMMAND ----------
 
+# NOTE: Run this — imports the SDK types. Fails fast if SDK < 0.28 is installed.
 import os
 import json
 import time
@@ -57,6 +59,7 @@ except ImportError:
 
 # COMMAND ----------
 
+# NOTE: Set your workspace URL and endpoint name here before running anything else.
 dbutils.widgets.text("workspace_url",    "https://<your-workspace>.azuredatabricks.net", "Workspace URL (no trailing slash)")
 dbutils.widgets.text("pt_endpoint",      "au_east_llm_inregion",                         "PT serving endpoint name (prerequisite)")
 dbutils.widgets.text("catalog",          "workshop_au",                                  "Catalog name (for payload logs)")
@@ -74,6 +77,7 @@ print(f"Schema         : {SCHEMA_W}")
 
 # COMMAND ----------
 
+# NOTE: Validates the URL and loads your PAT — raises immediately if either is still a placeholder.
 WORKSPACE_URL = WORKSPACE_URL_W.rstrip("/")
 if "<your-workspace>" in WORKSPACE_URL:
     raise ValueError(
@@ -127,6 +131,7 @@ print(f"  Payload table  : {CATALOG_NAME}.{SCHEMA_NAME}.{PAYLOAD_TABLE_PREFIX}_p
 
 # COMMAND ----------
 
+# NOTE: API version of the geography toggle you verified in Account Console — read-only, no changes.
 # Typed Settings API — reads llm_proxy_partner_powered and related flags.
 # PATCH body to disable: {"setting": {"boolean_val": {"value": false}}, "allow_missing": true, "field_mask": "boolean_val"}
 # GET response: {"etag": "...", "setting_name": "default", "boolean_val": {"value": true}}
@@ -187,6 +192,7 @@ for key in WORKSPACE_CONF_KEYS:
 
 # COMMAND ----------
 
+# NOTE: Skip if you already know Partner-Powered AI is disabled. Uncomment the PATCH line only if you want to disable it.
 def set_partner_powered_ai(workspace_url: str, headers: dict, enabled: bool) -> dict:
     """
     Enable or disable Partner-Powered AI for this workspace.
@@ -239,6 +245,7 @@ else:
 
 # COMMAND ----------
 
+# NOTE: SQL template — fill in the TODO variables above, then uncomment the spark.sql calls to run.
 # ---------------------------------------------------------------------------
 # TODO: Replace ALL placeholder values before running.
 # ---------------------------------------------------------------------------
@@ -274,6 +281,7 @@ print(grant_model_sql)
 
 # COMMAND ----------
 
+# NOTE: Grants CAN_QUERY on the serving endpoint — same as clicking Permissions in the Serving UI. Uncomment to apply.
 from databricks.sdk.service.serving import (
     ServingEndpointAccessControlRequest,
     ServingEndpointPermissionLevel,
@@ -302,6 +310,7 @@ print("SDK permission call is commented out — uncomment after setting ENDPOINT
 
 # COMMAND ----------
 
+# NOTE: Helper function — called below once GENIE_SPACE_ID is set. Uncomment the calls at the bottom.
 # Genie Space permissions use the dashboards object type: /api/2.0/permissions/dashboards/{space_id}
 # Valid levels: CAN_USE, CAN_EDIT, CAN_MANAGE
 # Space ID from the browser URL: .../genie/spaces/<SPACE-ID>
@@ -346,6 +355,7 @@ print("Genie Space permission calls are commented out — uncomment after settin
 
 # COMMAND ----------
 
+# NOTE: Checkpoint — set geography_enforced = True after confirming the Account Console toggle, then run.
 # Set geography_enforced = True after confirming the toggle is ON in Account Console.
 geography_enforced = None
 
@@ -401,6 +411,7 @@ else:
 
 # COMMAND ----------
 
+# NOTE: Checks the prerequisite endpoint is Ready before you configure the gateway on it.
 # AI Gateway sits between callers and the model — rate limits, guardrails, and logging in one config layer.
 
 def preflight_check_endpoint(w: WorkspaceClient, endpoint_name: str) -> bool:
@@ -487,6 +498,7 @@ _lab01_endpoint_ready = preflight_check_endpoint(w, PT_ENDPOINT_NAME)
 
 # COMMAND ----------
 
+# NOTE: Helper function — builds the AiGatewayConfig object used in Section 3. Called immediately below.
 def build_gateway_config(
     catalog: str, schema: str, table_prefix: str, endpoint_qpm: int = 60, user_qpm: int = 20,
 ) -> "AiGatewayConfig":
@@ -560,6 +572,7 @@ else:
 
 # COMMAND ----------
 
+# NOTE: Run this — applies the full gateway config to your endpoint via REST (rate limits + guardrails + logging).
 def _get_existing_gateway_config(workspace_url: str, headers: dict, endpoint_name: str) -> dict:
     """
     Fetch the current ai_gateway config dict. Use this before any PUT to avoid wiping settings.
@@ -647,6 +660,7 @@ else:
 
 # COMMAND ----------
 
+# NOTE: Skip unless your policy requires blocking NMI patterns — TFN/Medicare/ABN are already covered.
 def update_guardrails_with_custom_keywords(
     workspace_url: str, headers: dict, endpoint_name: str, nmi_keyword_prefixes: list,
 ) -> dict:
@@ -694,6 +708,7 @@ print("NMI keyword blocking function defined — optional, uncomment if required
 
 # COMMAND ----------
 
+# NOTE: Reference — prints the full table name where payload logs will appear. No changes made here.
 _payload_table = f"{CATALOG_NAME}.{SCHEMA_NAME}.{PAYLOAD_TABLE_PREFIX}_payload"
 print(f"Payload log table: {_payload_table}")
 
@@ -725,6 +740,7 @@ print(f"Payload log table: {_payload_table}")
 
 # COMMAND ----------
 
+# NOTE: Helper function — called below. Do NOT uncomment the update call before completing Lab 02.
 def update_rate_limits(
     workspace_url: str, headers: dict, endpoint_name: str, endpoint_qpm: int, user_qpm: int,
 ) -> dict:
@@ -769,6 +785,7 @@ print("Do not change before running Lab 02.")
 
 # COMMAND ----------
 
+# NOTE: Runs all four gateway tests — connectivity, custom prompt, PII block, and safety filter.
 def test_basic_connectivity(workspace_url: str, token: str, endpoint_name: str) -> bool:
     url = f"{workspace_url}/serving-endpoints/{endpoint_name}/invocations"
     resp = requests.post(
@@ -901,6 +918,7 @@ else:
 
 # COMMAND ----------
 
+# NOTE: Sends a tagged request so the call appears in system.ai_gateway.usage with team/project attribution.
 import openai
 
 def call_gateway_with_tags(
@@ -952,6 +970,7 @@ print(f"  ORDER BY event_time DESC LIMIT 10")
 
 # COMMAND ----------
 
+# NOTE: Fetches the live gateway config and prints a PASS/FAIL compliance summary — run after Section 3b.
 def print_gateway_compliance_summary(workspace_url: str, headers: dict, endpoint_name: str) -> bool:
     """
     Fetch the AI Gateway config and print a compliance summary.
@@ -1032,6 +1051,7 @@ else:
 
 # COMMAND ----------
 
+# NOTE: Checkpoint — run this at the end to see which steps are complete before moving to Lab 02.
 print("=" * 60)
 print("  Lab 01 -- Final Checkpoint")
 print("=" * 60)

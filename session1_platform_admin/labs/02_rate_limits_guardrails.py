@@ -31,6 +31,7 @@
 
 # COMMAND ----------
 
+# NOTE: Run this — imports only, no side effects. Fails fast if the SDK isn't installed.
 import os
 import json
 import time
@@ -42,6 +43,7 @@ from databricks.sdk import WorkspaceClient
 
 # COMMAND ----------
 
+# NOTE: Set your workspace URL and endpoint name here — must match what you configured in Lab 01.
 dbutils.widgets.text("workspace_url", "https://<your-workspace>.azuredatabricks.net", "Workspace URL")
 dbutils.widgets.text("gw_endpoint",   "au_east_llm_inregion",                         "AI Gateway endpoint name")
 dbutils.widgets.text("catalog",       "workshop_au",                                  "Catalog name")
@@ -58,6 +60,7 @@ print(f"Catalog.Schema : {CATALOG_W}.{SCHEMA_W}")
 
 # COMMAND ----------
 
+# NOTE: Loads your token and builds the invoke URL — run before any test cells below.
 ENDPOINT_NAME = GW_ENDPOINT
 
 try:
@@ -102,6 +105,7 @@ print(f"User QPM limit (Lab 01 config) : {USER_QPM}")
 
 # COMMAND ----------
 
+# NOTE: Reference only — shows the tier structure. The endpoint from Lab 01 is already running.
 # Reference: rate limit tier structure. Creating these endpoints requires POST to /api/2.0/serving-endpoints.
 # The endpoint from Lab 01 is already running — this cell is reference only.
 
@@ -162,6 +166,7 @@ for tier, cfg in ENDPOINT_TIERS.items():
 
 # COMMAND ----------
 
+# NOTE: This fires 30 concurrent requests to trigger 429s — uncomment burst_test_rate_limit() when ready.
 def send_single_request(invoke_url: str, token: str, prompt: str = "Hi") -> dict:
     """Send one request and return status, latency, and response body."""
     start = time.time()
@@ -275,6 +280,7 @@ print(f"When you run it: expect ~{USER_QPM} requests to return 200 and the rest 
 
 # COMMAND ----------
 
+# NOTE: Defines safety test cases and runs them — uncomment run_safety_tests() to send live requests.
 SAFETY_TEST_CASES = [
     {
         "name":     "Safe — electricity meter query",
@@ -350,6 +356,7 @@ print("Safety tests are commented out — safe to run after endpoint is confirme
 
 # COMMAND ----------
 
+# NOTE: Defines AU PII test cases — uncomment run_au_pii_tests() to send live requests and see results.
 AU_PII_TEST_CASES = [
     {
         "name":     "TFN in prompt",
@@ -472,6 +479,7 @@ print("AU PII tests are commented out — safe to run after endpoint is availabl
 
 # COMMAND ----------
 
+# NOTE: Verifies NMI alone passes but NMI+person details are blocked — uncomment run_nmi_edge_cases() to run.
 NMI_TEST_CASES = [
     {
         "name":     "NMI alone — should NOT be blocked",
@@ -527,6 +535,7 @@ print("NMI edge case tests are commented out — safe to run.")
 
 # COMMAND ----------
 
+# NOTE: Runs the application-layer keyword filter and shows which prompts would be blocked and logged.
 BLOCKED_TERMS = [
     "[internal investigation reference]",
     "AER enforcement",
@@ -625,6 +634,7 @@ for prompt in KEYWORD_TEST_PROMPTS:
 
 # COMMAND ----------
 
+# NOTE: Prints the UC function SQL — uncomment spark.sql() at the bottom to register it in your catalog.
 CUSTOM_GUARDRAIL_SQL = f"""
 CREATE OR REPLACE FUNCTION {CATALOG_W}.{SCHEMA_W}.detect_aemo_pii(prompt STRING)
 RETURNS STRUCT<action STRING, trigger_type STRING, detail STRING>
@@ -684,6 +694,7 @@ print(f"  Path: {CATALOG_W}.{SCHEMA_W}.detect_aemo_pii")
 
 # COMMAND ----------
 
+# NOTE: Validates the custom guardrail logic locally — runs instantly with no model call needed.
 import re
 
 _MONTHS = {
@@ -770,6 +781,7 @@ for tc in CUSTOM_GUARDRAIL_TEST_CASES:
 
 # COMMAND ----------
 
+# NOTE: Uncomment the verify_all_guardrails() call to run the full config + live functional test report.
 def verify_all_guardrails(
     workspace_url: str, headers: dict, invoke_url: str, token: str, endpoint_name: str,
 ) -> dict:
@@ -892,6 +904,7 @@ print("Guardrail verification is commented out — run after endpoint is confirm
 
 # COMMAND ----------
 
+# NOTE: Checkpoint — reference only, shows what you should have verified. No action needed.
 print("=" * 65)
 print("Lab 02 — Checkpoint Summary")
 print("=" * 65)
