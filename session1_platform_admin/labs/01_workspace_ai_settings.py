@@ -41,9 +41,9 @@
 # MAGIC
 # MAGIC ---
 # MAGIC
-# MAGIC > **AU East residency quick ref** — Genie Spaces ✅ in-region | AI Gateway ✅ in-region | FMAPI Provisioned Throughput ✅ in-region | FMAPI Pay-Per-Token ⚠️ cross-geo by default (requires cross-geo processing enabled) | Knowledge Assistant ❌ not available in AU East | Foundation Model Fine-tuning ❌ not available AU East
+# MAGIC > **AU East residency quick ref** — Genie Spaces ✅ in-region | AI Gateway ✅ in-region | FMAPI Provisioned Throughput ✅ in-region | FMAPI Pay-Per-Token (Claude Sonnet 4.6/4.5, Haiku 4.5, Opus 4.6, GPT OSS 20B/120B, qwen3-embedding-0-6b) ✅ in-region | FMAPI Pay-Per-Token (Llama, Gemma, Qwen, older models ⥂) ⚠️ cross-geo | Knowledge Assistant ⚠️ cross-geo (no committed AU East in-geo date) | Foundation Model Fine-tuning ❌ not available AU East
 # MAGIC >
-# MAGIC > **Important:** ALL FMAPI Pay-Per-Token endpoints (including `databricks-claude-haiku-4-5`) require the "Allow cross-geography model serving" toggle to be enabled, because even AU-region models are currently backed by cross-geo infrastructure for Pay-Per-Token traffic. Only FMAPI Provisioned Throughput endpoints are fully in-region. See Lab 02 for the in-region setup using AI Gateway with a provisioned endpoint.
+# MAGIC > **Note:** Several FMAPI Pay-Per-Token models are natively in-region for AU East and do NOT require cross-geo routing: `databricks-claude-haiku-4-5`, `databricks-claude-sonnet-4-5`, `databricks-claude-sonnet-4-6`, `databricks-claude-opus-4-6`, `databricks-gpt-oss-20b`, `databricks-gpt-oss-120b`, `databricks-qwen3-embedding-0-6b`. Only Pay-Per-Token models marked ⥂ (Llama, Gemma, Qwen, older Claude Sonnet 4) require cross-geo processing to be enabled. FMAPI Provisioned Throughput (Llama, GPT OSS, Gemma) is always fully in-region.
 
 # COMMAND ----------
 

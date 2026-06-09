@@ -9,7 +9,7 @@
 # MAGIC |---|---|
 # MAGIC | ⏱️ **Duration** | 30–35 minutes |
 # MAGIC | **Role** | Workspace Admin |
-# MAGIC | **Model** | `databricks-claude-haiku-4-5` via FMAPI pay-per-token. Note: this model requires cross-geo processing to be enabled on the workspace — see Section 2 for details. |
+# MAGIC | **Model** | `databricks-claude-haiku-4-5` via FMAPI pay-per-token — natively in-region for AU East, no cross-geo routing required |
 # MAGIC | **Cluster** | DBR 14.3 LTS or later |
 # MAGIC | **SDK version** | `databricks-sdk>=0.28` (installed in Section 0) |
 # MAGIC
@@ -234,7 +234,7 @@ print(f"  Payload log table    : {CATALOG_NAME}.{SCHEMA_NAME}.{PAYLOAD_TABLE_PRE
 # MAGIC
 # MAGIC **Model used in this lab:** `databricks-claude-haiku-4-5` — FMAPI pay-per-token (PPT).
 # MAGIC
-# MAGIC > **Cross-geo note:** FMAPI Pay-Per-Token models — including `databricks-claude-haiku-4-5` — are marked with `*` in the Databricks AU East FMAPI availability matrix, meaning they require cross-geo processing to be enabled on the workspace. If your workspace has geography enforcement set to the strict mode that blocks all cross-geo traffic, you must allow `databricks-claude-haiku-4-5` as an exception, or use a Provisioned Throughput endpoint configured explicitly for AU East. Lab 05 covers geography enforcement settings in detail.
+# MAGIC > **AU East residency note:** `databricks-claude-haiku-4-5` is natively in-region for AU East — it is NOT marked with ⥂ and does NOT require cross-geo processing to be enabled. Other in-geo Pay-Per-Token models include `databricks-claude-sonnet-4-5`, `databricks-claude-sonnet-4-6`, `databricks-claude-opus-4-6`, `databricks-gpt-oss-20b`, `databricks-gpt-oss-120b`, and `databricks-qwen3-embedding-0-6b`. Models that DO require cross-geo (⥂) include Llama, Gemma, Qwen, and older unbranded Claude Sonnet 4.
 # MAGIC
 # MAGIC > **Note on "Provisioned Throughput":** The endpoint name `au_east_llm_inregion` used in this lab refers to the FMAPI pay-per-token endpoint backed by `databricks-claude-haiku-4-5`. Despite the name, it is not a dedicated Provisioned Throughput (reserved capacity) endpoint. "PT" in the endpoint name is the facilitator's naming convention — the underlying billing is pay-per-token.
 # MAGIC
@@ -858,10 +858,10 @@ print("Do not change these before running Lab 03.")
 # MAGIC
 # MAGIC **UI alternative:** Navigate to the endpoint in the AI Gateway tab and use the built-in Playground. Try a prompt containing a TFN: "My TFN is 645 942 679" — you should see a guardrail block error instead of a model response.
 # MAGIC
-# MAGIC **Cross-geo reminder:** If your workspace blocks cross-geo traffic and `databricks-claude-haiku-4-5`
-# MAGIC requires cross-geo, Test 1 and Test 2 will return HTTP 403 with a geography enforcement error —
-# MAGIC not an endpoint or gateway error. If that happens, check the geography enforcement setting with
-# MAGIC your facilitator before retrying.
+# MAGIC **Note:** `databricks-claude-haiku-4-5` is an in-region model for AU East and does not require
+# MAGIC cross-geo routing. If Test 1 or Test 2 return HTTP 403, this indicates an endpoint permission
+# MAGIC or AI Gateway configuration issue — not a geography enforcement issue. Check that the endpoint
+# MAGIC exists and the AI Gateway route is correctly pointing to it.
 
 # COMMAND ----------
 
@@ -1249,7 +1249,7 @@ print("-" * 60)
 # MAGIC <li>PII BLOCK active for TFN, Medicare, ABN (built-in); NMI blocking available via keyword config (Section 3c)</li>
 # MAGIC <li>Four end-to-end tests run automatically: connectivity, custom prompt, PII blocking, safety filter</li>
 # MAGIC </ul>
-# MAGIC <p><strong>Cross-geo note:</strong> databricks-claude-haiku-4-5 requires cross-geo processing to be enabled. If tests returned HTTP 403, check geography enforcement settings with your facilitator before Lab 03.</p>
+# MAGIC <p><strong>AU East note:</strong> databricks-claude-haiku-4-5 is natively in-region for AU East — no cross-geo routing required. If tests returned HTTP 403, check endpoint and AI Gateway configuration with your facilitator before Lab 03.</p>
 # MAGIC <p><strong>Next:</strong> Lab 03: Rate Limits and Guardrails Deep-Dive — burst testing, 429 handling, AU PII pattern verification</p>
 # MAGIC </div>
 # MAGIC

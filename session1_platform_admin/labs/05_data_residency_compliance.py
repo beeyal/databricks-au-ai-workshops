@@ -33,9 +33,10 @@
 # MAGIC | External Models (Azure OpenAI Regional) | In-region | Yes — verify deployment region |
 # MAGIC | Vector Search | In-region | Yes |
 # MAGIC | MLflow Tracking | In-region | Yes |
-# MAGIC | FMAPI Pay-Per-Token | Cross-geo | **No** — routes to US East |
-# MAGIC | Knowledge Assistant (Agent Bricks) | Not available | **No** — not GA in AU East as of June 2026 |
-# MAGIC | Supervisor Agent / MAS (Agent Bricks) | Not available | **No** — not GA in AU East as of June 2026 |
+# MAGIC | FMAPI Pay-Per-Token (claude-haiku-4-5, claude-sonnet-4-5/4-6, claude-opus-4-6, gpt-oss-20b/120b, qwen3-embedding-0-6b) | In-region | **Yes** — no cross-geo required |
+# MAGIC | FMAPI Pay-Per-Token (⥂ models: Llama, Gemma, Qwen, older Claude Sonnet 4) | Cross-geo | **No** — requires cross-geo routing enabled |
+# MAGIC | Knowledge Assistant (Agent Bricks) | Cross-geo | **No** — cross-geo, no committed AU East in-geo date |
+# MAGIC | Supervisor Agent / MAS (Agent Bricks) | Cross-geo | **No** — cross-geo, no committed AU East in-geo date |
 # MAGIC | Foundation Model Fine-tuning | Not available | Not applicable |
 
 # COMMAND ----------
@@ -375,12 +376,20 @@ AI_FEATURE_INVENTORY = [
         "notes": "Tokens stay in-region. Select australiaeast PT endpoint type at creation.",
     },
     {
-        "feature_name": "FMAPI Pay-Per-Token",
+        "feature_name": "FMAPI Pay-Per-Token (in-geo models: claude-haiku-4-5, claude-sonnet-4-5/4-6, claude-opus-4-6, gpt-oss-20b/120b, qwen3-embedding-0-6b)",
+        "feature_flag_type": None,
+        "residency": "IN_REGION",
+        "risk_rating": "LOW",
+        "approved_for_regulated_data": True,
+        "notes": "These models are natively in-region for AU East. No cross-geo routing required.",
+    },
+    {
+        "feature_name": "FMAPI Pay-Per-Token (⥂ cross-geo models: Llama, Gemma, Qwen, older Claude Sonnet 4)",
         "feature_flag_type": None,
         "residency": "CROSS_GEO",
         "risk_rating": "HIGH",
         "approved_for_regulated_data": False,
-        "notes": "Routes through US data centres. Do NOT use for any data above Public classification.",
+        "notes": "These models require cross-geo routing enabled. Do NOT use for regulated data.",
     },
     {
         "feature_name": "External Models (Azure OpenAI Regional)",
@@ -501,7 +510,7 @@ compliance_package = {
     "assessment_date": REPORT_TIMESTAMP,
     "assessed_by":     "TODO: Name/Role",
     # Named regulatory frameworks applicable to AU energy sector AI deployments
-    "regulatory_frameworks": ["Privacy Act 1988", "AESCSF", "AER Cyber Security Guidelines", "NER Chapter 7"],
+    "regulatory_frameworks": ["Privacy Act 1988", "AER Cyber Security Guidelines", "NER Chapter 7"],
     "section_1_infrastructure": {
         "workspace_region":                     region_check.get("location", "unknown"),
         "region_verification_source":           region_check.get("source", "unknown"),
@@ -683,7 +692,7 @@ AI_TAG_SCHEMA = {
     "data_classification": (["public", "internal", "confidential", "restricted", "secret"], "internal"),
     "data_residency":      (["au-east", "any-au", "global"],                                "au-east"),
     "pii_processes":       (["yes", "no", "conditional"],                                   "no"),
-    "regulatory_scope":    (["privacy-act-1988", "aescsf", "aer", "ner", "none"],           "none"),
+    "regulatory_scope":    (["privacy-act-1988", "aer", "ner", "none"],                       "none"),
     "ai_approved":         (["approved", "pending-review", "not-approved", "conditional"],  "pending-review"),
     "owner_team":          (None,                                                            None),
 }
