@@ -91,7 +91,11 @@ def _run_query(sql: str, timeout_secs: int = 50) -> pd.DataFrame:
         obo_token = ""
 
     if obo_token and host:
-        client = WorkspaceClient(host=host, token=obo_token)
+        # Explicitly pass empty client_id/secret so SDK uses ONLY the OBO PAT,
+        # not the SP OAuth M2M creds that are also in the environment.
+        from databricks.sdk.config import Config
+        cfg = Config(host=host, token=obo_token, client_id="", client_secret="")
+        client = WorkspaceClient(config=cfg)
     else:
         # Fall back to SP credentials (needs warehouse access granted)
         client = _get_cached_client()
@@ -668,7 +672,7 @@ def get_user_group_map() -> dict:
         obo_token = ""
 
     if obo_token and host:
-        client = WorkspaceClient(host=host, token=obo_token)
+        from databricks.sdk.config import Config as _Cfg; client = WorkspaceClient(config=_Cfg(host=host, token=obo_token, client_id="", client_secret=""))
     else:
         client = _get_cached_client()
 
