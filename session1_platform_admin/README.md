@@ -1,7 +1,7 @@
 # Session 1: Governing Databricks AI Features in Australian Regulated Industries
 
 **Track:** Platform Admin / Security  
-**Duration:** ~3 hours (5 labs × 30–45 min each)  
+**Duration:** ~2 hours (4 labs × 25–40 min each)  
 **Audience:** Workspace admins, security architects, platform engineers, cloud infrastructure leads
 
 ---
@@ -52,63 +52,51 @@ By the end of this workshop, you will be able to:
 
 ## Labs
 
-### Lab 01 — Workspace AI Settings & Access Control
+### Lab 01 — AI Gateway Setup
 
-**File:** `labs/01_workspace_ai_settings.py`  
-**Duration:** 35–40 minutes  
+**File:** `labs/01_ai_gateway_setup.py`  
+**Duration:** ~40 minutes  
 **Difficulty:** Intermediate
 
-Configure and verify AI feature flags at workspace and account level. Understand the hierarchy of controls (account admin vs workspace admin), verify the geography enforcement setting, and set up Unity Catalog grants for AI assets including models, serving endpoints, and Genie Spaces. Create service principals for automated workloads and design a group structure for an energy utility.
+Pre-flight checks (geography enforcement, Partner-Powered AI flags, UC grants on models/endpoints/Genie Spaces), then configure an AI Gateway route on the prerequisite serving endpoint. Covers rate limits, PII BLOCK guardrails, payload logging, and end-to-end testing.
 
-Key topics: Settings API (`llm_proxy_partner_powered`, `restrict_workspace_admins`), geography enforcement (UI-verified via Account Console; no confirmed public API), UC GRANT for AI assets, service principal creation, group structure.
+Key topics: Settings API (`llm_proxy_partner_powered`), geography enforcement (UI-verified), UC GRANT for AI assets, AI Gateway config via REST and SDK, PII/safety testing, compliance check.
 
 ---
 
-### Lab 02 — AI Gateway Setup
+### Lab 02 — Rate Limits & Guardrails
 
-**File:** `labs/02_ai_gateway_setup.py`  
-**Duration:** 40–45 minutes  
+**File:** `labs/02_rate_limits_guardrails.py`  
+**Duration:** ~35 minutes  
 **Difficulty:** Intermediate
 
-AI Gateway is the control plane for all LLM calls originating from your workspace. Configure an AI Gateway endpoint that routes to your Provisioned Throughput model (in-region), sets per-user rate limits, and blocks access to external Pay-Per-Token models that process data outside Australia East. Configure guardrails to filter harmful content and PII patterns.
+Prove rate limits fire 429s with a live burst test. Test built-in AU PII detection (TFN, Medicare, ABN, phone, email). Handle the NMI edge case. Add application-layer keyword blocking and a custom LLM-as-judge UC function for energy-sector-specific identifiers. Generate a structured guardrail verification report.
 
-Key topics: AI Gateway endpoint creation, routing rules, rate limits, guardrail configuration, blocking unapproved models.
+Key topics: QPM/TPM limits, 429 handling, AU PII pattern testing, NMI edge case, keyword blocking, custom UC guardrail, verification report artefact.
 
 ---
 
-### Lab 03 — Rate Limits and Guardrails
+### Lab 03 — Usage Tracking & Cost Attribution
 
-**File:** `labs/03_rate_limits_guardrails.py`  
-**Duration:** 35–40 minutes  
+**File:** `labs/03_usage_tracking.py`  
+**Duration:** ~30 minutes  
 **Difficulty:** Intermediate
 
-Build on the AI Gateway endpoint created in Lab 02. Tune per-user and per-endpoint QPM/TPM limits to protect against runaway costs and enforce fair-use quotas. Configure AU-specific PII guardrails that block Tax File Numbers, Medicare numbers, and ABNs from reaching the LLM. Test the guardrails by firing requests that should and should not be blocked, then generate a guardrail verification report suitable for a compliance audit.
+Verify audit logging is active. Query `system.ai_gateway.usage` for token consumption, user trends, and guardrail hits. Build a cost attribution view by team/project tag. Set up a daily budget alert. Reference SQL query card included.
 
-Key topics: QPM/TPM rate limit configuration, 429 handling, AU PII pattern guardrails, guardrail testing, verification report artefact.
+Key topics: `system.ai_gateway.usage`, `system.access.audit`, `system.billing.usage`, cost attribution by request tag, budget alerts, split billing via endpoint tags.
 
 ---
 
-### Lab 04 — Usage Tracking & Cost Attribution
+### Lab 04 — Data Residency & Compliance Evidence
 
-**File:** `labs/04_usage_tracking.py`  
-**Duration:** 30–35 minutes  
+**File:** `labs/04_data_residency_compliance.py`  
+**Duration:** ~25 minutes  
 **Difficulty:** Intermediate
 
-Query the Databricks system tables that record AI activity and cost. Build a cost attribution view across `system.ai_gateway.usage` (token usage, guardrail hits, latency), `system.billing.usage` (Model Serving DBUs), and `system.access.audit` (Genie and endpoint invocations). Configure a budget alert on the billing system table and produce a reference SQL card participants can take back to their organisations.
+Assemble a compliance evidence package: workspace region verification, geography enforcement check, AI feature inventory with residency status, regulatory audit log export, UC tag schema for asset classification, and a pre-flight checklist for new user group onboarding.
 
-Key topics: `system.ai_gateway.usage`, `system.billing.usage`, `system.access.audit`, cost attribution by team/project tag, budget alerts.
-
----
-
-### Lab 05 — Data Residency & Compliance Evidence
-
-**File:** `labs/05_data_residency_compliance.py`  
-**Duration:** 30–35 minutes  
-**Difficulty:** Intermediate
-
-Assemble a compliance evidence package that satisfies Australian data residency and privacy obligations. Run a pre-flight checklist that programmatically verifies geography enforcement is on, AI Gateway is routing only to in-region endpoints, and PII guardrails are active. Query `system.access.audit` to export an AI-action audit log. Package all artefacts into a structured evidence bundle.
-
-Key topics: Geography enforcement API check, pre-flight checklist script, `system.access.audit` AI event export, data residency evidence bundle, Privacy Act PII controls documentation.
+Key topics: Geography enforcement API check, pre-flight checklist script, `system.access.audit` AI event export, UC governed tags, compliance evidence package, Privacy Act PII controls documentation.
 
 ---
 
@@ -116,28 +104,29 @@ Key topics: Geography enforcement API check, pre-flight checklist script, `syste
 
 At the end of this workshop, your workshop workspace will have:
 
-- A documented inventory of all AI features and their enabled/disabled state (Lab 01)
-- An AI Gateway endpoint routing all LLM traffic through the in-region PT endpoint (Lab 02)
-- Configured rate limits and AU PII guardrails, with a guardrail verification report (Lab 03)
-- A cost attribution view across AI usage system tables with a budget alert configured (Lab 04)
-- A compliance evidence package with pre-flight checklist and regulatory audit log export (Lab 05)
+- An AI Gateway endpoint routing all LLM traffic through the in-region PT endpoint, with PII BLOCK guardrails, payload logging, and rate limits configured (Lab 01)
+- Proven rate limits and AU PII guardrails via live tests, with a guardrail verification report (Lab 02)
+- A cost attribution view across AI usage system tables with a daily budget alert configured (Lab 03)
+- A compliance evidence package with pre-flight checklist, feature inventory, and regulatory audit log export (Lab 04)
 - A controls checklist you can take back to your organisation's AI governance framework
 
 ---
 
 ## AU East Residency Reference
 
-The table below is your quick reference for labs and discussions. It reflects the status as of May 2026.
+The table below is your quick reference for labs and discussions. It reflects the status as of June 2026.
 
 | Feature | Residency | Safe for Regulated Data |
 |---------|-----------|------------------------|
 | Genie Spaces | In-region (AU East) | Yes |
+| Genie Agent Mode (within Genie Spaces) | In-region (AU East) | Yes |
 | AI Gateway | In-region (AU East) | Yes |
-| Notebook Assistant (Genie Code) | In-region (AU East) | Yes |
 | FMAPI Provisioned Throughput | In-region (AU East) | Yes |
+| FMAPI Pay-Per-Token — claude-haiku-4-5, claude-sonnet-4-5/4-6, claude-opus-4-6, gpt-oss-20b/120b, qwen3-embedding-0-6b | In-region (AU East) | **Yes** |
+| FMAPI Pay-Per-Token — Llama, Gemma, qwen35-122b-a10b, qwen3-next-80b-a3b-instruct, older Claude Sonnet 4 | **Cross-geo** | **No** |
 | Model Serving (custom models) | In-region (AU East) | Yes |
-| FMAPI Pay-Per-Token | **Cross-geo** | **No** |
-| Knowledge Assistant | **Cross-geo** | **No** — workaround: use Genie Spaces instead |
+| Knowledge Assistant (Agent Bricks) | **Cross-geo** | **No** — no committed AU East in-geo date |
+| Supervisor Agent / MAS (Agent Bricks) | **Cross-geo** | **No** — no committed AU East in-geo date |
 | Foundation Model Fine-tuning | Not available in AU East | N/A |
 
 ---

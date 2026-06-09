@@ -1,41 +1,15 @@
 # Databricks notebook source
 # MAGIC %md
 # MAGIC <div style="background: linear-gradient(135deg, #1B3139 0%, #243447 100%); padding: 24px; border-radius: 8px; margin-bottom: 8px">
-# MAGIC   <h1 style="color: #FF6B35; margin: 0 0 8px 0; font-size: 28px">Lab 04: Usage Tracking & Cost Attribution</h1>
+# MAGIC   <h1 style="color: #FF6B35; margin: 0 0 8px 0; font-size: 28px">Lab 03: Usage Tracking &amp; Cost Attribution</h1>
 # MAGIC   <p style="color: #AECBCC; margin: 0; font-size: 14px">Workshop 1: Admin Track · Australian Regulated Industries · Databricks</p>
 # MAGIC </div>
 # MAGIC
 # MAGIC | | |
 # MAGIC |---|---|
-# MAGIC | ⏱️ **Duration** | 25–30 minutes |
-# MAGIC | **Prerequisites** | Lab 02 complete — AI Gateway endpoint with usage tracking enabled |
+# MAGIC | ⏱️ **Duration** | ~30 minutes |
+# MAGIC | **Prerequisites** | Lab 01 complete — AI Gateway endpoint with usage tracking enabled |
 # MAGIC | **By the end** | Cost attribution view built, budget alert configured, reference SQL card printed |
-# MAGIC
-# MAGIC ---
-# MAGIC
-# MAGIC | Table | What it contains | Latency |
-# MAGIC |---|---|---|
-# MAGIC | `system.ai_gateway.usage` | Token usage, latency, tags, guardrail hits | ~15 min |
-# MAGIC | `system.access.audit` | All API calls including Genie, serving endpoint invocations | ~1 hour |
-# MAGIC | `system.billing.usage` | DBU consumption by SKU — includes Model Serving DBUs | ~2 hours |
-# MAGIC | `system.serving.served_entities` | Current model serving endpoint inventory | Near real-time |
-
-# COMMAND ----------
-
-# MAGIC %md
-# MAGIC ## UI navigation — do this before running any code
-# MAGIC
-# MAGIC **Browse the system catalog:**
-# MAGIC ```
-# MAGIC Navigate: Left sidebar → Catalog icon → system → ai_gateway → usage → Sample Data tab
-# MAGIC You should see: columns including endpoint_name, requester, input_tokens, output_tokens, status_code, request_tags, destination_model.
-# MAGIC ```
-# MAGIC
-# MAGIC **AI Gateway usage dashboard:**
-# MAGIC ```
-# MAGIC Navigate: AI Gateway → [your endpoint] → **Metrics tab**
-# MAGIC You should see: token consumption chart, request latency, error rates, and a per-request log with user, token count, and status.
-# MAGIC ```
 
 # COMMAND ----------
 
@@ -43,6 +17,9 @@
 # MAGIC <div style="border-left: 4px solid #FF3621; padding-left: 16px; margin: 24px 0">
 # MAGIC <h2 style="color: #1B3139; margin: 0">Section 0: Setup & Permissions Check</h2>
 # MAGIC </div>
+# MAGIC
+# MAGIC System tables used in this lab:
+# MAGIC `system.ai_gateway.usage` (~15 min latency) | `system.access.audit` (~1 hr) | `system.billing.usage` (~2 hrs) | `system.serving.served_entities` (near real-time)
 
 # COMMAND ----------
 
@@ -62,7 +39,6 @@ print(f"GW endpoint    : {GW_ENDPOINT}")
 
 # COMMAND ----------
 
-# Verify access to all key system tables before running subsequent sections
 SYSTEM_TABLES = [
     "system.ai_gateway.usage",
     "system.access.audit",
@@ -83,16 +59,45 @@ for table in SYSTEM_TABLES:
 # COMMAND ----------
 
 # MAGIC %md
+# MAGIC ## Audit Logging — Quick Check
+
+# COMMAND ----------
+
+# Verify audit logging is active and AI events are flowing.
+# Queries system.access.audit for recent AI-related actions.
+try:
+    audit_check = spark.sql("""
+        SELECT
+            service_name,
+            action_name,
+            COUNT(*) AS event_count
+        FROM system.access.audit
+        WHERE event_date >= current_date() - INTERVAL 7 DAYS
+          AND service_name IN ('serverlessRealTimeInference', 'aibiGenie', 'aiPlayground', 'modelServing')
+        GROUP BY 1, 2
+        ORDER BY event_count DESC
+        LIMIT 10
+    """)
+    row_count = audit_check.count()
+    if row_count > 0:
+        print(f"PASS — AI events present in system.access.audit ({row_count} distinct service/action combinations in last 7 days)")
+        display(audit_check)
+    else:
+        print("WARNING — No AI events in last 7 days. Run AI Playground once, then re-check.")
+except Exception as e:
+    print(f"CANNOT VERIFY — {e}")
+    print("ACTION: Enable system tables in Account Console → Settings → System tables")
+
+# COMMAND ----------
+
+# MAGIC %md
 # MAGIC <div style="border-left: 4px solid #FF3621; padding-left: 16px; margin: 24px 0">
 # MAGIC <h2 style="color: #1B3139; margin: 0">Section 1: Querying system.ai_gateway.usage</h2>
 # MAGIC </div>
 # MAGIC
-# MAGIC Each row in `system.ai_gateway.usage` represents one request routed through an AI Gateway endpoint. The table has ~15 minute latency — data from Labs 02/03 may already be visible.
+# MAGIC Each row represents one request routed through an AI Gateway endpoint. ~15 minute latency — data from Labs 01/02 may already be visible.
 # MAGIC
-# MAGIC 🖱️ **UI:** AI Gateway → [your endpoint] → **Metrics tab**
-# MAGIC You should see: Token consumption chart, request latency, error rates (200/400/429 breakdown), and a per-request log with user, token count, and status. This is the visual summary of the same data queried below.
-# MAGIC
-# MAGIC ⚡ **Or run the cells below to query `system.ai_gateway.usage` directly for custom aggregations and cost attribution:**
+# MAGIC 🖱️ **UI:** AI Gateway → [your endpoint] → **Metrics tab** — token consumption chart, request latency, error rates (200/400/429 breakdown), and per-request log.
 
 # COMMAND ----------
 
@@ -102,12 +107,8 @@ display(spark.sql("DESCRIBE system.ai_gateway.usage"))
 # COMMAND ----------
 
 # Note: system.ai_gateway.usage populates once AI Gateway traffic flows through your endpoint.
-# The queries below may return 0 rows until participants have run Labs 02 and 03.
-# If you see 0 rows, confirm that:
-#   1. The AI Gateway endpoint from Lab 02 is in a READY state.
-#   2. At least one request (from Lab 02 or Lab 03) has been sent through the endpoint.
-#   3. Approximately 15 minutes have elapsed since the first request (system table latency).
-# The schema (DESCRIBE above) is always visible regardless of whether rows exist yet.
+# If you see 0 rows: (1) confirm endpoint is Ready, (2) confirm at least one request was sent,
+# (3) wait ~15 minutes.
 
 # COMMAND ----------
 
@@ -157,7 +158,7 @@ display(top_users)
 
 # COMMAND ----------
 
-# Daily trend — useful for capacity planning and spike detection
+# Daily trend — capacity planning and spike detection
 daily_trend = spark.sql("""
   SELECT
     DATE(event_time)                                         AS usage_date,
@@ -175,9 +176,8 @@ display(daily_trend)
 
 # COMMAND ----------
 
-# Blocked request analysis — understand what is being blocked and by whom
-# Note: system.ai_gateway.usage does not expose guardrail_action or guardrail_type columns.
-# Use status_code = 400 (blocked) and status_code = 429 (rate limited) to identify non-success traffic.
+# Blocked request analysis — status_code = 400 (blocked by guardrail), 429 (rate limited)
+# Note: guardrail_action and guardrail_type columns are not exposed in system.ai_gateway.usage.
 guardrail_hits = spark.sql("""
   SELECT
     DATE(event_time)                             AS event_date,
@@ -206,31 +206,21 @@ display(guardrail_hits)
 # MAGIC <h2 style="color: #1B3139; margin: 0">Section 2: Querying system.access.audit for AI Events</h2>
 # MAGIC </div>
 # MAGIC
-# MAGIC The audit log captures all API activity. Key action types for AI governance:
-# MAGIC
 # MAGIC | Action type | Service name | Description |
 # MAGIC |---|---|---|
-# MAGIC | `queryEndpoint` | `modelServing` | Serving endpoint was called (inference traffic) |
-# MAGIC | `genieConversation` | `databricksGenie` | Genie Space conversation |
+# MAGIC | `queryEndpoint` | `modelServing` | Serving endpoint called (inference traffic) |
+# MAGIC | `genieConversation` | `aibiGenie` | Genie Space conversation |
 # MAGIC | `aiPlaygroundQuery` | `aiPlayground` | AI Playground used |
-# MAGIC | `createServingEndpoint` / `updateServingEndpoint` | `modelServing` | Non-AI-Gateway endpoint lifecycle events |
 # MAGIC | `putInferenceEndpointAiGateway` | `serverlessRealTimeInference` | AI Gateway config created or updated |
-# MAGIC | `deleteInferenceEndpointAiGateway` | `serverlessRealTimeInference` | AI Gateway config removed |
 # MAGIC | `changeInferenceEndpointAcl` | `serverlessRealTimeInference` | Endpoint permission change |
 # MAGIC
-# MAGIC **Note on service_name split:** `modelServing` covers non-AI-Gateway endpoint lifecycle and inference calls. AI Gateway configuration actions appear under `serverlessRealTimeInference` — this matches the filter used in Lab 05. Validate against your workspace with: `SELECT DISTINCT service_name, action_name FROM system.access.audit WHERE action_name LIKE '%Endpoint%' OR action_name LIKE '%Gateway%' LIMIT 100`
+# MAGIC > `modelServing` covers inference calls and non-AI-Gateway endpoint lifecycle. AI Gateway configuration actions appear under `serverlessRealTimeInference`.
 # MAGIC
-# MAGIC 🖱️ **UI:** Left sidebar → Catalog → system → access → audit → Sample Data tab (or open a Query Editor and run `SELECT * FROM system.access.audit LIMIT 100`)
-# MAGIC You should see: Raw audit rows with event_time, user_identity, action_name, service_name, and request_params. The queries below filter these to AI-specific events.
-# MAGIC
-# MAGIC ⚡ **Run the cells below to query AI events from `system.access.audit`:**
+# MAGIC 🖱️ **UI:** Left sidebar → Catalog → system → access → audit → Sample Data tab.
 
 # COMMAND ----------
 
 # Model serving inference calls — last 7 days
-# service_name = 'modelServing' covers queryEndpoint (inference traffic) and non-AI-Gateway endpoint lifecycle.
-# AI Gateway configuration actions (putInferenceEndpointAiGateway etc.) appear under
-# 'serverlessRealTimeInference' — those are queried separately in the gateway_changes cell below.
 serving_calls = spark.sql("""
   SELECT
     DATE(event_time)                AS event_date,
@@ -292,10 +282,8 @@ display(playground_usage)
 
 # COMMAND ----------
 
-# AI Gateway configuration changes — change management audit evidence (data governance obligations)
+# AI Gateway configuration changes — change management audit evidence
 # AI Gateway config events appear under service_name = 'serverlessRealTimeInference', NOT 'modelServing'.
-# This matches the filter documented in Lab 02 and Lab 05. modelServing covers inference calls and
-# non-AI-Gateway endpoint lifecycle; serverlessRealTimeInference covers AI Gateway config and ACL changes.
 gateway_changes = spark.sql("""
   SELECT
     event_time,
@@ -328,32 +316,21 @@ display(gateway_changes)
 # MAGIC <h2 style="color: #1B3139; margin: 0">Section 3: Cost Attribution View — By Team and Project</h2>
 # MAGIC </div>
 # MAGIC
-# MAGIC Applications pass cost centre tags via the `databricks-request-tag` HTTP header (e.g. `team=network-ops;project=meter-anomaly`). These appear in `system.ai_gateway.usage.request_tags` as a MAP column.
+# MAGIC Applications pass cost centre tags via `databricks-request-tag` HTTP header (e.g. `team=network-ops;project=meter-anomaly`). These appear in `system.ai_gateway.usage.request_tags` as a MAP column.
 # MAGIC
-# MAGIC 🖱️ **UI:** Left sidebar → Catalog → [catalog] → [schema] → after running the cell below, click `ai_gateway_cost_attribution` to browse the view. For finance reporting, pin the "Monthly cost by team" query result as an AI/BI dashboard widget.
-# MAGIC
-# MAGIC ⚡ **Run the cell below to create the cost attribution view (uncomment the spark.sql call, then run the query cells):**
+# MAGIC 🖱️ **UI:** After creating the view below, browse it via Catalog → [catalog] → [schema] → `ai_gateway_cost_attribution`.
 
 # COMMAND ----------
 
-# Token pricing — illustrative blended rates used in the view SQL and budget functions below.
-# The view uses 0.90 AUD/1M input and 2.70 AUD/1M output as illustrative blended estimates.
-# These are NOT the published list prices for any specific model — update to your contracted
-# rates once PT agreements are in place.
-#
-# For reference, approximate list prices at time of writing (update per contract):
-#   databricks-claude-haiku-4-5   : ~$1.00/1M input, ~$5.00/1M output  (via Provisioned Throughput)
-#   databricks-claude-sonnet-4-6  : ~$3.00/1M input, ~$15.00/1M output (via Provisioned Throughput)
-#
-# The view SQL below uses fixed blended rates (0.90 / 2.70) rather than a per-model CASE expression
-# so that the view remains valid when model_name values vary. To switch to per-model pricing,
-# replace the ROUND(...) columns with a CASE expression on model_name referencing your rate table.
+# Token pricing — illustrative blended rates. Update to contracted rates.
+# These are NOT published list prices — for reference only.
+#   databricks-claude-haiku-4-5  : ~$1.00/1M input, ~$5.00/1M output  (Provisioned Throughput)
+#   databricks-claude-sonnet-4-6 : ~$3.00/1M input, ~$15.00/1M output (Provisioned Throughput)
 
 ILLUSTRATIVE_INPUT_RATE_PER_1M  = 0.90   # AUD — update to contracted rate
 ILLUSTRATIVE_OUTPUT_RATE_PER_1M = 2.70   # AUD — update to contracted rate
 
 print(f"Illustrative blended rates: ${ILLUSTRATIVE_INPUT_RATE_PER_1M}/1M input, ${ILLUSTRATIVE_OUTPUT_RATE_PER_1M}/1M output (AUD)")
-print("Update ILLUSTRATIVE_INPUT_RATE_PER_1M / ILLUSTRATIVE_OUTPUT_RATE_PER_1M to contracted rates.")
 
 # COMMAND ----------
 
@@ -383,19 +360,10 @@ WITH usage_base AS (
   GROUP BY 1, 2, 3, 4, 5, 6, 7
 )
 SELECT
-  usage_date,
-  endpoint_name,
-  destination_model,
-  team,
-  project,
-  environment,
-  user_id,
-  request_count,
-  input_tokens,
-  output_tokens,
+  usage_date, endpoint_name, destination_model, team, project, environment, user_id,
+  request_count, input_tokens, output_tokens,
   input_tokens + output_tokens                                      AS total_tokens,
-  rate_limited_requests,
-  blocked_requests,
+  rate_limited_requests, blocked_requests,
   ROUND(avg_latency_ms, 0)                                          AS avg_latency_ms,
   ROUND(input_tokens  / 1000000.0 * 0.90, 4)                       AS est_input_cost_aud,
   ROUND(output_tokens / 1000000.0 * 2.70, 4)                       AS est_output_cost_aud,
@@ -414,8 +382,6 @@ print(f"Target view: {CATALOG_NAME}.{SCHEMA_NAME}.ai_gateway_cost_attribution")
 # COMMAND ----------
 
 # Monthly cost by team — for internal chargeback and finance reporting
-# IMPORTANT: this query requires the view to exist (uncomment the spark.sql(create_view_sql) call above first).
-# If you run this cell before creating the view, it will fail with AnalysisException: Table or view not found.
 try:
     cost_by_team = spark.sql(f"""
       SELECT
@@ -430,21 +396,19 @@ try:
     """)
     display(cost_by_team)
 except Exception as _e:
-    print(f"[SKIP] View not yet created — uncomment the spark.sql(create_view_sql) block above and re-run Section 3 first.")
+    print(f"[SKIP] View not yet created — uncomment the spark.sql(create_view_sql) block above and re-run first.")
     print(f"       Error: {_e}")
 
 # COMMAND ----------
 
-# TODO: Uncomment to export the monthly cost attribution to a UC volume for finance reporting
+# TODO: Uncomment to export cost attribution to a UC volume for finance reporting
 # from datetime import date as _date
 # spark.sql(f"CREATE VOLUME IF NOT EXISTS {CATALOG_NAME}.{SCHEMA_NAME}.cost_reports")
 # (cost_by_team.coalesce(1).write
-#     .mode("overwrite")
-#     .option("header", "true")
+#     .mode("overwrite").option("header", "true")
 #     .csv(f"/Volumes/{CATALOG_NAME}/{SCHEMA_NAME}/cost_reports/cost_by_team_{_date.today().strftime('%Y-%m')}.csv"))
-# print(f"Cost report exported — download via: Catalog → Volumes → {CATALOG_NAME}.{SCHEMA_NAME}.cost_reports")
 
-print("Cost attribution export is commented out — uncomment after view is created and volume is available.")
+print("Cost attribution export is commented out — uncomment after view is created.")
 
 # COMMAND ----------
 
@@ -478,7 +442,7 @@ print("\nNote: Untagged requests indicate applications not passing the 'databric
 # MAGIC <h2 style="color: #1B3139; margin: 0">Section 4: Usage Charts</h2>
 # MAGIC </div>
 # MAGIC
-# MAGIC Run each cell and click the **chart icon** in the output header to switch to a visualisation view. Charts can be pinned to a Databricks AI/BI dashboard.
+# MAGIC Run each cell and click the **chart icon** in the output header to switch to a visualisation view.
 
 # COMMAND ----------
 
@@ -520,8 +484,8 @@ display(endpoint_utilisation)
 
 # COMMAND ----------
 
-# Request outcome breakdown — pie/donut: segments by outcome
-# Note: guardrail_type is not exposed in system.ai_gateway.usage; use status_code to classify outcomes.
+# Request outcome breakdown — pie/donut by outcome
+# Note: guardrail_type is not exposed in system.ai_gateway.usage; use status_code to classify.
 guardrail_summary = spark.sql("""
   SELECT
     CASE
@@ -547,16 +511,13 @@ display(guardrail_summary)
 # MAGIC <h2 style="color: #1B3139; margin: 0">Section 5: Budget Alerts — Scheduled Notebook Pattern</h2>
 # MAGIC </div>
 # MAGIC
-# MAGIC Pattern: define thresholds, query `system.ai_gateway.usage` for current spend, send a notification when a threshold is crossed. Schedule this notebook as a Databricks job (8am AEST daily).
+# MAGIC Define thresholds, query `system.ai_gateway.usage` for current spend, send a notification when a threshold is crossed. Schedule this notebook as a Databricks job (8am AEST daily).
 # MAGIC
-# MAGIC 🖱️ **UI (to schedule this notebook):** Top-right toolbar of this notebook → Schedules & Triggers → Add trigger → Scheduled → Cron expression `0 0 8 * * ?` → Timezone: Australia/Sydney → Create
-# MAGIC You should see: The notebook appear in the Jobs list with a cron schedule. On failure it will send email alerts to the addresses in `BUDGET_CONFIG["alert_recipients"]`.
-# MAGIC
-# MAGIC ⚡ **Run the cells below to define thresholds and execute the budget check now (runs immediately — no uncomment needed):**
+# MAGIC 🖱️ **UI (to schedule):** Top-right toolbar → Schedules & Triggers → Add trigger → Scheduled → Cron expression `0 0 8 * * ?` → Timezone: Australia/Sydney → Create
 
 # COMMAND ----------
 
-# TODO: Set your budget thresholds (AUD estimated costs at list-price token rates)
+# TODO: Set your budget thresholds (AUD estimated costs at illustrative token rates)
 BUDGET_CONFIG = {
     "daily_warn_aud":     50.0,
     "daily_critical_aud": 100.0,
@@ -579,7 +540,6 @@ import calendar
 
 
 def check_daily_budget(budget_config: dict) -> dict:
-    """Check today's spend against daily thresholds. Returns OK, WARN, or CRITICAL."""
     today = date.today().isoformat()
     result = spark.sql(f"""
       SELECT
@@ -597,26 +557,22 @@ def check_daily_budget(budget_config: dict) -> dict:
     tokens   = result["total_tokens"]       or 0
     requests = result["request_count"]      or 0
 
-    if cost >= budget_config["daily_critical_aud"]:
-        status = "CRITICAL"
-    elif cost >= budget_config["daily_warn_aud"]:
-        status = "WARN"
-    else:
-        status = "OK"
+    status = (
+        "CRITICAL" if cost >= budget_config["daily_critical_aud"]
+        else "WARN"   if cost >= budget_config["daily_warn_aud"]
+        else "OK"
+    )
 
     return {
-        "check_date":               today,
-        "estimated_cost_aud":       cost,
-        "total_tokens":             tokens,
-        "request_count":            requests,
-        "status":                   status,
-        "daily_warn_threshold":     budget_config["daily_warn_aud"],
+        "check_date": today, "estimated_cost_aud": cost,
+        "total_tokens": tokens, "request_count": requests,
+        "status": status,
+        "daily_warn_threshold": budget_config["daily_warn_aud"],
         "daily_critical_threshold": budget_config["daily_critical_aud"],
     }
 
 
 def check_monthly_budget(budget_config: dict) -> dict:
-    """Check current month's cumulative spend against monthly thresholds."""
     today       = date.today()
     month_start = today.replace(day=1).isoformat()
     result = spark.sql(f"""
@@ -636,26 +592,21 @@ def check_monthly_budget(budget_config: dict) -> dict:
     days_elapsed  = today.day
     projected     = cost * days_in_month / days_elapsed if days_elapsed > 0 else 0
 
-    if cost >= budget_config["monthly_cap_aud"]:
-        status = "CAP_REACHED"
-    elif cost >= budget_config["monthly_warn_aud"]:
-        status = "WARN"
-    else:
-        status = "OK"
+    status = (
+        "CAP_REACHED" if cost >= budget_config["monthly_cap_aud"]
+        else "WARN"   if cost >= budget_config["monthly_warn_aud"]
+        else "OK"
+    )
 
     return {
-        "month_start":                month_start,
-        "mtd_cost_aud":               cost,
+        "month_start": month_start, "mtd_cost_aud": cost,
         "projected_monthly_cost_aud": round(projected, 2),
-        "total_tokens":               result["total_tokens"] or 0,
-        "status":                     status,
-        "days_elapsed":               days_elapsed,
-        "days_in_month":              days_in_month,
+        "total_tokens": result["total_tokens"] or 0,
+        "status": status, "days_elapsed": days_elapsed, "days_in_month": days_in_month,
     }
 
 
 def print_budget_report(daily: dict, monthly: dict) -> None:
-    """Print a formatted budget report."""
     print("=" * 60)
     print(f"AI Gateway Budget Report — {daily['check_date']}")
     print("=" * 60)
@@ -677,7 +628,6 @@ def print_budget_report(daily: dict, monthly: dict) -> None:
         print(f"\nAction required: review top users via the cost attribution view.")
 
 
-# Run the budget check
 print("Running budget checks...")
 try:
     daily_result   = check_daily_budget(BUDGET_CONFIG)
@@ -708,7 +658,7 @@ except Exception as e:
 # MAGIC     name="AI Gateway Daily Budget Alert",
 # MAGIC     tasks=[Task(
 # MAGIC         task_key="budget-check",
-# MAGIC         notebook_task=NotebookTask(notebook_path="/Shared/workshops/04_usage_tracking"),
+# MAGIC         notebook_task=NotebookTask(notebook_path="/Shared/workshops/03_usage_tracking"),
 # MAGIC     )],
 # MAGIC     schedule=CronSchedule(
 # MAGIC         quartz_cron_expression="0 0 8 * * ?",
@@ -745,7 +695,6 @@ LIMIT 20
 
     "Cost by team — current month": """
 -- Rates (0.90 / 2.70 AUD per 1M tokens) are illustrative blended estimates.
--- Update to contracted rates — see ILLUSTRATIVE_INPUT_RATE_PER_1M / ILLUSTRATIVE_OUTPUT_RATE_PER_1M above.
 SELECT
   COALESCE(request_tags['team'], 'untagged')     AS team,
   SUM(input_tokens  / 1000000.0 * 0.90)
@@ -788,7 +737,6 @@ ORDER BY 1 DESC, query_count DESC
 
     "AI Gateway change log — last 90 days": """
 -- AI Gateway config changes appear under 'serverlessRealTimeInference', not 'modelServing'.
--- modelServing covers inference calls (queryEndpoint) and non-AI-Gateway endpoint lifecycle.
 SELECT
   event_time,
   user_identity.email                AS changed_by,
@@ -821,16 +769,17 @@ for query_name, sql in REFERENCE_QUERIES.items():
 
 # MAGIC %md
 # MAGIC ---
-# MAGIC ## Lab 04 Checkpoint
+# MAGIC ## Lab 03 Checkpoint
 
 # COMMAND ----------
 
 print("=" * 60)
-print("  Lab 04 — Checkpoint Summary")
+print("  Lab 03 — Checkpoint Summary")
 print("=" * 60)
 print()
 
-lab04_checks = [
+lab03_checks = [
+    "Audit logging verified active — AI events flowing into system.access.audit",
     "system.ai_gateway.usage schema explored (date, endpoint, team, project, token counts)",
     "Top users by token consumption (30-day) queried",
     "Daily trend query written (capacity and anomaly detection)",
@@ -843,12 +792,12 @@ lab04_checks = [
     "Reference SQL query card printed",
 ]
 
-for check in lab04_checks:
+for check in lab03_checks:
     print(f"  [DONE]  {check}")
 
 print()
 print("-" * 60)
-print("  Next lab : 05_data_residency_compliance.py")
+print("  Next lab : 04_data_residency_compliance.py")
 print("  Topic    : Data residency verification and compliance evidence")
 print("-" * 60)
 
@@ -864,85 +813,42 @@ print("-" * 60)
 # MAGIC | `request_id` | STRING | Unique request identifier |
 # MAGIC | `event_time` | TIMESTAMP | Request receipt timestamp |
 # MAGIC | `endpoint_name` | STRING | AI Gateway endpoint name |
-# MAGIC | `endpoint_id` | STRING | Unique endpoint identifier |
-# MAGIC | `endpoint_tags` | MAP&lt;STRING,STRING&gt; | Tags configured on the endpoint (team, cost_center, etc.) |
-# MAGIC | `destination_name` | STRING | Provider/model name |
 # MAGIC | `destination_model` | STRING | Specific model used |
 # MAGIC | `requester` | STRING | User email or service principal ID |
-# MAGIC | `requester_type` | STRING | USER, SERVICE_PRINCIPAL, etc. |
 # MAGIC | `input_tokens` | LONG | Input token count |
 # MAGIC | `output_tokens` | LONG | Output token count |
-# MAGIC | `total_tokens` | LONG | Combined token count |
-# MAGIC | `token_details` | STRUCT | Breakdown including cache and reasoning tokens |
 # MAGIC | `latency_ms` | LONG | End-to-end gateway latency in milliseconds |
-# MAGIC | `time_to_first_byte_ms` | LONG | Time to first response byte |
 # MAGIC | `status_code` | INTEGER | HTTP response code (200, 400, 429) |
 # MAGIC | `request_tags` | MAP&lt;STRING,STRING&gt; | Per-request tags from `Databricks-Ai-Gateway-Request-Tags` header |
-# MAGIC | `routing_information` | STRUCT | Routing attempts with fallback details |
-# MAGIC | `ip_address` | STRING | Requester IP address |
-# MAGIC | `user_agent` | STRING | Client user agent |
-# MAGIC | `api_type` | STRING | API category (chat, completions, embeddings) |
+# MAGIC | `endpoint_tags` | MAP&lt;STRING,STRING&gt; | Tags configured on the endpoint (team, cost_center, etc.) |
 # MAGIC
 # MAGIC > **Access:** Only account admins can query `system.ai_gateway.usage`.
 # MAGIC > **Latency:** ~15 minutes from request time.
-# MAGIC > **Chargeback:** Use `endpoint_tags` for billing split (flows into `custom_tags` in `system.billing.usage`). Use `request_tags` for per-request attribution in this table only.
+# MAGIC > **Genie July 6, 2026 pricing change:** LLM usage in Genie Spaces moves to pay-as-you-go beyond a free monthly per-user allowance. Only overage is subject to budget controls. Genie SQL warehouse compute is billed separately under `billing_origin_product = 'SQL'`.
 # MAGIC </div>
 # MAGIC
 # MAGIC ---
 # MAGIC
 # MAGIC ## Section 7: Billing Model, Split Billing & Out-of-the-Box Monitoring
 # MAGIC
-# MAGIC ---
+# MAGIC ### 7a. How AI Features Are Charged
 # MAGIC
-# MAGIC ### 7a. How AI Features Are Charged — Where Costs Appear
-# MAGIC
-# MAGIC **AI Gateway adds zero overhead DBUs.** All model serving costs appear as `MODEL_SERVING` records in `system.billing.usage` — the gateway routing/governance layer does not create a separate billing line.
+# MAGIC AI Gateway adds zero overhead DBUs. All model serving costs appear as `MODEL_SERVING` records in `system.billing.usage`.
 # MAGIC
 # MAGIC | Feature | `billing_origin_product` | `sku_name` pattern | Billing model |
 # MAGIC |---|---|---|---|
 # MAGIC | FMAPI Pay-Per-Token (via AI Gateway) | `MODEL_SERVING` | `LIKE '%SERVERLESS_REAL_TIME_INFERENCE%'` | DBUs per 1M tokens |
 # MAGIC | FMAPI Provisioned Throughput | `MODEL_SERVING` | `LIKE '%SERVERLESS_REAL_TIME_INFERENCE%'` | DBUs/hour, always-on |
 # MAGIC | Genie LLM usage (post-July 6 overage) | `MODEL_SERVING` | `LIKE '%SERVERLESS_REAL_TIME_INFERENCE%'` | Free tier per user; overage billed in DBUs |
-# MAGIC | AI Functions (ai_query, ai_extract) | `AI_FUNCTIONS` | — | |
-# MAGIC | Agent Bricks (KA, MAS) | `AGENT_BRICKS` | — | |
-# MAGIC | Genie SQL warehouse compute | `SQL` | — | Separate from Genie LLM cost |
 # MAGIC
-# MAGIC > **sku_name note:** The actual sku_name follows a pattern like `PREMIUM_SERVERLESS_REAL_TIME_INFERENCE_AZURE_AUSTRALIA_EAST`. Always use a LIKE filter — an exact match will return zero rows.
+# MAGIC > **sku_name note:** Use a LIKE filter — exact match returns zero rows.
+# MAGIC > **FMAPI PT billing note:** Always-on, billed DBUs/hour regardless of traffic. Shut down PT endpoints when not needed.
 # MAGIC
-# MAGIC > **AI Gateway overhead:** AI Gateway does NOT add a separate billing line item. All AI Gateway traffic is recorded under `billing_origin_product = 'MODEL_SERVING'`. To isolate AI Gateway traffic, filter on `usage_metadata.ai_gateway_endpoint_name IS NOT NULL`.
+# MAGIC ### 7b. Split Billing — Endpoint Tags Pattern
 # MAGIC
-# MAGIC **To isolate AI Gateway traffic in `system.billing.usage`:**
-# MAGIC ```sql
-# MAGIC WHERE billing_origin_product = 'MODEL_SERVING'
-# MAGIC   AND sku_name LIKE '%SERVERLESS_REAL_TIME_INFERENCE%'
-# MAGIC   AND usage_metadata.ai_gateway_endpoint_name IS NOT NULL
-# MAGIC ```
-# MAGIC
-# MAGIC **FMAPI PT billing note:** Provisioned Throughput is always-on and billed DBUs/hour regardless of traffic. Entry capacity for Llama 3.3 70B is ~85 DBU/hr; scaling capacity is ~342 DBU/hr. Shut down PT endpoints when not needed.
-# MAGIC
-# MAGIC **Genie July 6, 2026 pricing change:** LLM usage in Genie Spaces, Genie Code, and Genie moves to pay-as-you-go beyond a free monthly per-user allowance. The free allowance cannot be removed by admins. Only overage is subject to budget controls. Genie SQL warehouse compute is billed separately under `billing_origin_product = 'SQL'`.
-# MAGIC
-# MAGIC ---
-# MAGIC
-# MAGIC ### 7b. Split Billing for User Groups — Endpoint Tags Pattern
-# MAGIC
-# MAGIC **The reliable billing attribution mechanism is endpoint-level tags** — these propagate into the `custom_tags` MAP column in `system.billing.usage` on every `MODEL_SERVING` record.
-# MAGIC
-# MAGIC **Step 1: Tag your AI Gateway endpoint at creation (or update):**
-# MAGIC ```python
-# MAGIC # Add to the serving endpoint config when creating the AI Gateway route
-# MAGIC # Endpoint tags are set on the serving endpoint, not the AI Gateway config block
-# MAGIC # Use: PUT /api/2.0/serving-endpoints/{name}/tags
-# MAGIC # Or set via UI: Serving → [endpoint] → Tags tab
-# MAGIC ```
-# MAGIC
-# MAGIC **Step 2: Query split costs by team in system.billing.usage:**
+# MAGIC Endpoint-level tags propagate into `custom_tags` in `system.billing.usage` on every `MODEL_SERVING` record.
 
 # COMMAND ----------
-
-# Section 7b: Split billing by team using endpoint tags
-# Endpoint tags (set on the serving endpoint) propagate into custom_tags in system.billing.usage.
-# This is the recommended mechanism for internal chargeback — more reliable than request_tags for billing.
 
 split_billing_sql = """
 SELECT
@@ -966,50 +872,22 @@ print(split_billing_sql)
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC ---
-# MAGIC
 # MAGIC ### 7c. Out-of-the-Box Monitoring: Built-in AI Gateway Dashboard
 # MAGIC
-# MAGIC **You do not need to build a dashboard.** Databricks provides a built-in AI Gateway dashboard. It requires one-time provisioning by an account admin, after which it is available to all account admins.
+# MAGIC **Navigate:** Left sidebar → AI Gateway → **"Create Dashboard"** → after creation, click **"View Dashboard"**.
 # MAGIC
-# MAGIC **How to access (first time — account admin required):**
-# MAGIC 1. Navigate: **Left sidebar → AI Gateway** 
-# MAGIC 2. Click **"Create Dashboard"** — this provisions the dashboard in your catalog
-# MAGIC 3. After creation, click **"View Dashboard"** to open it
+# MAGIC > **Version requirement:** Dashboard must be v0.4+ to include the **Cost Observability** tab.
 # MAGIC
-# MAGIC > **Version requirement:** The dashboard must be v0.4 or above to include the **Cost Observability** tab. If you have an older version, update it from the AI Gateway page.
-# MAGIC
-# MAGIC **Dashboard tabs:**
-# MAGIC
-# MAGIC | Tab | What you see | Data source |
-# MAGIC |---|---|---|
-# MAGIC | Overview | Daily requests, token trends, top users by volume | `system.ai_gateway.usage` |
-# MAGIC | Performance | Latency percentiles (P50/P90/P95/P99), error rates, 429 rate | `system.ai_gateway.usage` |
-# MAGIC | Usage | Consumption by endpoint, workspace, requester | `system.ai_gateway.usage` |
-# MAGIC | Cost Observability | Breakdown by endpoint, target model, requesting user, endpoint tags, request tags | `system.billing.usage` |
-# MAGIC | External MCP Server | MCP tool-call metrics (Gated Beta) | `system.ai_gateway.usage` |
-# MAGIC | Coding Agents | Genie Code and agent activity tracking | `system.ai_gateway.usage` |
-# MAGIC
-# MAGIC > **Important:** The **Cost Observability tab** reads from `system.billing.usage` (not `system.ai_gateway.usage`). It uses endpoint tags and request tags for team/project breakdowns.
-# MAGIC
-# MAGIC **Access and limitations:**
-# MAGIC - Account admin access required to create and view the dashboard
-# MAGIC - `system.ai_gateway.usage` is auto-populated once AI Gateway traffic flows through an endpoint
-# MAGIC - External model (Azure OpenAI) cost estimates in Cost Observability are informational — supply your own pricing table if needed
-# MAGIC
-# MAGIC ---
+# MAGIC | Tab | Data source |
+# MAGIC |---|---|
+# MAGIC | Overview / Performance / Usage | `system.ai_gateway.usage` |
+# MAGIC | Cost Observability | `system.billing.usage` |
+# MAGIC | External MCP Server | `system.ai_gateway.usage` (Gated Beta) |
 # MAGIC
 # MAGIC ### 7d. Unity AI Gateway Cost Controls — Hard Spend Caps
 # MAGIC
-# MAGIC For hard budget enforcement (blocking requests when budget exhausted), use **Unity AI Gateway Cost Controls** (AI Spend Controls, Beta):
+# MAGIC **Navigate:** Account Console → Usage → Budgets tab → Add budget → Resource type: Unity AI Gateway
+# MAGIC - Scope: entire account, specific workspaces, user groups, or individual users
+# MAGIC - Hard cap: "Block usage when budget is exhausted"
 # MAGIC
-# MAGIC - **Navigate:** Account Console → Usage → Budgets tab → Add budget → Resource type: Unity AI Gateway
-# MAGIC - **Scope:** Entire account, specific workspaces, user groups, or individual users
-# MAGIC - **Genie-specific:** Use resource tag `databricks-product: genie` to scope to Genie LLM spend only
-# MAGIC - **Hard cap:** Check "Block usage when budget is exhausted" — users see "budget exhausted" message
-# MAGIC - **Soft alert:** Email notification only; usage continues
-# MAGIC
-# MAGIC > **Recommended for workshops:** Set a soft alert at 70% and hard cap at 100% of your daily DBU budget. This prevents runaway cost from a misconfigured lab loop without cutting off users mid-exercise.
-# MAGIC
-# MAGIC > **Rate limits vs budgets:** Rate limits (Lab 02/03) control REQUEST RATE (QPM/TPM). Budget controls control SPEND (DBUs). Use both: rate limits for operational protection, budgets for financial guardrails.
-
+# MAGIC > **Rate limits vs budgets:** Rate limits control REQUEST RATE (QPM/TPM). Budget controls control SPEND (DBUs). Use both.
