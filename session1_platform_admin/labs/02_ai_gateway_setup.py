@@ -234,7 +234,7 @@ print(f"  Payload log table    : {CATALOG_NAME}.{SCHEMA_NAME}.{PAYLOAD_TABLE_PRE
 # MAGIC
 # MAGIC **Model used in this lab:** `databricks-claude-haiku-4-5` — FMAPI pay-per-token (PPT).
 # MAGIC
-# MAGIC > **AU East residency note:** `databricks-claude-haiku-4-5` is natively in-region for AU East — it is NOT marked with ⥂ and does NOT require cross-geo processing to be enabled. Other in-geo Pay-Per-Token models include `databricks-claude-sonnet-4-5`, `databricks-claude-sonnet-4-6`, `databricks-claude-opus-4-6`, `databricks-gpt-oss-20b`, `databricks-gpt-oss-120b`, and `databricks-qwen3-embedding-0-6b`. Models that DO require cross-geo (⥂) include Llama, Gemma, Qwen, and older unbranded Claude Sonnet 4.
+# MAGIC > **AU East residency note:** `databricks-claude-haiku-4-5` is natively in-region for AU East — it is NOT marked with ⥂ and does NOT require cross-geo processing to be enabled. Other in-geo Pay-Per-Token models include `databricks-claude-sonnet-4-5`, `databricks-claude-sonnet-4-6`, `databricks-claude-opus-4-6`, `databricks-gpt-oss-20b`, `databricks-gpt-oss-120b`, and `databricks-qwen3-embedding-0-6b`. Models that DO require cross-geo (⥂) include Llama, Gemma, qwen35-122b-a10b, qwen3-next-80b-a3b-instruct, and older unbranded Claude Sonnet 4.
 # MAGIC
 # MAGIC > **Note on "Provisioned Throughput":** The endpoint name `au_east_llm_inregion` used in this lab refers to the FMAPI pay-per-token endpoint backed by `databricks-claude-haiku-4-5`. Despite the name, it is not a dedicated Provisioned Throughput (reserved capacity) endpoint. "PT" in the endpoint name is the facilitator's naming convention — the underlying billing is pay-per-token.
 # MAGIC

@@ -34,7 +34,7 @@
 # MAGIC | Vector Search | In-region | Yes |
 # MAGIC | MLflow Tracking | In-region | Yes |
 # MAGIC | FMAPI Pay-Per-Token (claude-haiku-4-5, claude-sonnet-4-5/4-6, claude-opus-4-6, gpt-oss-20b/120b, qwen3-embedding-0-6b) | In-region | **Yes** — no cross-geo required |
-# MAGIC | FMAPI Pay-Per-Token (⥂ models: Llama, Gemma, Qwen, older Claude Sonnet 4) | Cross-geo | **No** — requires cross-geo routing enabled |
+# MAGIC | FMAPI Pay-Per-Token (⥂ models: Llama, Gemma, qwen35-122b-a10b, qwen3-next-80b-a3b-instruct, older Claude Sonnet 4) | Cross-geo | **No** — requires cross-geo routing enabled |
 # MAGIC | Knowledge Assistant (Agent Bricks) | Cross-geo | **No** — cross-geo, no committed AU East in-geo date |
 # MAGIC | Supervisor Agent / MAS (Agent Bricks) | Cross-geo | **No** — cross-geo, no committed AU East in-geo date |
 # MAGIC | Foundation Model Fine-tuning | Not available | Not applicable |
@@ -384,7 +384,7 @@ AI_FEATURE_INVENTORY = [
         "notes": "These models are natively in-region for AU East. No cross-geo routing required.",
     },
     {
-        "feature_name": "FMAPI Pay-Per-Token (⥂ cross-geo models: Llama, Gemma, Qwen, older Claude Sonnet 4)",
+        "feature_name": "FMAPI Pay-Per-Token (⥂ cross-geo models: Llama, Gemma, qwen35-122b-a10b, qwen3-next-80b-a3b-instruct, older Claude Sonnet 4)",
         "feature_flag_type": None,
         "residency": "CROSS_GEO",
         "risk_rating": "HIGH",
