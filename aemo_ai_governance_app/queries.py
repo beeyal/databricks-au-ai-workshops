@@ -50,6 +50,23 @@ _TOKEN_TO_DBU = 1 / 1_000_000  # 1 DBU ≈ 1 M tokens (illustrative)
 # SDK statement execution helper
 # ---------------------------------------------------------------------------
 
+@st.cache_data(ttl=1700, show_spinner=False)  # Token expires in 30min; refresh at 28min
+def _get_sp_token(host: str) -> str:
+    """Exchange CLIENT_ID/SECRET for an M2M access token via OAuth."""
+    client_id = os.environ.get("DATABRICKS_CLIENT_ID", "")
+    client_secret = os.environ.get("DATABRICKS_CLIENT_SECRET", "")
+    if not (host and client_id and client_secret):
+        return ""
+    try:
+        from databricks.sdk.config import Config
+        cfg = Config(host=host, client_id=client_id, client_secret=client_secret)
+        auth_header = cfg.authenticate().get("Authorization", "")
+        return auth_header.replace("Bearer ", "").strip()
+    except Exception as e:
+        print(f"Token exchange error: {e}")
+        return ""
+
+
 @st.cache_resource(show_spinner=False)
 def _get_cached_client() -> WorkspaceClient:
     """SP-only WorkspaceClient for non-SQL SDK calls (Groups, etc.).
@@ -77,14 +94,11 @@ def _run_query(sql: str, timeout_secs: int = 50) -> pd.DataFrame:
     # Get OBO token outside cache so st.context is available
     raw_host = os.environ.get("DATABRICKS_HOST", "").rstrip("/")
     host = raw_host if raw_host.startswith("https://") else f"https://{raw_host}"
-    try:
-        obo_token = st.context.headers.get("X-Forwarded-Access-Token", "")
-    except Exception:
-        obo_token = ""
 
-    if obo_token and host:
-        # Use direct HTTP — avoids SDK seeing both token + CLIENT_ID/SECRET env vars
-        return _run_query_http(sql, host, obo_token, timeout_secs)
+    # Get SP M2M token directly from CLIENT_ID/SECRET — works on all warehouses
+    sp_token = _get_sp_token(host)
+    if sp_token:
+        return _run_query_http(sql, host, sp_token, timeout_secs)
     else:
         return _run_query_sdk(sql, timeout_secs)
 
