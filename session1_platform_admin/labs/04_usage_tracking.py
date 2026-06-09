@@ -898,24 +898,29 @@ print("-" * 60)
 # MAGIC
 # MAGIC **AI Gateway adds zero overhead DBUs.** All model serving costs appear as `MODEL_SERVING` records in `system.billing.usage` — the gateway routing/governance layer does not create a separate billing line.
 # MAGIC
-# MAGIC | Feature | `billing_origin_product` | `sku_name` | Billing model |
+# MAGIC | Feature | `billing_origin_product` | `sku_name` pattern | Billing model |
 # MAGIC |---|---|---|---|
-# MAGIC | FMAPI Pay-Per-Token (via AI Gateway) | `MODEL_SERVING` | `SERVERLESS_REAL_TIME_INFERENCE` | DBUs per 1M tokens |
-# MAGIC | FMAPI Provisioned Throughput | `MODEL_SERVING` | `SERVERLESS_REAL_TIME_INFERENCE` | DBUs/hour, always-on |
-# MAGIC | AI Gateway (native, separate from model serving) | `AI_GATEWAY` | — | Separate product line |
-# MAGIC | Genie LLM usage (post-July 6 overage) | `MODEL_SERVING` | `SERVERLESS_REAL_TIME_INFERENCE` | Free tier per user; overage billed in DBUs |
+# MAGIC | FMAPI Pay-Per-Token (via AI Gateway) | `MODEL_SERVING` | `LIKE '%SERVERLESS_REAL_TIME_INFERENCE%'` | DBUs per 1M tokens |
+# MAGIC | FMAPI Provisioned Throughput | `MODEL_SERVING` | `LIKE '%SERVERLESS_REAL_TIME_INFERENCE%'` | DBUs/hour, always-on |
+# MAGIC | Genie LLM usage (post-July 6 overage) | `MODEL_SERVING` | `LIKE '%SERVERLESS_REAL_TIME_INFERENCE%'` | Free tier per user; overage billed in DBUs |
 # MAGIC | AI Functions (ai_query, ai_extract) | `AI_FUNCTIONS` | — | |
 # MAGIC | Agent Bricks (KA, MAS) | `AGENT_BRICKS` | — | |
+# MAGIC | Genie SQL warehouse compute | `SQL` | — | Separate from Genie LLM cost |
+# MAGIC
+# MAGIC > **sku_name note:** The actual sku_name follows a pattern like `PREMIUM_SERVERLESS_REAL_TIME_INFERENCE_AZURE_AUSTRALIA_EAST`. Always use a LIKE filter — an exact match will return zero rows.
+# MAGIC
+# MAGIC > **AI Gateway overhead:** AI Gateway does NOT add a separate billing line item. All AI Gateway traffic is recorded under `billing_origin_product = 'MODEL_SERVING'`. To isolate AI Gateway traffic, filter on `usage_metadata.ai_gateway_endpoint_name IS NOT NULL`.
 # MAGIC
 # MAGIC **To isolate AI Gateway traffic in `system.billing.usage`:**
 # MAGIC ```sql
 # MAGIC WHERE billing_origin_product = 'MODEL_SERVING'
+# MAGIC   AND sku_name LIKE '%SERVERLESS_REAL_TIME_INFERENCE%'
 # MAGIC   AND usage_metadata.ai_gateway_endpoint_name IS NOT NULL
 # MAGIC ```
 # MAGIC
 # MAGIC **FMAPI PT billing note:** Provisioned Throughput is always-on and billed DBUs/hour regardless of traffic. Entry capacity for Llama 3.3 70B is ~85 DBU/hr; scaling capacity is ~342 DBU/hr. Shut down PT endpoints when not needed.
 # MAGIC
-# MAGIC **Genie July 6, 2026 pricing change:** LLM usage in Genie Spaces, Genie Code, and Genie moves to pay-as-you-go beyond a free monthly per-user allowance. The free allowance cannot be removed by admins. Only overage is subject to budget controls. Genie SQL compute (serverless warehouse) is billed separately as `SERVERLESS_SQL`.
+# MAGIC **Genie July 6, 2026 pricing change:** LLM usage in Genie Spaces, Genie Code, and Genie moves to pay-as-you-go beyond a free monthly per-user allowance. The free allowance cannot be removed by admins. Only overage is subject to budget controls. Genie SQL warehouse compute is billed separately under `billing_origin_product = 'SQL'`.
 # MAGIC
 # MAGIC ---
 # MAGIC
@@ -963,34 +968,34 @@ print(split_billing_sql)
 # MAGIC %md
 # MAGIC ---
 # MAGIC
-# MAGIC ### 7c. Out-of-the-Box Monitoring: Built-in AI Gateway Dashboard (Zero Setup)
+# MAGIC ### 7c. Out-of-the-Box Monitoring: Built-in AI Gateway Dashboard
 # MAGIC
-# MAGIC **You do not need to build a dashboard.** Databricks provides a built-in AI Gateway usage dashboard accessible directly from the UI with no pipeline or notebook required.
+# MAGIC **You do not need to build a dashboard.** Databricks provides a built-in AI Gateway dashboard. It requires one-time provisioning by an account admin, after which it is available to all account admins.
 # MAGIC
-# MAGIC **How to access:**
-# MAGIC 1. Navigate: **Left sidebar → Serving → AI Gateway tab**
-# MAGIC 2. Click **"View Dashboard"** (or "Create Dashboard" on first use if the button shows that label)
-# MAGIC 3. The dashboard opens immediately — it reads from `system.ai_gateway.usage` which is auto-populated
+# MAGIC **How to access (first time — account admin required):**
+# MAGIC 1. Navigate: **Left sidebar → AI Gateway** (the standalone item, not Serving → AI Gateway tab)
+# MAGIC 2. Click **"Create Dashboard"** — this provisions the dashboard in your catalog
+# MAGIC 3. After creation, click **"View Dashboard"** to open it
 # MAGIC
-# MAGIC > **Version requirement:** The dashboard must be v0.4 or above to include the **Cost Analysis** tab. If you imported an older version, update it from the AI Gateway page.
+# MAGIC > **Version requirement:** The dashboard must be v0.4 or above to include the **Cost Observability** tab. If you have an older version, update it from the AI Gateway page.
 # MAGIC
 # MAGIC **Dashboard tabs:**
 # MAGIC
-# MAGIC | Tab | What you see |
-# MAGIC |---|---|
-# MAGIC | Overview | Daily requests, token trends, top users by volume |
-# MAGIC | Performance | Latency percentiles (P50/P90/P95/P99), error rates, 429 rate |
-# MAGIC | Usage | Consumption by endpoint, workspace, requester |
-# MAGIC | Cost Analysis | Breakdown by endpoint, target model, requesting user, endpoint tags, request tags |
-# MAGIC | External MCP Servers | MCP tool-call metrics (Gated Beta) |
-# MAGIC | Coding Agents | Genie Code and agent activity tracking |
+# MAGIC | Tab | What you see | Data source |
+# MAGIC |---|---|---|
+# MAGIC | Overview | Daily requests, token trends, top users by volume | `system.ai_gateway.usage` |
+# MAGIC | Performance | Latency percentiles (P50/P90/P95/P99), error rates, 429 rate | `system.ai_gateway.usage` |
+# MAGIC | Usage | Consumption by endpoint, workspace, requester | `system.ai_gateway.usage` |
+# MAGIC | Cost Observability | Breakdown by endpoint, target model, requesting user, endpoint tags, request tags | `system.billing.usage` |
+# MAGIC | External MCP Server | MCP tool-call metrics (Gated Beta) | `system.ai_gateway.usage` |
+# MAGIC | Coding Agents | Genie Code and agent activity tracking | `system.ai_gateway.usage` |
 # MAGIC
-# MAGIC The **Cost Analysis tab** uses endpoint tags and request tags to show team/project breakdowns. For regulated workloads this is your primary operational spend view — no custom SQL required.
+# MAGIC > **Important:** The **Cost Observability tab** reads from `system.billing.usage` (not `system.ai_gateway.usage`). It uses endpoint tags and request tags for team/project breakdowns.
 # MAGIC
-# MAGIC **Limitations:**
-# MAGIC - Account admin access required to view the dashboard (publisher permissions model)
-# MAGIC - ~15 minute data latency
-# MAGIC - External model (Azure OpenAI) cost estimates are informational only — supply your own pricing table if needed
+# MAGIC **Access and limitations:**
+# MAGIC - Account admin access required to create and view the dashboard
+# MAGIC - `system.ai_gateway.usage` is auto-populated once AI Gateway traffic flows through an endpoint
+# MAGIC - External model (Azure OpenAI) cost estimates in Cost Observability are informational — supply your own pricing table if needed
 # MAGIC
 # MAGIC ---
 # MAGIC

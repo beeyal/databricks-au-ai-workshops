@@ -410,18 +410,18 @@ AI_FEATURE_INVENTORY = [
     {
         "feature_name": "Knowledge Assistant (Agent Bricks)",
         "feature_flag_type": None,
-        "residency": "NOT_AVAILABLE",
+        "residency": "CROSS_GEO",
         "risk_rating": "HIGH",
         "approved_for_regulated_data": False,
-        "notes": "Not GA in AU East as of June 2026. Workaround: use Agent Framework with PT backend for in-region Q&A.",
+        "notes": "Available in AU East with cross-geo routing enabled. No committed in-geo date as of June 2026. Workaround: use Agent Framework with PT backend for in-region Q&A.",
     },
     {
         "feature_name": "Supervisor Agent / MAS (Agent Bricks)",
         "feature_flag_type": None,
-        "residency": "NOT_AVAILABLE",
+        "residency": "CROSS_GEO",
         "risk_rating": "HIGH",
         "approved_for_regulated_data": False,
-        "notes": "Not GA in AU East as of June 2026. Monitor Databricks release notes for AU East availability.",
+        "notes": "Available in AU East with cross-geo routing enabled. No committed in-geo date as of June 2026. Monitor Databricks release notes for AU East in-geo availability.",
     },
     {
         "feature_name": "Foundation Model Fine-tuning",

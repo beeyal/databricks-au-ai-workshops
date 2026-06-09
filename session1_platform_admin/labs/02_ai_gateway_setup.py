@@ -327,7 +327,11 @@ _lab02_endpoint_ready = preflight_check_endpoint(w, PT_ENDPOINT_NAME)
 # MAGIC This replaces the entire `ai_gateway` config block. All settings (rate limits, guardrails, inference table) must be included in every PUT or they will be removed. Helper functions below fetch the current config before updating to avoid accidental wipe.
 # MAGIC
 # MAGIC **PII types detected natively (no custom configuration required):**
-# MAGIC Names, email addresses, phone numbers, physical addresses, credit card numbers, bank account numbers (BSB + account), Australian TFN, Medicare numbers, ABN, passport numbers, IP addresses, dates of birth.
+# MAGIC **Classic AI Gateway (GA, Presidio-based):** credit card numbers, email addresses, phone numbers, bank account numbers, social security numbers.
+# MAGIC
+# MAGIC **Unity AI Gateway (Beta) built-in templates:** names, email addresses, phone numbers, social security numbers, credit card numbers, physical addresses.
+# MAGIC
+# MAGIC ⚠️ **Neither version natively detects:** Australian TFN, Medicare numbers, ABN, BSB + account number pairs, passport numbers, IP addresses, or dates of birth. These require custom guardrail prompts (see Section 3c).
 # MAGIC
 # MAGIC > **NMI (National Metering Identifier) is NOT a built-in PII type.** It is energy-domain-specific and requires custom keyword blocking using the `invalid_keywords` field (see Section 3c).
 # MAGIC

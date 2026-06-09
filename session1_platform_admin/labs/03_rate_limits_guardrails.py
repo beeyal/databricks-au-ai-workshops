@@ -129,7 +129,9 @@ print(f"User QPM limit (Lab 02 config) : {USER_QPM}")
 # MAGIC AI Gateway supports two rate limit dimensions:
 # MAGIC
 # MAGIC - **Metric:** `"calls"` for QPM (queries per minute) or `"tokens"` for TPM (tokens per minute). Both can coexist on the same endpoint; the first limit hit applies.
-# MAGIC - **Key (who the limit applies to):** `"endpoint"` (global ceiling across all callers), `"user"` (per Databricks identity), or `"user_group"` (shared ceiling for an entire Unity Catalog group).
+# MAGIC - **Key (who the limit applies to):** `"endpoint"` (global ceiling across all callers), `"user"` (per Databricks identity), or `"user_group"` (shared ceiling for an entire Unity Catalog group — any member can consume the full limit until exhausted; it is not divided equally per member).
+# MAGIC
+# MAGIC > **Multi-group behaviour:** If a user belongs to multiple groups, they are only rate-limited if they exceed ALL of those groups' rate limits. The most permissive group governs — not the most restrictive. If a user also has a user-specific limit, the user-specific limit takes precedence over group limits. The endpoint limit is always a hard global maximum.
 # MAGIC
 # MAGIC **QPM vs TPM — which to use?**
 # MAGIC
