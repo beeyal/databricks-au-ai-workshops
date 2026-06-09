@@ -861,14 +861,150 @@ print("-" * 60)
 # MAGIC
 # MAGIC | Column | Type | Description |
 # MAGIC |---|---|---|
-# MAGIC | `event_time` | TIMESTAMP | Request timestamp |
+# MAGIC | `request_id` | STRING | Unique request identifier |
+# MAGIC | `event_time` | TIMESTAMP | Request receipt timestamp |
 # MAGIC | `endpoint_name` | STRING | AI Gateway endpoint name |
-# MAGIC | `destination_model` | STRING | Underlying model display name |
-# MAGIC | `requester` | STRING | User email or service principal name |
-# MAGIC | `input_tokens` | LONG | Tokens in the request |
-# MAGIC | `output_tokens` | LONG | Tokens in the response |
+# MAGIC | `endpoint_id` | STRING | Unique endpoint identifier |
+# MAGIC | `endpoint_tags` | MAP&lt;STRING,STRING&gt; | Tags configured on the endpoint (team, cost_center, etc.) |
+# MAGIC | `destination_name` | STRING | Provider/model name |
+# MAGIC | `destination_model` | STRING | Specific model used |
+# MAGIC | `requester` | STRING | User email or service principal ID |
+# MAGIC | `requester_type` | STRING | USER, SERVICE_PRINCIPAL, etc. |
+# MAGIC | `input_tokens` | LONG | Input token count |
+# MAGIC | `output_tokens` | LONG | Output token count |
+# MAGIC | `total_tokens` | LONG | Combined token count |
+# MAGIC | `token_details` | STRUCT | Breakdown including cache and reasoning tokens |
 # MAGIC | `latency_ms` | LONG | End-to-end gateway latency in milliseconds |
+# MAGIC | `time_to_first_byte_ms` | LONG | Time to first response byte |
 # MAGIC | `status_code` | INTEGER | HTTP response code (200, 400, 429) |
-# MAGIC | `request_tags` | MAP&lt;STRING,STRING&gt; | Tags from `databricks-request-tag` header |
-# MAGIC | `routing_information` | STRUCT | Detailed routing attempts (primary + fallback) |
+# MAGIC | `request_tags` | MAP&lt;STRING,STRING&gt; | Per-request tags from `Databricks-Ai-Gateway-Request-Tags` header |
+# MAGIC | `routing_information` | STRUCT | Routing attempts with fallback details |
+# MAGIC | `ip_address` | STRING | Requester IP address |
+# MAGIC | `user_agent` | STRING | Client user agent |
+# MAGIC | `api_type` | STRING | API category (chat, completions, embeddings) |
+# MAGIC
+# MAGIC > **Access:** Only account admins can query `system.ai_gateway.usage`.
+# MAGIC > **Latency:** ~15 minutes from request time.
+# MAGIC > **Chargeback:** Use `endpoint_tags` for billing split (flows into `custom_tags` in `system.billing.usage`). Use `request_tags` for per-request attribution in this table only.
 # MAGIC </div>
+# MAGIC
+# MAGIC ---
+# MAGIC
+# MAGIC ## Section 7: Billing Model, Split Billing & Out-of-the-Box Monitoring
+# MAGIC
+# MAGIC ---
+# MAGIC
+# MAGIC ### 7a. How AI Features Are Charged — Where Costs Appear
+# MAGIC
+# MAGIC **AI Gateway adds zero overhead DBUs.** All model serving costs appear as `MODEL_SERVING` records in `system.billing.usage` — the gateway routing/governance layer does not create a separate billing line.
+# MAGIC
+# MAGIC | Feature | `billing_origin_product` | `sku_name` | Billing model |
+# MAGIC |---|---|---|---|
+# MAGIC | FMAPI Pay-Per-Token (via AI Gateway) | `MODEL_SERVING` | `SERVERLESS_REAL_TIME_INFERENCE` | DBUs per 1M tokens |
+# MAGIC | FMAPI Provisioned Throughput | `MODEL_SERVING` | `SERVERLESS_REAL_TIME_INFERENCE` | DBUs/hour, always-on |
+# MAGIC | AI Gateway (native, separate from model serving) | `AI_GATEWAY` | — | Separate product line |
+# MAGIC | Genie LLM usage (post-July 6 overage) | `MODEL_SERVING` | `SERVERLESS_REAL_TIME_INFERENCE` | Free tier per user; overage billed in DBUs |
+# MAGIC | AI Functions (ai_query, ai_extract) | `AI_FUNCTIONS` | — | |
+# MAGIC | Agent Bricks (KA, MAS) | `AGENT_BRICKS` | — | |
+# MAGIC
+# MAGIC **To isolate AI Gateway traffic in `system.billing.usage`:**
+# MAGIC ```sql
+# MAGIC WHERE billing_origin_product = 'MODEL_SERVING'
+# MAGIC   AND usage_metadata.ai_gateway_endpoint_name IS NOT NULL
+# MAGIC ```
+# MAGIC
+# MAGIC **FMAPI PT billing note:** Provisioned Throughput is always-on and billed DBUs/hour regardless of traffic. Entry capacity for Llama 3.3 70B is ~85 DBU/hr; scaling capacity is ~342 DBU/hr. Shut down PT endpoints when not needed.
+# MAGIC
+# MAGIC **Genie July 6, 2026 pricing change:** LLM usage in Genie Spaces, Genie Code, and Genie moves to pay-as-you-go beyond a free monthly per-user allowance. The free allowance cannot be removed by admins. Only overage is subject to budget controls. Genie SQL compute (serverless warehouse) is billed separately as `SERVERLESS_SQL`.
+# MAGIC
+# MAGIC ---
+# MAGIC
+# MAGIC ### 7b. Split Billing for User Groups — Endpoint Tags Pattern
+# MAGIC
+# MAGIC **The reliable billing attribution mechanism is endpoint-level tags** — these propagate into the `custom_tags` MAP column in `system.billing.usage` on every `MODEL_SERVING` record.
+# MAGIC
+# MAGIC **Step 1: Tag your AI Gateway endpoint at creation (or update):**
+# MAGIC ```python
+# MAGIC # Add to the serving endpoint config when creating the AI Gateway route
+# MAGIC # Endpoint tags are set on the serving endpoint, not the AI Gateway config block
+# MAGIC # Use: PUT /api/2.0/serving-endpoints/{name}/tags
+# MAGIC # Or set via UI: Serving → [endpoint] → Tags tab
+# MAGIC ```
+# MAGIC
+# MAGIC **Step 2: Query split costs by team in system.billing.usage:**
+
+# COMMAND ----------
+
+# Section 7b: Split billing by team using endpoint tags
+# Endpoint tags (set on the serving endpoint) propagate into custom_tags in system.billing.usage.
+# This is the recommended mechanism for internal chargeback — more reliable than request_tags for billing.
+
+split_billing_sql = """
+SELECT
+  DATE_TRUNC('month', usage_date)                    AS billing_month,
+  custom_tags['team']                                AS team,
+  custom_tags['cost_center']                         AS cost_center,
+  usage_metadata.ai_gateway_endpoint_name            AS endpoint,
+  SUM(usage_quantity)                                AS total_dbus,
+  COUNT(*)                                           AS record_count
+FROM system.billing.usage
+WHERE billing_origin_product = 'MODEL_SERVING'
+  AND usage_metadata.ai_gateway_endpoint_name IS NOT NULL
+  AND usage_date >= CURRENT_DATE() - INTERVAL 90 DAYS
+GROUP BY 1, 2, 3, 4
+ORDER BY billing_month DESC, total_dbus DESC
+"""
+
+print("Split billing SQL (run in a SQL cell or via display(spark.sql(...))):")
+print(split_billing_sql)
+
+# COMMAND ----------
+
+# MAGIC %md
+# MAGIC ---
+# MAGIC
+# MAGIC ### 7c. Out-of-the-Box Monitoring: Built-in AI Gateway Dashboard (Zero Setup)
+# MAGIC
+# MAGIC **You do not need to build a dashboard.** Databricks provides a built-in AI Gateway usage dashboard accessible directly from the UI with no pipeline or notebook required.
+# MAGIC
+# MAGIC **How to access:**
+# MAGIC 1. Navigate: **Left sidebar → Serving → AI Gateway tab**
+# MAGIC 2. Click **"View Dashboard"** (or "Create Dashboard" on first use if the button shows that label)
+# MAGIC 3. The dashboard opens immediately — it reads from `system.ai_gateway.usage` which is auto-populated
+# MAGIC
+# MAGIC > **Version requirement:** The dashboard must be v0.4 or above to include the **Cost Analysis** tab. If you imported an older version, update it from the AI Gateway page.
+# MAGIC
+# MAGIC **Dashboard tabs:**
+# MAGIC
+# MAGIC | Tab | What you see |
+# MAGIC |---|---|
+# MAGIC | Overview | Daily requests, token trends, top users by volume |
+# MAGIC | Performance | Latency percentiles (P50/P90/P95/P99), error rates, 429 rate |
+# MAGIC | Usage | Consumption by endpoint, workspace, requester |
+# MAGIC | Cost Analysis | Breakdown by endpoint, target model, requesting user, endpoint tags, request tags |
+# MAGIC | External MCP Servers | MCP tool-call metrics (Gated Beta) |
+# MAGIC | Coding Agents | Genie Code and agent activity tracking |
+# MAGIC
+# MAGIC The **Cost Analysis tab** uses endpoint tags and request tags to show team/project breakdowns. For regulated workloads this is your primary operational spend view — no custom SQL required.
+# MAGIC
+# MAGIC **Limitations:**
+# MAGIC - Account admin access required to view the dashboard (publisher permissions model)
+# MAGIC - ~15 minute data latency
+# MAGIC - External model (Azure OpenAI) cost estimates are informational only — supply your own pricing table if needed
+# MAGIC
+# MAGIC ---
+# MAGIC
+# MAGIC ### 7d. Unity AI Gateway Cost Controls — Hard Spend Caps
+# MAGIC
+# MAGIC For hard budget enforcement (blocking requests when budget exhausted), use **Unity AI Gateway Cost Controls** (AI Spend Controls, Beta):
+# MAGIC
+# MAGIC - **Navigate:** Account Console → Usage → Budgets tab → Add budget → Resource type: Unity AI Gateway
+# MAGIC - **Scope:** Entire account, specific workspaces, user groups, or individual users
+# MAGIC - **Genie-specific:** Use resource tag `databricks-product: genie` to scope to Genie LLM spend only
+# MAGIC - **Hard cap:** Check "Block usage when budget is exhausted" — users see "budget exhausted" message
+# MAGIC - **Soft alert:** Email notification only; usage continues
+# MAGIC
+# MAGIC > **Recommended for workshops:** Set a soft alert at 70% and hard cap at 100% of your daily DBU budget. This prevents runaway cost from a misconfigured lab loop without cutting off users mid-exercise.
+# MAGIC
+# MAGIC > **Rate limits vs budgets:** Rate limits (Lab 02/03) control REQUEST RATE (QPM/TPM). Budget controls control SPEND (DBUs). Use both: rate limits for operational protection, budgets for financial guardrails.
+

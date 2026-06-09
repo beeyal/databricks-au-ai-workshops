@@ -1097,13 +1097,24 @@ print("-" * 65)
 # MAGIC ```
 # MAGIC Both types can coexist in the same `rate_limits` array. The first limit hit applies.
 # MAGIC
-# MAGIC Valid `key` values: `"endpoint"`, `"user"`, `"user_group"`
+# MAGIC Valid `key` values: `"endpoint"`, `"user"`, `"user_group"`, `"service_principal"`
 # MAGIC - `"endpoint"` — global ceiling across all callers
 # MAGIC - `"user"` — per Databricks identity (human or service principal)
 # MAGIC - `"user_group"` — shared ceiling for a Unity Catalog group collectively (max 5 group rules per endpoint)
+# MAGIC - `"service_principal"` — limit a specific SP app ID
 # MAGIC
 # MAGIC Valid `renewal_period` values: `"minute"` (only supported value)
-# MAGIC Maximum 20 rate limit rules per endpoint.
+# MAGIC Maximum 20 rate limit rules per endpoint total; maximum 5 `user_group` rules per endpoint.
+# MAGIC
+# MAGIC **Rate limits vs. spend controls — use both:**
+# MAGIC
+# MAGIC | Mechanism | Controls | When to use |
+# MAGIC |---|---|---|
+# MAGIC | Rate limits (this lab) | Request rate — QPM/TPM | Prevent abuse, protect shared capacity, enforce fairness |
+# MAGIC | Unity AI Gateway Cost Controls (Budgets) | Spend in DBUs | Set monthly caps per workspace, group, or user; block at limit |
+# MAGIC
+# MAGIC Rate limits fire on request volume; spend controls fire on cumulative token cost. A well-governed deployment uses both.
+# MAGIC Configure spend controls in: **Account Console → Usage → Budgets → Add budget → Resource type: Unity AI Gateway**
 # MAGIC
 # MAGIC ---
 # MAGIC

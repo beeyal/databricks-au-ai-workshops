@@ -321,6 +321,8 @@ _lab02_endpoint_ready = preflight_check_endpoint(w, PT_ENDPOINT_NAME)
 # MAGIC - Safety filter on input and output
 # MAGIC - Rate limits: 60 QPM endpoint-wide, 20 QPM per user (Lab 03 burst tests expect these values — do not change them here)
 # MAGIC
+# MAGIC > **Billing attribution tip:** Tag your serving endpoint with `team` and `cost_center` labels. These tags propagate into the `custom_tags` MAP column in `system.billing.usage` on every `MODEL_SERVING` record, enabling team-level chargeback with no additional tooling. Set tags via: Serving → [endpoint] → Tags tab, or via `PUT /api/2.0/serving-endpoints/{name}/tags`. Lab 04 Section 7b shows the split-billing SQL that uses these tags.
+# MAGIC
 # MAGIC **API path used:** `PUT /api/2.0/serving-endpoints/{name}/ai-gateway`
 # MAGIC This replaces the entire `ai_gateway` config block. All settings (rate limits, guardrails, inference table) must be included in every PUT or they will be removed. Helper functions below fetch the current config before updating to avoid accidental wipe.
 # MAGIC
