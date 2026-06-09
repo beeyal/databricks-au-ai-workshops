@@ -753,7 +753,7 @@ print(TAG_SQL_EXAMPLES)
 # MAGIC
 # MAGIC **UI (manual pre-flight equivalent):**
 # MAGIC 1. accounts.azuredatabricks.net → Workspaces → [workspace] → Security and compliance tab → verify Geography enforcement is ON (Note: AWS accounts use accounts.cloud.databricks.com)
-# MAGIC 2. Left sidebar → Serving → AI Gateway tab → [endpoint] → verify state is Ready
+# MAGIC 2. Left sidebar → AI Gateway → [endpoint] → verify state is Ready
 # MAGIC 3. Edit Unity AI Gateway → confirm PII BLOCK + safety filter are enabled on input and output
 # MAGIC 4. User management → Groups → confirm target group exists and has correct members
 # MAGIC

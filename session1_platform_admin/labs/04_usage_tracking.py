@@ -973,7 +973,7 @@ print(split_billing_sql)
 # MAGIC **You do not need to build a dashboard.** Databricks provides a built-in AI Gateway dashboard. It requires one-time provisioning by an account admin, after which it is available to all account admins.
 # MAGIC
 # MAGIC **How to access (first time — account admin required):**
-# MAGIC 1. Navigate: **Left sidebar → AI Gateway** (the standalone item, not Serving → AI Gateway tab)
+# MAGIC 1. Navigate: **Left sidebar → AI Gateway** 
 # MAGIC 2. Click **"Create Dashboard"** — this provisions the dashboard in your catalog
 # MAGIC 3. After creation, click **"View Dashboard"** to open it
 # MAGIC

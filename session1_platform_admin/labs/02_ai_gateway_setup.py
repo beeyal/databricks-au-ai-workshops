@@ -20,32 +20,23 @@
 # MAGIC - [ ] Set per-endpoint and per-user QPM rate limits (60 QPM / 20 QPM)
 # MAGIC - [ ] Tested the gateway end-to-end: connectivity, PII blocking, and safety filter
 # MAGIC
-# MAGIC **AI Gateway versions — know which one you are using:**
-# MAGIC
-# MAGIC | Version | Navigation path | Centralised PII guardrails | Used in this lab |
-# MAGIC |---|---|---|---|
-# MAGIC | V1 (GA) | Left sidebar → Serving → AI Gateway tab | Yes — BLOCK / MASK on input and output | **Yes** |
-# MAGIC | Unity AI Gateway (Beta) | Left sidebar → **AI Gateway** (standalone item — preview must be enabled by account admin) | No — endpoint-level safety filter only | No — use V1 for all regulated workloads |
-# MAGIC
-# MAGIC > **Why V1 for regulated workloads:** Unity AI Gateway (Beta) does not yet have centralised PII guardrail policy. Using it for data classified above Public means TFNs, Medicare numbers, and ABNs will not be blocked at the gateway layer. Use V1 (GA) for all regulated workloads until Beta reaches GA with full guardrail parity.
+# MAGIC **Navigate:** Left sidebar → **AI Gateway**
 
 # COMMAND ----------
 
 # MAGIC %md
 # MAGIC ## UI Tour — complete this before running any code
 # MAGIC
-# MAGIC **Task 1 — Open the AI Gateway UI (V1 / GA)**
+# MAGIC **Task 1 — Open AI Gateway**
 # MAGIC
-# MAGIC Navigate: Left sidebar → Serving → click the **AI Gateway** tab at the top of the Serving page.
+# MAGIC Navigate: Left sidebar → **AI Gateway**
 # MAGIC You should see: List of existing AI Gateway endpoints and a "+ Create" button (top-right).
-# MAGIC
-# MAGIC > The standalone **AI Gateway** item in the left sidebar is Unity AI Gateway (Beta). It is visible because your account admin has enabled the preview (Account Console → Previews). This lab uses the V1 path (Serving → AI Gateway tab) which has full centralised PII guardrail support — do not use the standalone Beta item for this lab.
 # MAGIC
 # MAGIC ---
 # MAGIC
 # MAGIC **Task 2 — Explore the Create Endpoint form (do not submit)**
 # MAGIC
-# MAGIC Navigate: Left sidebar → Serving → AI Gateway tab → click **+ Create**
+# MAGIC Navigate: Left sidebar → AI Gateway → click **+ Create**
 # MAGIC You should see:
 # MAGIC - Provider selection (Databricks Foundation Models or External provider)
 # MAGIC - Rate limits section: QPM or TPM, per endpoint / per user
@@ -329,7 +320,7 @@ _lab02_endpoint_ready = preflight_check_endpoint(w, PT_ENDPOINT_NAME)
 # MAGIC **PII types detected natively (no custom configuration required):**
 # MAGIC **Classic AI Gateway (GA, Presidio-based):** credit card numbers, email addresses, phone numbers, bank account numbers, social security numbers.
 # MAGIC
-# MAGIC **Unity AI Gateway (Beta) built-in templates:** names, email addresses, phone numbers, social security numbers, credit card numbers, physical addresses.
+# MAGIC **AI Gateway built-in detection templates:** names, email addresses, phone numbers, social security numbers, credit card numbers, physical addresses.
 # MAGIC
 # MAGIC ⚠️ **Neither version natively detects:** Australian TFN, Medicare numbers, ABN, BSB + account number pairs, passport numbers, IP addresses, or dates of birth. These require custom guardrail prompts (see Section 3c).
 # MAGIC
@@ -342,7 +333,7 @@ _lab02_endpoint_ready = preflight_check_endpoint(w, PT_ENDPOINT_NAME)
 # MAGIC
 # MAGIC **UI alternative — do this instead of running the code if you prefer:**
 # MAGIC ```
-# MAGIC Navigate: Left sidebar → Serving → AI Gateway tab → + Create
+# MAGIC Navigate: Left sidebar → AI Gateway → + Create
 # MAGIC
 # MAGIC Provider:     Databricks Foundation Models
 # MAGIC Model:        databricks-claude-haiku-4-5
@@ -621,7 +612,7 @@ else:
 # MAGIC %md
 # MAGIC After running the cell above, verify in the UI:
 # MAGIC
-# MAGIC Navigate: Left sidebar → Serving → AI Gateway tab → click the endpoint name
+# MAGIC Navigate: Left sidebar → AI Gateway → click the endpoint name
 # MAGIC You should see:
 # MAGIC - Usage tracking: Enabled
 # MAGIC - Inference tables: Enabled, pointing to `workshop_au.ai_governance.ai_gw_payloads`
@@ -720,7 +711,7 @@ print("NMI keyword blocking function defined -- optional, uncomment if required 
 # MAGIC
 # MAGIC Payload logging was included in the config applied in Section 3b. This section shows how to update it independently if the target table needs to change.
 # MAGIC
-# MAGIC **UI:** Left sidebar → Serving → AI Gateway tab → click the endpoint → Edit endpoint → Inference tables section → enter catalog/schema/prefix → Save.
+# MAGIC **UI:** Left sidebar → AI Gateway → click the endpoint → Edit → Inference tables section → enter catalog/schema/prefix → Save.
 # MAGIC
 # MAGIC After your first test call in Section 6, you can verify the payload log:
 
@@ -788,7 +779,7 @@ print("Run the SQL cell below after making test calls in Section 6.")
 # MAGIC
 # MAGIC **Lab 03 dependency:** Lab 03 runs burst tests that expect 60 QPM endpoint and 20 QPM per-user limits to be active. Do not raise these limits before running Lab 03. The commented example below shows 120/20 for illustration only.
 # MAGIC
-# MAGIC **UI:** Left sidebar → Serving → AI Gateway tab → click the endpoint → Edit endpoint → Rate limits section.
+# MAGIC **UI:** Left sidebar → AI Gateway → click the endpoint → Edit → Rate limits section.
 
 # COMMAND ----------
 
@@ -862,7 +853,7 @@ print("Do not change these before running Lab 03.")
 # MAGIC | PII blocking | TFN + Medicare in prompt is blocked | HTTP 400 (guardrail block) |
 # MAGIC | Safety filter | Harmful content prompt is blocked | HTTP 400 or 403 |
 # MAGIC
-# MAGIC **UI alternative:** Navigate to the endpoint in the AI Gateway tab and use the built-in Playground. Try a prompt containing a TFN: "My TFN is 645 942 679" — you should see a guardrail block error instead of a model response.
+# MAGIC **UI alternative:** Navigate to the endpoint in AI Gateway and use the built-in Playground. Try a prompt containing a TFN: "My TFN is 645 942 679" — you should see a guardrail block error instead of a model response.
 # MAGIC
 # MAGIC **Note:** `databricks-claude-haiku-4-5` is an in-region model for AU East and does not require
 # MAGIC cross-geo routing. If Test 1 or Test 2 return HTTP 403, this indicates an endpoint permission
@@ -1110,7 +1101,7 @@ print("  ORDER BY event_time DESC LIMIT 10")
 # MAGIC
 # MAGIC This section fetches the full gateway config via the REST API and prints a compliance summary. Run it as a final check before handing the endpoint to consuming teams — or include it in a CI/CD pipeline to assert controls are active.
 # MAGIC
-# MAGIC **UI:** Left sidebar → Serving → AI Gateway tab → click the endpoint name → Overview tab.
+# MAGIC **UI:** Left sidebar → AI Gateway → click the endpoint name → Overview tab.
 # MAGIC You should see: usage tracking, inference tables, guardrails, and rate limits all active.
 
 # COMMAND ----------

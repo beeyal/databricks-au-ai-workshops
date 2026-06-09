@@ -31,16 +31,14 @@
 # MAGIC
 # MAGIC **Rate limit config**
 # MAGIC ```
-# MAGIC Navigate: Left sidebar → Serving → AI Gateway tab → [your endpoint] → Edit Unity AI Gateway → Rate limits
+# MAGIC Navigate: Left sidebar → AI Gateway → [your endpoint] → Edit → Rate limits
 # MAGIC You should see: QPM (calls) and TPM (tokens) limit rules per key (endpoint / user / user_group).
 # MAGIC               A 429 is returned to the caller when the limit is exceeded.
 # MAGIC ```
 # MAGIC
-# MAGIC > Rate limits and guardrails live in the v1/GA path (Serving → AI Gateway). The standalone **AI Gateway** left-nav item is Unity AI Gateway (Beta) — visible when your account admin has enabled the preview. It does not yet have centralised guardrail policy. Use the V1 path (Serving → AI Gateway) for all regulated workloads.
-# MAGIC
-# MAGIC **Guardrails (v1)**
+# MAGIC **Guardrails**
 # MAGIC ```
-# MAGIC Navigate: same Edit Unity AI Gateway dialog → Guardrails section
+# MAGIC Navigate: same Edit dialog → Guardrails section
 # MAGIC You should see: Safety filter toggle (Input / Output), PII detection with three options (None / Block / Mask),
 # MAGIC               and an Invalid keywords text field (input only).
 # MAGIC ```
@@ -613,7 +611,7 @@ print("NMI edge case tests are commented out — safe to run.")
 # MAGIC
 # MAGIC Use both. The application filter catches fast; the gateway catches requests that skip the application layer.
 # MAGIC
-# MAGIC **UI:** Left sidebar → Serving → AI Gateway tab → [your endpoint] → Edit Unity AI Gateway → Guardrails → Input → Invalid keywords → add each term. The gateway applies these as case-insensitive substring matches before any NER evaluation.
+# MAGIC **UI:** Left sidebar → AI Gateway → [your endpoint] → Edit → Guardrails → Input → Invalid keywords → add each term. The gateway applies these as case-insensitive substring matches before any NER evaluation.
 
 # COMMAND ----------
 
@@ -895,7 +893,7 @@ for tc in CUSTOM_GUARDRAIL_TEST_CASES:
 # MAGIC
 # MAGIC The function below produces a structured verification report for inclusion in a compliance evidence package. It checks config via API (what is configured) and runs live functional tests (does it actually work).
 # MAGIC
-# MAGIC **UI alternative:** Left sidebar → Serving → AI Gateway tab → [your endpoint] → Overview tab → scroll to Guardrails section. Screenshot this page as the visual evidence artefact for audit.
+# MAGIC **UI alternative:** Left sidebar → AI Gateway → [your endpoint] → Overview tab → scroll to Guardrails section. Screenshot this page as the visual evidence artefact for audit.
 # MAGIC
 # MAGIC The API-generated report is more useful for automated compliance checks — it can be written to Delta and queried by `system.access.audit` alongside gateway config change events.
 
