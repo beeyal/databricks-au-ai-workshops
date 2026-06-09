@@ -29,32 +29,14 @@ from databricks.sdk.service.sql import StatementState
 # ---------------------------------------------------------------------------
 
 def get_client() -> WorkspaceClient:
-    """Return a WorkspaceClient.
+    """Return WorkspaceClient using SP credentials only (no OBO).
 
-    Priority order:
-    1. OBO user-forwarded token (X-Forwarded-Access-Token header)
-    2. SDK OAuth using DATABRICKS_CLIENT_ID + DATABRICKS_CLIENT_SECRET (SP)
-    3. Local profile fallback for development
+    SQL queries use _run_query_http() with the OBO token to avoid the
+    'more than one authorization method' conflict that occurs when both
+    DATABRICKS_TOKEN (OBO) and DATABRICKS_CLIENT_ID/SECRET (SP M2M) are set.
+    This client is only used for non-SQL SDK calls (Groups API, etc.).
     """
-    host = os.environ.get("DATABRICKS_HOST", "").rstrip("/")
-
-    # 1. OBO — user's token forwarded by Databricks Apps
-    try:
-        user_token = st.context.headers.get("X-Forwarded-Access-Token", "")
-        if user_token and host:
-            return WorkspaceClient(host=host, token=user_token)
-    except Exception:
-        pass
-
-    # 2. SDK resolves credentials from env vars automatically
-    if host:
-        try:
-            return WorkspaceClient(host=host)
-        except Exception:
-            pass
-
-    # 3. Local dev
-    return WorkspaceClient(profile="dogfood")
+    return _get_cached_client()
 
 
 WAREHOUSE_ID = os.environ.get("DATABRICKS_WAREHOUSE_ID", "93a682dcf60dae13")
@@ -69,11 +51,20 @@ _TOKEN_TO_DBU = 1 / 1_000_000  # 1 DBU ≈ 1 M tokens (illustrative)
 # ---------------------------------------------------------------------------
 
 @st.cache_resource(show_spinner=False)
-def _get_cached_client(token_hash: str = "") -> WorkspaceClient:
-    """Cache the WorkspaceClient. token_hash busts the cache when the token rotates."""
+def _get_cached_client() -> WorkspaceClient:
+    """SP-only WorkspaceClient for non-SQL SDK calls (Groups, etc.).
+    Uses M2M OAuth from DATABRICKS_CLIENT_ID/SECRET — no token involved.
+    """
     host = os.environ.get("DATABRICKS_HOST", "").rstrip("/")
+    client_id = os.environ.get("DATABRICKS_CLIENT_ID", "")
+    client_secret = os.environ.get("DATABRICKS_CLIENT_SECRET", "")
+    if host and client_id and client_secret:
+        from databricks.sdk.config import Config
+        cfg = Config(host=f"https://{host}" if not host.startswith("https") else host,
+                     client_id=client_id, client_secret=client_secret)
+        return WorkspaceClient(config=cfg)
     if host:
-        return WorkspaceClient(host=host)
+        return WorkspaceClient(host=host if host.startswith("https") else f"https://{host}")
     return WorkspaceClient(profile="dogfood")
 
 
@@ -84,7 +75,8 @@ def _run_query(sql: str, timeout_secs: int = 50) -> pd.DataFrame:
     otherwise falls back to the SP's ambient credentials.
     """
     # Get OBO token outside cache so st.context is available
-    host = os.environ.get("DATABRICKS_HOST", "").rstrip("/")
+    raw_host = os.environ.get("DATABRICKS_HOST", "").rstrip("/")
+    host = raw_host if raw_host.startswith("https://") else f"https://{raw_host}"
     try:
         obo_token = st.context.headers.get("X-Forwarded-Access-Token", "")
     except Exception:
