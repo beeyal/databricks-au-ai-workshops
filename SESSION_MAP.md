@@ -21,11 +21,10 @@ Creates the `workshop_au` catalog and `energy` + `ai_governance` schemas, loads 
 
 | Lab | File | Description |
 |-----|------|-------------|
-| 01 | `labs/01_workspace_ai_settings.py` | Inspect and configure AI feature flags; verify geography enforcement |
-| 02 | `labs/02_ai_gateway_setup.py` | Configure an AI Gateway endpoint with routing rules and rate limits |
-| 03 | `labs/03_rate_limits_guardrails.py` | Add guardrails to block cross-geo models and filter PII patterns |
-| 04 | `labs/04_usage_tracking.py` | Query `system.access.audit` to build an AI activity audit view |
-| 05 | `labs/05_data_residency_compliance.py` | Data residency deep-dive (optional, time-permitting) |
+| 01 | `labs/01_ai_gateway_setup.py` | Configure an AI Gateway endpoint with routing rules and rate limits |
+| 02 | `labs/02_rate_limits_guardrails.py` | Add guardrails to block cross-geo models and filter PII patterns |
+| 03 | `labs/03_usage_tracking.py` | Query `system.access.audit` to build an AI activity audit view |
+| 04 | `labs/04_data_residency_compliance.py` | Data residency deep-dive (optional, time-permitting) |
 
 **Cleanup:** `setup/cleanup.py`
 Drops the `energy` schema and tables, revokes participant grants, removes the AI Gateway test endpoint.
@@ -36,9 +35,9 @@ Drops the `energy` schema and tables, revokes participant grants, removes the AI
 
 **Folder:** `session2_genie_space/`
 **Audience:** Data engineers, analysts
-**Duration:** 2.5 hours
+**Duration:** 2 hours
 
-**Slide deck:** TBD
+**Slide deck:** https://docs.google.com/presentation/d/1Kw-mwE8kVvc-j70mXzFOVnUAURVoYBaoDKIVF6MKFoU/edit
 
 **Setup:** `setup/setup.py`
 Creates `workshop_au.aemo`, loads the 5 AEMO NEM tables from DBFS CSVs, adds column comments and table descriptions, grants participant access. Expected runtime: ~5 minutes.
@@ -118,16 +117,15 @@ Confirms the `workshop_au` catalog is accessible and Genie Code is enabled in th
 | Lab | File | Description |
 |-----|------|-------------|
 | 01 | `labs/01_custom_instructions.py` | Write AEMO-specific personal instructions for Genie Code |
-| 02 | `labs/02_skills_walkthrough.py` | Create three SKILL.md files: `energy-analytics`, `regulatory-compliance`, `genie-space-creator` |
+| 02 | `labs/02_skills_walkthrough.py` | Create two SKILL.md files: `energy-operations`, `regulatory-compliance` |
 | 03 | `labs/03_mcp_intro.py` | MCP concepts and `DatabricksMCPClient.list_tools()` demo |
 
 **Skills (installed during Lab 02):**
 
 | Skill | Trigger keywords |
 |-------|-----------------|
-| `energy-analytics` | SAIDI, SAIFI, spot price, RRP, dispatch, LOR, NEM analysis |
-| `regulatory-compliance` | Australian regulatory requirements, compliance, AER, Privacy Act, STPIS, NER obligations |
-| `genie-space-creator` | create Genie Space, golden queries, NL-to-SQL, Genie API |
+| `energy-operations` | SAIDI, SAIFI, spot price, RRP, dispatch, LOR, NEM analysis, NMI, NEM12, meter data |
+| `regulatory-compliance` | SOCI Act, AESCSF, Australian regulatory requirements, compliance, AER, Privacy Act, STPIS, NER, CIRMP, data residency |
 
 **Cleanup:** `setup/cleanup.py`
 Removes the custom instructions file and skill files from the participant's workspace home directory.

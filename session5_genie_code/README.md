@@ -14,7 +14,7 @@ Genie Code out of the box has no awareness of NEM terminology, AEMO regulatory o
 | Lab | Topic | Duration | What you install |
 |-----|-------|----------|-----------------|
 | Lab 01 | Custom Instructions | 20 min | Personal instructions file at `/Users/{email}/.assistant_instructions.md` |
-| Lab 02 | Skills Walkthrough | 30 min | Three SKILL.md files: `energy-analytics`, `regulatory-compliance`, `genie-space-creator` |
+| Lab 02 | Skills Walkthrough | 30 min | Two SKILL.md files: `energy-operations`, `regulatory-compliance` |
 | Lab 03 | MCP Introduction | 10 min | Conceptual intro + `DatabricksMCPClient` tool discovery demo |
 
 ---
@@ -45,22 +45,17 @@ You also see the workspace-level pattern (`Workspace/.assistant_workspace_instru
 
 Skills are `SKILL.md` files with YAML front-matter that Genie Code loads on demand — either when a query matches the `description:` field, or when you type `@skill-name` explicitly.
 
-Three skills are created in `/Users/{email}/.assistant/skills/`:
+Two skills are created in `/Users/{email}/.assistant/skills/`:
 
-### `energy-analytics`
-SAIDI/SAIFI/CAIDI formulas, NEM spot price reference table (cap $15,300/MWh, floor -$1,000/MWh), 5-minute dispatch vs 30-minute settlement explained, and three ready-to-run SQL patterns for `workshop_au.aemo`.
+### `energy-operations`
+NEM12 quality flags, SAIDI/SAIFI/CAIDI formulas, NEM spot price reference, 5-minute dispatch vs 30-minute settlement explained, peak/off-peak window definitions, network asset types, and SQL patterns for `workshop_au.aemo` and `workshop_au.energy`.
 
-Auto-loads on: SAIDI, SAIFI, spot price, RRP, dispatch, LOR, NEM analysis.
+Auto-loads on: SAIDI, SAIFI, spot price, RRP, dispatch, LOR, NEM analysis, NMI, meter data.
 
 ### `regulatory-compliance`
-Australian data residency requirements incident reporting obligations (12h critical / 72h significant), Privacy Act APP 6 and APP 11 for NMI data, NER Chapter 7 retention (7 years), STPIS performance benchmarks by network zone, and Major Event Day exclusion rules.
+SOCI Act 2018 CIRMP obligations, AESCSF framework, Privacy Act APP 6 and APP 11 for NMI data, NER Chapter 7 retention (7 years), AER STPIS benchmarks, data residency classification table, and AU East in-region vs cross-geo feature matrix. Includes UC audit log queries for evidence.
 
-Auto-loads on: Australian regulatory requirements, compliance, AER, Privacy Act, STPIS, NER obligations.
-
-### `genie-space-creator`
-Full REST API walkthrough to create a Genie Space (create → add tables → add golden queries → set permissions). Includes five ready-to-use golden query templates for NEM data and the MCP endpoint URL pattern for connecting agents to the space.
-
-Auto-loads on: create Genie Space, golden queries, NL-to-SQL, Genie API.
+Auto-loads on: Australian regulatory requirements, compliance, SOCI Act, AER, Privacy Act, STPIS, AESCSF, NER, data residency, CIRMP.
 
 ---
 
@@ -103,9 +98,8 @@ All three endpoints run on Azure Australia East — no data leaves the region.
 ```
 /Users/{email}/.assistant_instructions.md ← loads every session
 /Users/{email}/.assistant/skills/
- energy-analytics/SKILL.md ← SAIDI/SAIFI, spot price, SQL patterns
- regulatory-compliance/SKILL.md ← Australian regulatory requirements, Privacy Act, STPIS
- genie-space-creator/SKILL.md ← REST API, golden queries, MCP endpoint
+ energy-operations/SKILL.md ← NEM12, SAIDI/SAIFI, spot price, SQL patterns
+ regulatory-compliance/SKILL.md ← SOCI Act, AESCSF, Privacy Act, AER/STPIS, data residency
 ```
 
 ---
