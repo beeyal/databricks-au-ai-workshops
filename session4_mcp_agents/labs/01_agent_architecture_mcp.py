@@ -387,9 +387,8 @@ else:
 
 from databricks.sdk import WorkspaceClient
 
-ws   = WorkspaceClient()
-HOST = ws.config.host.rstrip("/")
-me   = ws.current_user.me()
+ws = WorkspaceClient()
+me = ws.current_user.me()
 
 print("Workspace connection verified.")
 print()

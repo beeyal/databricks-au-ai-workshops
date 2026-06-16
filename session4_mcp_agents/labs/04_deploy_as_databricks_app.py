@@ -56,17 +56,29 @@
 
 # COMMAND ----------
 
-dbutils.widgets.text("catalog", "workshop_au", "Catalog name")
-dbutils.widgets.text("schema_aemo", "aemo", "AEMO schema name")
-dbutils.widgets.text("pt_endpoint", "au_east_llm_inregion", "PT endpoint name")
-dbutils.widgets.text("genie_space_id", "", "AEMO Genie Space ID")
-dbutils.widgets.text("app_name", "aemo-operations-agent","App name (lowercase + hyphens)")
+# MAGIC %pip install databricks-sdk databricks-langchain databricks-mcp langgraph mlflow gradio --quiet
+dbutils.library.restartPython()
 
-CATALOG = dbutils.widgets.get("catalog")
-SCHEMA_AEMO = dbutils.widgets.get("schema_aemo")
-PT_ENDPOINT = dbutils.widgets.get("pt_endpoint")
-GENIE_SPACE_ID = dbutils.widgets.get("genie_space_id")
-APP_NAME = dbutils.widgets.get("app_name")
+# COMMAND ----------
+
+# --- Config read ---
+import json
+from pathlib import Path
+
+_config_path = Path('/tmp/workshop2c_config.json')
+_saved = json.loads(_config_path.read_text()) if _config_path.exists() else {}
+
+dbutils.widgets.text('catalog',        _saved.get('CATALOG',        'workshop_au'),           'Catalog name')
+dbutils.widgets.text('schema_aemo',    _saved.get('SCHEMA_AEMO',    'aemo'),                  'AEMO schema name')
+dbutils.widgets.text('pt_endpoint',    _saved.get('PT_ENDPOINT',    'au_east_llm_inregion'),  'PT endpoint name')
+dbutils.widgets.text('genie_space_id', _saved.get('GENIE_SPACE_ID', ''),                      'AEMO Genie Space ID')
+dbutils.widgets.text('app_name',       _saved.get('APP_NAME',       'aemo-operations-agent'), 'App name (lowercase + hyphens)')
+
+CATALOG        = dbutils.widgets.get('catalog')
+SCHEMA_AEMO    = dbutils.widgets.get('schema_aemo')
+PT_ENDPOINT    = dbutils.widgets.get('pt_endpoint')
+GENIE_SPACE_ID = dbutils.widgets.get('genie_space_id')
+APP_NAME       = dbutils.widgets.get('app_name')
 
 from databricks.sdk import WorkspaceClient
 ws = WorkspaceClient()
@@ -79,7 +91,7 @@ print(f"Genie Space ID : {GENIE_SPACE_ID}")
 print(f"App name : {APP_NAME}")
 
 if not GENIE_SPACE_ID:
- print("\nNOTE: Set 'genie_space_id' widget — the app still deploys without it.")
+    print("\nNOTE: Set 'genie_space_id' widget — the app still deploys without it.")
 
 # COMMAND ----------
 
@@ -238,11 +250,12 @@ import mlflow
 # ---------------------------------------------------------------------------
 # Configuration — read from Databricks Apps environment variables
 # ---------------------------------------------------------------------------
-PT_ENDPOINT = os.environ.get("PT_ENDPOINT", "au_east_llm_inregion")
+PT_ENDPOINT    = os.environ.get("PT_ENDPOINT",    "au_east_llm_inregion")
 GENIE_SPACE_ID = os.environ.get("GENIE_SPACE_ID", "")
-WORKSPACE_URL = os.environ.get("DATABRICKS_HOST", "").rstrip("/")
-CATALOG = os.environ.get("CATALOG", "workshop_au")
-SCHEMA_AEMO = os.environ.get("SCHEMA_AEMO", "aemo")
+WORKSPACE_URL  = os.environ.get("DATABRICKS_HOST", "").rstrip("/")
+CATALOG        = os.environ.get("CATALOG",        "workshop_au")
+SCHEMA_AEMO    = os.environ.get("SCHEMA_AEMO",    "aemo")
+VS_INDEX_NAME  = os.environ.get("VS_INDEX_NAME",  "workshop_au.aemo.aemo_market_notices_index")
 
 mlflow.set_experiment("/Apps/aemo-operations-agent")
 
@@ -251,35 +264,48 @@ mlflow.set_experiment("/Apps/aemo-operations-agent")
 # ---------------------------------------------------------------------------
 
 async def build_agent():
- servers = [
- DatabricksMCPServer.from_uc_function(
- catalog=CATALOG,
- schema=SCHEMA_AEMO,
- name="aemo-uc-tools",
- ),
- ]
+    servers = [
+        DatabricksMCPServer.from_uc_function(
+            catalog=CATALOG,
+            schema=SCHEMA_AEMO,
+            name="aemo-uc-tools",
+        ),
+    ]
 
- if GENIE_SPACE_ID:
- servers.append(
- DatabricksMCPServer(
- name="aemo-genie",
- url=f"{WORKSPACE_URL}/api/2.0/mcp/genie/{GENIE_SPACE_ID}",
- )
- )
+    if GENIE_SPACE_ID:
+        servers.append(
+            DatabricksMCPServer(
+                name="aemo-genie",
+                url=f"{WORKSPACE_URL}/api/2.0/mcp/genie/{GENIE_SPACE_ID}",
+            )
+        )
 
- client = DatabricksMultiServerMCPClient(servers)
- tools = await client.get_tools()
- llm = ChatDatabricks(endpoint=PT_ENDPOINT)
+    if VS_INDEX_NAME:
+        vs_parts = VS_INDEX_NAME.split(".")
+        servers.append(
+            DatabricksMCPServer(
+                name="aemo-market-notices",
+                url=f"{WORKSPACE_URL}/api/2.0/mcp/vector-search/{'/'.join(vs_parts)}",
+            )
+        )
 
- system_prompt = (
- "You are the AEMO NEM Operations Assistant. "
- "You help operations staff answer questions about NEM dispatch intervals, "
- "spot prices, market notices, settlements, and generation unit status. "
- "When you use a tool, briefly explain what you looked up before presenting results. "
- "All data is from Australia East — data residency is maintained."
- )
+    async with DatabricksMultiServerMCPClient(servers) as client:
+        tools = await client.get_tools()
+    llm = ChatDatabricks(endpoint=PT_ENDPOINT)
 
- return create_react_agent(model=llm, tools=tools, prompt=system_prompt)
+    system_prompt = (
+        "You are the AEMO NEM Operations Assistant. "
+        "You help operations staff answer questions about NEM dispatch intervals, "
+        "spot prices, market notices, settlements, and generation unit status. "
+        "When you use a tool, briefly explain what you looked up before presenting results. "
+        "All data is from Australia East — data residency is maintained."
+    )
+
+    return create_react_agent(
+        model=llm,
+        tools=tools,
+        state_modifier=system_prompt,
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -287,14 +313,14 @@ async def build_agent():
 # ---------------------------------------------------------------------------
 
 def chat(message: str, history: list) -> str:
- async def run():
- agent = await build_agent()
- result = await agent.ainvoke(
- {"messages": [{"role": "user", "content": message}]}
- )
- return result["messages"][-1].content
+    async def run():
+        agent = await build_agent()
+        result = await agent.ainvoke(
+            {"messages": [{"role": "user", "content": message}]}
+        )
+        return result["messages"][-1].content
 
- return asyncio.run(run())
+    return asyncio.run(run())
 
 
 # ---------------------------------------------------------------------------
@@ -302,23 +328,23 @@ def chat(message: str, history: list) -> str:
 # ---------------------------------------------------------------------------
 
 demo = gr.ChatInterface(
- fn=chat,
- title="AEMO NEM Operations Assistant",
- description=(
- "Ask questions about NEM dispatch intervals, spot prices, market notices, "
- "settlements, and generation unit status. "
- "All data is processed in **Australia East** — data residency maintained (AU East)."
- ),
- examples=[
- "What was the average spot price in VIC yesterday?",
- "Which generators dispatched the most in NSW last week?",
- "Were there any LOR1 or LOR2 events this week?",
- "Show me the five highest 5-minute dispatch prices across all regions this month.",
- ],
- theme=gr.themes.Soft(primary_hue="blue", secondary_hue="orange"),
- retry_btn="Retry",
- undo_btn="Undo last turn",
- clear_btn="Clear conversation",
+    fn=chat,
+    title="AEMO NEM Operations Assistant",
+    description=(
+        "Ask questions about NEM dispatch intervals, spot prices, market notices, "
+        "settlements, and generation unit status. "
+        "All data is processed in **Australia East** — data residency maintained (AU East)."
+    ),
+    examples=[
+        "What was the average spot price in VIC yesterday?",
+        "Which generators dispatched the most in NSW last week?",
+        "Were there any LOR1 or LOR2 events this week?",
+        "Show me the five highest 5-minute dispatch prices across all regions this month.",
+    ],
+    theme=gr.themes.Soft(primary_hue="blue", secondary_hue="orange"),
+    retry_btn="Retry",
+    undo_btn="Undo last turn",
+    clear_btn="Clear conversation",
 )
 
 
@@ -327,7 +353,7 @@ demo = gr.ChatInterface(
 # ---------------------------------------------------------------------------
 
 if __name__ == "__main__":
- demo.launch(server_name="0.0.0.0", server_port=8080, show_error=True)
+    demo.launch(server_name="0.0.0.0", server_port=8080, show_error=True)
 '''
 
 print(APP_PY_CONTENT)
@@ -342,8 +368,9 @@ print(APP_PY_CONTENT)
 import os
 
 APP_FOLDER = f"/Workspace/Users/{ws.current_user.me().user_name}/apps/aemo-operations-agent"
-dbutils.fs.mkdirs(APP_FOLDER)
-dbutils.fs.put(f"{APP_FOLDER}/app.py", APP_PY_CONTENT, overwrite=True)
+os.makedirs(APP_FOLDER, exist_ok=True)
+with open(f"{APP_FOLDER}/app.py", "w") as f:
+    f.write(APP_PY_CONTENT)
 print(f"app.py written to: {APP_FOLDER}/app.py")
 
 # COMMAND ----------
@@ -362,7 +389,8 @@ langgraph>=1.0.9
 mlflow>=2.17.0
 """
 
-dbutils.fs.put(f"{APP_FOLDER}/requirements.txt", REQUIREMENTS_CONTENT, overwrite=True)
+with open(f"{APP_FOLDER}/requirements.txt", "w") as f:
+    f.write(REQUIREMENTS_CONTENT)
 print(f"requirements.txt written to: {APP_FOLDER}/requirements.txt")
 print(REQUIREMENTS_CONTENT)
 
@@ -375,28 +403,33 @@ print(REQUIREMENTS_CONTENT)
 
 # COMMAND ----------
 
+VS_INDEX_NAME_VALUE = f"{CATALOG}.{SCHEMA_AEMO}.aemo_market_notices_index"
+
 APP_YAML_CONTENT = f"""command: ["python", "app.py"]
 
 env:
- - name: PT_ENDPOINT
- value: {PT_ENDPOINT}
- - name: CATALOG
- value: {CATALOG}
- - name: SCHEMA_AEMO
- value: {SCHEMA_AEMO}
- # To add GENIE_SPACE_ID: uncomment below or set it via the UI Environment tab
- # - name: GENIE_SPACE_ID
- # value: {GENIE_SPACE_ID}
+  - name: PT_ENDPOINT
+    value: {PT_ENDPOINT}
+  - name: CATALOG
+    value: {CATALOG}
+  - name: SCHEMA_AEMO
+    value: {SCHEMA_AEMO}
+  - name: VS_INDEX_NAME
+    value: {VS_INDEX_NAME_VALUE}
+  # To add GENIE_SPACE_ID: uncomment below or set it via the UI Environment tab
+  # - name: GENIE_SPACE_ID
+  #   value: {GENIE_SPACE_ID}
 
 resources:
- - name: aemo-pt-endpoint
- description: Provisioned Throughput endpoint for AEMO agent LLM calls
- serving_endpoint:
- name: {PT_ENDPOINT}
- permission: CAN_QUERY
+  - name: aemo-pt-endpoint
+    description: Provisioned Throughput endpoint for AEMO agent LLM calls
+    serving_endpoint:
+      name: {PT_ENDPOINT}
+      permission: CAN_QUERY
 """
 
-dbutils.fs.put(f"{APP_FOLDER}/app.yaml", APP_YAML_CONTENT, overwrite=True)
+with open(f"{APP_FOLDER}/app.yaml", "w") as f:
+    f.write(APP_YAML_CONTENT)
 print(f"app.yaml written to: {APP_FOLDER}/app.yaml")
 print(APP_YAML_CONTENT)
 
@@ -407,12 +440,15 @@ print(APP_YAML_CONTENT)
 
 # COMMAND ----------
 
-files = dbutils.fs.ls(APP_FOLDER)
-print(f"Files in {APP_FOLDER}:\n")
-for f in files:
- print(f" {f.name:<25} {f.size / 1024:>6.1f} KB")
+import os as _os
 
-names = {f.name for f in files}
+names = set(_os.listdir(APP_FOLDER))
+print(f"Files in {APP_FOLDER}:\n")
+for fname in sorted(names):
+    fpath = f"{APP_FOLDER}/{fname}"
+    size_kb = _os.path.getsize(fpath) / 1024
+    print(f"  {fname:<25} {size_kb:>6.1f} KB")
+
 assert "app.py" in names, "app.py missing"
 assert "requirements.txt" in names, "requirements.txt missing"
 assert "app.yaml" in names, "app.yaml missing"
@@ -513,17 +549,17 @@ print("=" * 65)
 # COMMAND ----------
 
 try:
- app_info = ws.apps.get(APP_NAME)
- sp_name = app_info.service_principal_name
- print(f"App service principal: {sp_name}")
- print()
- print("Run this SQL in a SQL cell or DBSQL editor:\n")
- print(f" GRANT USE CATALOG ON CATALOG {CATALOG} TO `{sp_name}`;")
- print(f" GRANT USE SCHEMA ON SCHEMA {CATALOG}.{SCHEMA_AEMO} TO `{sp_name}`;")
- print(f" GRANT EXECUTE ON SCHEMA {CATALOG}.{SCHEMA_AEMO} TO `{sp_name}`;")
+    app_info = ws.apps.get(APP_NAME)
+    sp_name = app_info.service_principal_name
+    print(f"App service principal: {sp_name}")
+    print()
+    print("Run this SQL in a SQL cell or DBSQL editor:\n")
+    print(f"  GRANT USE CATALOG ON CATALOG {CATALOG} TO `{sp_name}`;")
+    print(f"  GRANT USE SCHEMA ON SCHEMA {CATALOG}.{SCHEMA_AEMO} TO `{sp_name}`;")
+    print(f"  GRANT EXECUTE ON SCHEMA {CATALOG}.{SCHEMA_AEMO} TO `{sp_name}`;")
 except Exception as e:
- print(f"App '{APP_NAME}' not found yet — deploy it first via the UI, then re-run this cell.")
- print(f"(Error: {e})")
+    print(f"App '{APP_NAME}' not found yet — deploy it first via the UI, then re-run this cell.")
+    print(f"(Error: {e})")
 
 # COMMAND ----------
 
@@ -574,25 +610,41 @@ except Exception as e:
 import urllib.request, urllib.error
 
 try:
- app_info = ws.apps.get(APP_NAME)
- app_url = app_info.url
- print(f"App URL: {app_url}")
- print(f"Status: {app_info.compute_status.state if app_info.compute_status else 'unknown'}")
+    app_info = ws.apps.get(APP_NAME)
+    app_url = app_info.url
+    print(f"App URL: {app_url}")
+    print(f"Status: {app_info.compute_status.state if app_info.compute_status else 'unknown'}")
 
- try:
- with urllib.request.urlopen(f"{app_url}/", timeout=10) as resp:
- print(f"HTTP {resp.status} — app is reachable.")
- except urllib.error.HTTPError as e:
- if e.code == 302:
- print("HTTP 302 redirect to login — expected. Databricks Apps enforces OAuth before serving content.")
- print("Open the URL in a browser to authenticate and use the app.")
- else:
- print(f"HTTP error: {e.code} {e.reason}")
- except Exception as e:
- print(f"Could not reach app URL: {e}")
+    # --- Save APP_NAME and APP_URL back to config for Lab 05 ---
+    import json
+    from pathlib import Path
+    _config_path = Path('/tmp/workshop2c_config.json')
+    _saved = json.loads(_config_path.read_text()) if _config_path.exists() else {}
+    _saved.update({
+        'CATALOG': CATALOG,
+        'SCHEMA_AEMO': SCHEMA_AEMO,
+        'PT_ENDPOINT': PT_ENDPOINT,
+        'GENIE_SPACE_ID': GENIE_SPACE_ID,
+        'APP_NAME': APP_NAME,
+        'APP_URL': app_url,
+    })
+    _config_path.write_text(json.dumps(_saved, indent=2))
+    print(f"APP_URL saved to config: {app_url}")
+
+    try:
+        with urllib.request.urlopen(f"{app_url}/", timeout=10) as resp:
+            print(f"HTTP {resp.status} — app is reachable.")
+    except urllib.error.HTTPError as e:
+        if e.code == 302:
+            print("HTTP 302 redirect to login — expected. Databricks Apps enforces OAuth before serving content.")
+            print("Open the URL in a browser to authenticate and use the app.")
+        else:
+            print(f"HTTP error: {e.code} {e.reason}")
+    except Exception as e:
+        print(f"Could not reach app URL: {e}")
 
 except Exception as e:
- print(f"App '{APP_NAME}' not found. Deploy it via the UI first.")
+    print(f"App '{APP_NAME}' not found. Deploy it via the UI first.")
 
 # COMMAND ----------
 
@@ -654,12 +706,12 @@ print(f"{'App name':<35} {'Status':<15} {'URL'}")
 print("-" * 100)
 
 try:
- for app in ws.apps.list():
- state = app.compute_status.state if app.compute_status else "—"
- url = app.url or "—"
- print(f"{app.name:<35} {str(state):<15} {url}")
+    for app in ws.apps.list():
+        state = app.compute_status.state if app.compute_status else "—"
+        url = app.url or "—"
+        print(f"{app.name:<35} {str(state):<15} {url}")
 except Exception as e:
- print(f"Could not list apps: {e}")
+    print(f"Could not list apps: {e}")
 
 # COMMAND ----------
 

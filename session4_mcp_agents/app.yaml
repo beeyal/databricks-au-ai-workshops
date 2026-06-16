@@ -7,6 +7,8 @@ env:
     value: workshop_au
   - name: SCHEMA_AEMO
     value: aemo
+  - name: VS_INDEX_NAME
+    value: workshop_au.aemo.market_notices_index
   # GENIE_SPACE_ID: set this via the UI Environment tab after deployment,
   # or uncomment the lines below and fill in your Space ID.
   # - name: GENIE_SPACE_ID

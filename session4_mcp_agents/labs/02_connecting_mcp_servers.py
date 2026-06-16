@@ -48,6 +48,14 @@
 
 # COMMAND ----------
 
+# MAGIC %pip install databricks-mcp databricks-langchain databricks-sdk --quiet
+
+# COMMAND ----------
+
+dbutils.library.restartPython()
+
+# COMMAND ----------
+
 import json
 from pathlib import Path
 
@@ -66,6 +74,10 @@ SCHEMA_AEMO    = dbutils.widgets.get("schema_aemo")
 PT_ENDPOINT    = dbutils.widgets.get("pt_endpoint")
 GENIE_SPACE_ID = dbutils.widgets.get("genie_space_id")
 VS_INDEX_NAME  = dbutils.widgets.get("vs_index")
+
+# Defaults for optional-feature flags; updated in Sections 2.1 and 3.1
+GENIE_MCP_AVAILABLE = False
+VS_MCP_AVAILABLE    = False
 
 from databricks.sdk import WorkspaceClient
 ws   = WorkspaceClient()
@@ -487,7 +499,12 @@ else:
 
 # COMMAND ----------
 
-vs_parts   = VS_INDEX_NAME.split(".")
+vs_parts = VS_INDEX_NAME.split(".")
+if len(vs_parts) != 3:
+    raise ValueError(
+        f"VS_INDEX_NAME must be a 3-part name (catalog.schema.index_name), got: '{VS_INDEX_NAME}'. "
+        "Update the 'vs_index' widget."
+    )
 vs_mcp_url = f"{HOST}/api/2.0/mcp/vector-search/{'/'.join(vs_parts)}"
 
 print(f"Vector Search MCP endpoint:\n  {vs_mcp_url}\n")
@@ -495,13 +512,22 @@ print(f"Vector Search MCP endpoint:\n  {vs_mcp_url}\n")
 vs_client = DatabricksMCPClient(vs_mcp_url, ws)
 vs_tools  = vs_client.list_tools()
 
-print(f"Discovered {len(vs_tools)} tool(s):\n")
-for t in vs_tools:
-    print(f"  Tool name  : {t.name}")
-    print(f"  Description: {t.description}")
-    if hasattr(t, "inputSchema") and t.inputSchema:
-        for pname, pschema in t.inputSchema.get("properties", {}).items():
-            print(f"    '{pname}': {pschema.get('description','')}")
+if not vs_tools:
+    print("WARNING: Vector Search index returned 0 tools.")
+    print("The index may still be syncing. Check status: Compute → Vector Search → aemo_market_notices_index")
+    print("Wait 2-3 minutes and re-run this cell.")
+    VS_MCP_AVAILABLE = False
+else:
+    print(f"Discovered {len(vs_tools)} tool(s):\n")
+    for t in vs_tools:
+        print(f"  Tool name  : {t.name}")
+        print(f"  Description: {t.description}")
+        if hasattr(t, "inputSchema") and t.inputSchema:
+            for pname, pschema in t.inputSchema.get("properties", {}).items():
+                print(f"    '{pname}': {pschema.get('description','')}")
+    vs_tool_name = vs_tools[0].name
+    VS_MCP_AVAILABLE = True
+    print(f"\nTool ready: {vs_tool_name}")
 
 # COMMAND ----------
 
@@ -525,21 +551,23 @@ for t in vs_tools:
 
 # COMMAND ----------
 
-vs_tool_name = vs_tools[0].name
-search_query = "LOR event Victoria low reserve"
-
-print(f"Calling : {vs_tool_name}")
-print(f"Query   : {search_query}\n")
-
-vs_result = vs_client.call_tool(vs_tool_name, {"query": search_query, "num_results": 5})
-
-if vs_result and "content" in vs_result and not vs_result.get("isError"):
-    for item in vs_result["content"]:
-        if item.get("type") == "text":
-            print("Search results:")
-            print(item["text"][:1200])
+if not VS_MCP_AVAILABLE:
+    print("Skipping — Vector Search index not ready. Re-run Section 3.1 after 2-3 minutes.")
 else:
-    print("Search result:", vs_result)
+    search_query = "LOR event Victoria low reserve"
+
+    print(f"Calling : {vs_tool_name}")
+    print(f"Query   : {search_query}\n")
+
+    vs_result = vs_client.call_tool(vs_tool_name, {"query": search_query, "num_results": 5})
+
+    if vs_result and "content" in vs_result and not vs_result.get("isError"):
+        for item in vs_result["content"]:
+            if item.get("type") == "text":
+                print("Search results:")
+                print(item["text"][:1200])
+    else:
+        print("Search result:", vs_result)
 
 # COMMAND ----------
 
@@ -560,26 +588,29 @@ else:
 
 # COMMAND ----------
 
-paraphrased_queries = [
-    "LOR event Victoria low reserve",           # exact terminology
-    "Victoria electricity shortage emergency",  # paraphrase — no "LOR"
-    "SA generator tripped constraints binding", # different region, different phrasing
-]
+if not VS_MCP_AVAILABLE:
+    print("Skipping — Vector Search index not ready.")
+else:
+    paraphrased_queries = [
+        "LOR event Victoria low reserve",           # exact terminology
+        "Victoria electricity shortage emergency",  # paraphrase — no "LOR"
+        "SA generator tripped constraints binding", # different region, different phrasing
+    ]
 
-print("Semantic search — same concept, different words:\n")
-for query in paraphrased_queries:
-    result = vs_client.call_tool(vs_tool_name, {"query": query, "num_results": 2})
-    print(f"  Query: '{query}'")
-    if result and "content" in result:
-        try:
-            hits = json.loads(result["content"][0]["text"])
-            for hit in hits[:2]:
-                score = hit.get("score", "?")
-                title = hit.get("title", hit.get("notice_text", "?")[:60])
-                print(f"    Score {score:.4f}: {title}")
-        except Exception:
-            print(f"    {result['content'][0]['text'][:120]}")
-    print()
+    print("Semantic search — same concept, different words:\n")
+    for query in paraphrased_queries:
+        result = vs_client.call_tool(vs_tool_name, {"query": query, "num_results": 2})
+        print(f"  Query: '{query}'")
+        if result and "content" in result:
+            try:
+                hits = json.loads(result["content"][0]["text"])
+                for hit in hits[:2]:
+                    score = hit.get("score", "?")
+                    title = hit.get("title", hit.get("notice_text", "?")[:60])
+                    print(f"    Score {score:.4f}: {title}")
+            except Exception:
+                print(f"    {result['content'][0]['text'][:120]}")
+        print()
 
 # COMMAND ----------
 
@@ -779,6 +810,10 @@ from pathlib import Path
 config_path = Path("/tmp/workshop2c_config.json")
 config = json.loads(config_path.read_text()) if config_path.exists() else {}
 
+# vs_mcp_url is constructed in Section 3.1; provide a fallback if that cell was skipped
+_vs_mcp_url = vs_mcp_url if 'vs_mcp_url' in dir() else \
+    f"{HOST}/api/2.0/mcp/vector-search/{'/'.join(VS_INDEX_NAME.split('.'))}"
+
 config.update({
     "HOST":           HOST,
     "CATALOG":        CATALOG,
@@ -786,10 +821,10 @@ config.update({
     "PT_ENDPOINT":    PT_ENDPOINT,
     "GENIE_SPACE_ID": GENIE_SPACE_ID,
     "VS_INDEX_NAME":  VS_INDEX_NAME,
-    "VS_MCP_URL":     vs_mcp_url,
+    "VS_MCP_URL":     _vs_mcp_url,
     "GENIE_MCP_URL":  f"{HOST}/api/2.0/mcp/genie/{GENIE_SPACE_ID}" if GENIE_SPACE_ID != "" else None,
     "UC_MCP_URL":     f"{HOST}/api/2.0/mcp/functions/{CATALOG}/{SCHEMA_AEMO}",
-    "TOOL_COUNT":     len(all_tools),
+    "TOOL_COUNT":     len(all_tools) if 'all_tools' in dir() else None,
 })
 
 config_path.write_text(json.dumps(config, indent=2))
@@ -798,7 +833,7 @@ print(f"Configuration updated and saved to {config_path}")
 print(f"\n  UC Functions MCP  : {config['UC_MCP_URL']}")
 print(f"  Genie MCP         : {config.get('GENIE_MCP_URL', 'not configured')}")
 print(f"  Vector Search MCP : {config['VS_MCP_URL']}")
-print(f"  Total tools       : {config['TOOL_COUNT']}")
+print(f"  Total tools       : {config['TOOL_COUNT'] if config['TOOL_COUNT'] is not None else 'unknown (Section 4 not run)'}")
 print("\nReady for Lab 03: Building a Multi-Tool ReAct Agent")
 
 # COMMAND ----------

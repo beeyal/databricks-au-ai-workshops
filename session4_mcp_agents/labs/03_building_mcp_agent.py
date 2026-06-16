@@ -30,8 +30,9 @@
 
 # COMMAND ----------
 
-# NOTE: Run this — installs the MCP and OpenAI clients. Takes ~30 seconds.
-%pip install "databricks-mcp>=0.2" "openai>=1.0" --quiet
+# NOTE: Run this — installs all required packages. Takes ~60 seconds.
+%pip install databricks-mcp databricks-langchain langgraph langchain-core mlflow --quiet
+dbutils.library.restartPython()
 
 # COMMAND ----------
 
@@ -42,26 +43,46 @@ from pathlib import Path
 _config_path = Path("/tmp/workshop2c_config.json")
 _saved = json.loads(_config_path.read_text()) if _config_path.exists() else {}
 
-dbutils.widgets.text("catalog",        _saved.get("CATALOG",       "workshop_au"),           "Catalog name")
-dbutils.widgets.text("schema_aemo",    _saved.get("SCHEMA_AEMO",   "aemo"),                  "AEMO schema name")
-dbutils.widgets.text("pt_endpoint",    _saved.get("PT_ENDPOINT",   "au_east_llm_inregion"),  "PT endpoint name")
-dbutils.widgets.text("vs_index_name",  _saved.get("VS_INDEX_NAME", ""),                      "Vector Search index (catalog.schema.index)")
-dbutils.widgets.text("genie_space_id", _saved.get("GENIE_SPACE_ID",""),                      "Genie Space ID (Extension A only)")
+dbutils.widgets.text("catalog",            _saved.get("CATALOG",            "workshop_au"),                        "Catalog name")
+dbutils.widgets.text("schema_aemo",        _saved.get("SCHEMA_AEMO",        "aemo"),                               "AEMO schema name")
+dbutils.widgets.text("pt_endpoint",        _saved.get("PT_ENDPOINT",        "au_east_llm_inregion"),               "PT endpoint name")
+dbutils.widgets.text("vs_index_name",      _saved.get("VS_INDEX_NAME",      ""),                                   "Vector Search index (catalog.schema.index)")
+dbutils.widgets.text("genie_space_id",     _saved.get("GENIE_SPACE_ID",     ""),                                   "Genie Space ID (Extension A only)")
+dbutils.widgets.text("mlflow_experiment",  _saved.get("MLFLOW_EXPERIMENT",  "/Shared/workshop2c-aemo-operations-agent"), "MLflow experiment path")
 
-CATALOG        = dbutils.widgets.get("catalog")
-SCHEMA_AEMO    = dbutils.widgets.get("schema_aemo")
-PT_ENDPOINT    = dbutils.widgets.get("pt_endpoint")
-VS_INDEX_NAME  = dbutils.widgets.get("vs_index_name")
-GENIE_SPACE_ID = dbutils.widgets.get("genie_space_id").strip()
+CATALOG            = dbutils.widgets.get("catalog")
+SCHEMA_AEMO        = dbutils.widgets.get("schema_aemo")
+PT_ENDPOINT        = dbutils.widgets.get("pt_endpoint")
+VS_INDEX_NAME      = dbutils.widgets.get("vs_index_name")
+GENIE_SPACE_ID     = dbutils.widgets.get("genie_space_id").strip()
+MLFLOW_EXPERIMENT  = dbutils.widgets.get("mlflow_experiment").strip()
 
 ctx   = dbutils.notebook.entry_point.getDbutils().notebook().getContext()
 HOST  = ctx.apiUrl().get()
 TOKEN = ctx.apiToken().get()
 
-print(f"Catalog    : {CATALOG}.{SCHEMA_AEMO}")
-print(f"PT endpoint: {PT_ENDPOINT}")
-print(f"VS index   : {VS_INDEX_NAME or '(not set — enter in widget above)'}")
-print(f"Genie space: {GENIE_SPACE_ID or '(not set — needed for Extension A only)'}")
+print(f"Catalog         : {CATALOG}.{SCHEMA_AEMO}")
+print(f"PT endpoint     : {PT_ENDPOINT}")
+print(f"VS index        : {VS_INDEX_NAME or '(not set — enter in widget above)'}")
+print(f"Genie space     : {GENIE_SPACE_ID or '(not set — needed for Extension A only)'}")
+print(f"MLflow experiment: {MLFLOW_EXPERIMENT}")
+
+# Save all config values (including MLFLOW_EXPERIMENT) so downstream labs can read them.
+import json as _json_cfg
+from pathlib import Path as _Path_cfg
+
+_config_path = _Path_cfg("/tmp/workshop2c_config.json")
+_cfg = _json_cfg.loads(_config_path.read_text()) if _config_path.exists() else {}
+_cfg.update({
+    "CATALOG":           CATALOG,
+    "SCHEMA_AEMO":       SCHEMA_AEMO,
+    "PT_ENDPOINT":       PT_ENDPOINT,
+    "GENIE_SPACE_ID":    GENIE_SPACE_ID,
+    "VS_INDEX_NAME":     VS_INDEX_NAME,
+    "MLFLOW_EXPERIMENT": MLFLOW_EXPERIMENT,
+})
+_config_path.write_text(_json_cfg.dumps(_cfg, indent=2))
+print(f"Configuration updated: {_config_path}")
 
 # COMMAND ----------
 

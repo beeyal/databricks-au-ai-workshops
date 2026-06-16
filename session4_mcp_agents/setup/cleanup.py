@@ -6,10 +6,14 @@
 # MAGIC </div>
 # MAGIC
 # MAGIC **What this removes:**
+# MAGIC - UC functions registered in `workshop_au.aemo`
 # MAGIC - AEMO Delta tables (`workshop_au.aemo.*`)
 # MAGIC - The `aemo` schema
+# MAGIC - `/tmp/workshop2c_config.json` (driver-local config file)
+# MAGIC - Vector Search index (`workshop_au.aemo.market_notices_index`) and endpoint (`workshop-vs-endpoint`)
 # MAGIC - Databricks Apps created during the labs (you confirm by name)
-# MAGIC - UC permission grants on the schema
+# MAGIC - MLflow experiment `/Apps/aemo-operations-agent`
+# MAGIC - UC permission grants on the schema (SELECT, CREATE TABLE, EXECUTE, USE SCHEMA, USE CATALOG)
 # MAGIC - Session registry row (if present)
 # MAGIC
 # MAGIC **What this does NOT remove:**
@@ -35,7 +39,7 @@ SCHEMA_GOV = dbutils.widgets.get("schema_gov")
 DRY_RUN    = dbutils.widgets.get("dry_run") == "true"
 
 ctx     = dbutils.notebook.entry_point.getDbutils().notebook().getContext()
-HOST    = ctx.apiUrl().get().replace("https://", "")
+HOST    = ctx.apiUrl().get().rstrip("/")
 TOKEN   = ctx.apiToken().get()
 HEADERS = {"Authorization": f"Bearer {TOKEN}", "Content-Type": "application/json"}
 
@@ -66,6 +70,22 @@ def do(label: str, fn) -> None:
 
 # COMMAND ----------
 
+# Drop UC functions in aemo schema before dropping schema
+print(f"UC functions in {CATALOG}.{SCHEMA}:")
+try:
+    funcs = spark.sql(f"SHOW FUNCTIONS IN {CATALOG}.{SCHEMA}").collect()
+    if funcs:
+        for f in funcs:
+            fn_fqn = f.function
+            do(f"DROP FUNCTION IF EXISTS {fn_fqn}",
+               lambda fq=fn_fqn: spark.sql(f"DROP FUNCTION IF EXISTS {fq}"))
+    else:
+        print("  (no functions found)")
+except Exception as e:
+    print(f"  (could not list functions: {e})")
+
+print()
+
 print(f"Tables in {CATALOG}.{SCHEMA}:")
 try:
     tables = [r.tableName for r in spark.sql(f"SHOW TABLES IN {CATALOG}.{SCHEMA}").collect()]
@@ -90,6 +110,70 @@ do(
 
 # MAGIC %md
 # MAGIC ---
+# MAGIC ## Step 1b: Remove /tmp/workshop2c_config.json
+
+# COMMAND ----------
+
+from pathlib import Path
+
+config_path = Path("/tmp/workshop2c_config.json")
+if config_path.exists():
+    if DRY_RUN:
+        print(f"  [DRY RUN] Would remove {config_path}")
+    else:
+        config_path.unlink()
+        print(f"  ✅ Removed {config_path}")
+else:
+    print(f"  {config_path} not found — already removed or never created.")
+
+# COMMAND ----------
+
+# MAGIC %md
+# MAGIC ---
+# MAGIC ## Step 1c: Delete Vector Search index and endpoint
+
+# COMMAND ----------
+
+from databricks.sdk import WorkspaceClient
+from databricks.sdk.errors import NotFound
+
+VS_INDEX_NAME    = f"{CATALOG}.{SCHEMA}.market_notices_index"
+VS_ENDPOINT_NAME = "workshop-vs-endpoint"
+
+w = WorkspaceClient(host=HOST, token=TOKEN)
+
+# Delete the index first (must be removed before the endpoint can be deleted)
+print(f"Vector Search index: {VS_INDEX_NAME}")
+try:
+    w.vector_search_indexes.get(VS_INDEX_NAME)
+    do(
+        f"Delete VS index '{VS_INDEX_NAME}'",
+        lambda: w.vector_search_indexes.delete(VS_INDEX_NAME),
+    )
+except NotFound:
+    print(f"  VS index '{VS_INDEX_NAME}' not found — already removed or never created.")
+except Exception as e:
+    print(f"  ⚠️  Could not check VS index: {e}")
+
+print()
+
+# Delete the endpoint (no-op if index deletion is dry-run — endpoint may still have the index)
+print(f"Vector Search endpoint: {VS_ENDPOINT_NAME}")
+try:
+    w.vector_search_endpoints.get_endpoint(VS_ENDPOINT_NAME)
+    do(
+        f"Delete VS endpoint '{VS_ENDPOINT_NAME}'",
+        lambda: w.vector_search_endpoints.delete(VS_ENDPOINT_NAME),
+    )
+except NotFound:
+    print(f"  VS endpoint '{VS_ENDPOINT_NAME}' not found — already removed or never created.")
+except Exception as e:
+    print(f"  ⚠️  Could not check VS endpoint: {e}")
+
+# COMMAND ----------
+
+# MAGIC %md
+# MAGIC ---
 # MAGIC ## Step 2: Remove Databricks Apps created during labs
 # MAGIC
 # MAGIC Lists all apps in the workspace. You will be asked to confirm which ones to delete.
@@ -101,7 +185,7 @@ import requests
 
 print("Fetching Databricks Apps in this workspace...")
 
-apps_resp = requests.get(f"https://{HOST}/api/2.0/apps", headers=HEADERS)
+apps_resp = requests.get(f"{HOST}/api/2.0/apps", headers=HEADERS)
 
 if apps_resp.status_code != 200:
     print(f"⚠️  Could not list apps: HTTP {apps_resp.status_code} {apps_resp.text[:200]}")
@@ -135,7 +219,7 @@ if not apps_to_delete:
 else:
     for app_name in apps_to_delete:
         # Look up the app to confirm it exists
-        info_resp = requests.get(f"https://{HOST}/api/2.0/apps/{app_name}", headers=HEADERS)
+        info_resp = requests.get(f"{HOST}/api/2.0/apps/{app_name}", headers=HEADERS)
         if info_resp.status_code == 404:
             print(f"  ⚠️  App '{app_name}' not found — skipping.")
             continue
@@ -143,11 +227,38 @@ else:
         if DRY_RUN:
             print(f"  [DRY RUN] Would delete app: '{app_name}'")
         else:
-            del_resp = requests.delete(f"https://{HOST}/api/2.0/apps/{app_name}", headers=HEADERS)
+            del_resp = requests.delete(f"{HOST}/api/2.0/apps/{app_name}", headers=HEADERS)
             if del_resp.status_code in (200, 204):
                 print(f"  ✅ Deleted app: '{app_name}'")
             else:
                 print(f"  ⚠️  Could not delete '{app_name}': HTTP {del_resp.status_code} {del_resp.text[:120]}")
+
+# COMMAND ----------
+
+# MAGIC %md
+# MAGIC ---
+# MAGIC ## Step 2b: Delete MLflow experiment
+
+# COMMAND ----------
+
+import mlflow
+from mlflow.tracking import MlflowClient
+
+EXPERIMENT_NAME = "/Apps/aemo-operations-agent"
+
+mlflow_client = MlflowClient()
+experiment = mlflow_client.get_experiment_by_name(EXPERIMENT_NAME)
+
+if experiment is None:
+    print(f"  MLflow experiment '{EXPERIMENT_NAME}' not found — nothing to delete.")
+else:
+    exp_id = experiment.experiment_id
+    if DRY_RUN:
+        print(f"  [DRY RUN] Would delete MLflow experiment '{EXPERIMENT_NAME}' (ID: {exp_id})")
+    else:
+        mlflow_client.delete_experiment(exp_id)
+        print(f"  ✅ Deleted MLflow experiment '{EXPERIMENT_NAME}' (ID: {exp_id})")
+        print(f"     (Experiment is soft-deleted and can be restored within 30 days via client.restore_experiment())")
 
 # COMMAND ----------
 
@@ -167,6 +278,7 @@ else:
     revoke_stmts = [
         f"REVOKE SELECT ON SCHEMA {CATALOG}.{SCHEMA} FROM",
         f"REVOKE CREATE TABLE ON SCHEMA {CATALOG}.{SCHEMA} FROM",
+        f"REVOKE EXECUTE ON SCHEMA {CATALOG}.{SCHEMA} FROM",   # covers app SP grants from lab04
         f"REVOKE USE SCHEMA ON SCHEMA {CATALOG}.{SCHEMA} FROM",
         # NOTE: Only revoke USE CATALOG if no other sessions are still active
         # for the same participant (sessions 1–5 all share workshop_au catalog).
@@ -225,12 +337,16 @@ if DRY_RUN:
     print("  2. Re-run all cells")
 else:
     print("Removed:")
+    print(f"  • UC functions in {CATALOG}.{SCHEMA}")
     print(f"  • AEMO tables in {CATALOG}.{SCHEMA}")
     print(f"  • Schema {CATALOG}.{SCHEMA}")
+    print(f"  • /tmp/workshop2c_config.json (if present)")
+    print(f"  • Vector Search index and endpoint (if present)")
     if apps_to_delete:
         print(f"  • {len(apps_to_delete)} Databricks App(s)")
+    print(f"  • MLflow experiment /Apps/aemo-operations-agent (if present)")
     if revoke_list:
-        print(f"  • UC grants for {len(revoke_list)} user(s)")
+        print(f"  • UC grants (SELECT, CREATE TABLE, EXECUTE, USE SCHEMA, USE CATALOG) for {len(revoke_list)} user(s)")
     print()
     print("Not removed (shared resources):")
     print(f"  • Catalog {CATALOG}")

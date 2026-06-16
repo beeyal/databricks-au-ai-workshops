@@ -55,24 +55,43 @@
 
 # COMMAND ----------
 
-dbutils.widgets.text("catalog", "workshop_au", "Catalog name")
-dbutils.widgets.text("schema_aemo", "aemo", "AEMO schema name")
-dbutils.widgets.text("pt_endpoint", "au_east_llm_inregion", "PT endpoint name")
-dbutils.widgets.text("app_name", "aemo-operations-agent","App name (from Lab 04)")
+# MAGIC %pip install mlflow>=2.17.0 databricks-sdk --quiet
 
-CATALOG = dbutils.widgets.get("catalog")
-SCHEMA_AEMO = dbutils.widgets.get("schema_aemo")
-PT_ENDPOINT = dbutils.widgets.get("pt_endpoint")
-APP_NAME = dbutils.widgets.get("app_name")
+# COMMAND ----------
+
+import json
+from pathlib import Path
+
+_cfg_path = Path("/tmp/workshop2c_config.json")
+if _cfg_path.exists():
+    _cfg = json.loads(_cfg_path.read_text())
+    print(f"Loaded config from {_cfg_path}")
+else:
+    print("WARNING: /tmp/workshop2c_config.json not found.")
+    print("Re-run Lab 01 on this cluster, or fill in the widgets manually.")
+    _cfg = {}
+
+dbutils.widgets.text("catalog",           _cfg.get("CATALOG",           "workshop_au"),                              "Catalog name")
+dbutils.widgets.text("schema_aemo",       _cfg.get("SCHEMA_AEMO",       "aemo"),                                     "AEMO schema name")
+dbutils.widgets.text("pt_endpoint",       _cfg.get("PT_ENDPOINT",       "au_east_llm_inregion"),                     "PT endpoint name")
+dbutils.widgets.text("app_name",          _cfg.get("APP_NAME",          "aemo-operations-agent"),                    "App name (from Lab 04)")
+dbutils.widgets.text("mlflow_experiment", _cfg.get("MLFLOW_EXPERIMENT", "/Shared/workshop2c-aemo-operations-agent"), "MLflow experiment path")
+
+CATALOG           = dbutils.widgets.get("catalog")
+SCHEMA_AEMO       = dbutils.widgets.get("schema_aemo")
+PT_ENDPOINT       = dbutils.widgets.get("pt_endpoint")
+APP_NAME          = dbutils.widgets.get("app_name")
+MLFLOW_EXPERIMENT = dbutils.widgets.get("mlflow_experiment")
 
 from databricks.sdk import WorkspaceClient
 ws = WorkspaceClient()
 HOST = ws.config.host.rstrip("/")
 
-print(f"Workspace host : {HOST}")
-print(f"Catalog.Schema : {CATALOG}.{SCHEMA_AEMO}")
-print(f"PT endpoint : {PT_ENDPOINT}")
-print(f"App name : {APP_NAME}")
+print(f"Workspace host    : {HOST}")
+print(f"Catalog.Schema    : {CATALOG}.{SCHEMA_AEMO}")
+print(f"PT endpoint       : {PT_ENDPOINT}")
+print(f"App name          : {APP_NAME}")
+print(f"MLflow experiment : {MLFLOW_EXPERIMENT}")
 
 # COMMAND ----------
 
@@ -144,28 +163,28 @@ print(sql_usage_summary)
 # COMMAND ----------
 
 try:
- df = spark.sql(f"""
- SELECT
- client_user_id,
- COUNT(*) AS requests,
- SUM(usage.total_tokens) AS total_tokens,
- ROUND(AVG(databricks_output.latency_ms), 0) AS avg_latency_ms,
- MAX(databricks_output.latency_ms) AS max_latency_ms,
- SUM(CASE WHEN status_code != 200 THEN 1 ELSE 0 END) AS errors
- FROM {INFERENCE_TABLE}
- WHERE timestamp >= CURRENT_TIMESTAMP - INTERVAL 7 DAYS
- GROUP BY client_user_id
- ORDER BY total_tokens DESC
- LIMIT 10
- """)
- print(f"Top callers to {PT_ENDPOINT} — last 7 days:\n")
- df.show(truncate=60)
+    df = spark.sql(f"""
+        SELECT
+            client_user_id,
+            COUNT(*) AS requests,
+            SUM(usage.total_tokens) AS total_tokens,
+            ROUND(AVG(databricks_output.latency_ms), 0) AS avg_latency_ms,
+            MAX(databricks_output.latency_ms) AS max_latency_ms,
+            SUM(CASE WHEN status_code != 200 THEN 1 ELSE 0 END) AS errors
+        FROM {INFERENCE_TABLE}
+        WHERE timestamp >= CURRENT_TIMESTAMP - INTERVAL 7 DAYS
+        GROUP BY client_user_id
+        ORDER BY total_tokens DESC
+        LIMIT 10
+    """)
+    print(f"Top callers to {PT_ENDPOINT} — last 7 days:\n")
+    df.show(truncate=60)
 except Exception as e:
- print(f"Could not query inference table: {e}")
- print("\nPossible causes:")
- print(" - AI Gateway inference logging not enabled on the endpoint")
- print(" -> Serving -> endpoint -> AI Gateway tab -> enable logging")
- print(" - No calls in the last 7 days")
+    print(f"Could not query inference table: {e}")
+    print("\nPossible causes:")
+    print(" - AI Gateway inference logging not enabled on the endpoint")
+    print(" -> Serving -> endpoint -> AI Gateway tab -> enable logging")
+    print(" - No calls in the last 7 days")
 
 # COMMAND ----------
 
@@ -232,31 +251,31 @@ except Exception as e:
 import mlflow
 from mlflow.entities import ViewType
 
-EXPERIMENT_NAME = "/Apps/aemo-operations-agent"
+EXPERIMENT_NAME = MLFLOW_EXPERIMENT
 
 try:
- experiment = mlflow.get_experiment_by_name(EXPERIMENT_NAME)
- if experiment is None:
- print(f"Experiment '{EXPERIMENT_NAME}' not found.")
- print("Run some queries through the deployed app first, then re-run this cell.")
- else:
- print(f"Experiment found: {experiment.name} (ID: {experiment.experiment_id})\n")
- recent_runs = mlflow.search_runs(
- experiment_ids=[experiment.experiment_id],
- filter_string="",
- run_view_type=ViewType.ACTIVE_ONLY,
- max_results=20,
- order_by=["start_time DESC"],
- )
- if recent_runs.empty:
- print("No runs found yet. Run queries through the app to generate traces.")
- else:
- display_cols = [c for c in recent_runs.columns
- if any(k in c for k in ["start_time", "end_time", "status", "metrics", "params"])]
- print(f"Recent runs ({len(recent_runs)}):\n")
- print(recent_runs[display_cols[:8]].to_string(index=False))
+    experiment = mlflow.get_experiment_by_name(EXPERIMENT_NAME)
+    if experiment is None:
+        print(f"Experiment '{EXPERIMENT_NAME}' not found.")
+        print("Run some queries through the deployed app first, then re-run this cell.")
+    else:
+        print(f"Experiment found: {experiment.name} (ID: {experiment.experiment_id})\n")
+        recent_runs = mlflow.search_runs(
+            experiment_ids=[experiment.experiment_id],
+            filter_string="",
+            run_view_type=ViewType.ACTIVE_ONLY,
+            max_results=20,
+            order_by=["start_time DESC"],
+        )
+        if recent_runs.empty:
+            print("No runs found yet. Run queries through the app to generate traces.")
+        else:
+            display_cols = [c for c in recent_runs.columns
+                            if any(k in c for k in ["start_time", "end_time", "status", "metrics", "params"])]
+            print(f"Recent runs ({len(recent_runs)}):\n")
+            print(recent_runs[display_cols[:8]].to_string(index=False))
 except Exception as e:
- print(f"Could not query MLflow: {e}")
+    print(f"Could not query MLflow: {e}")
 
 # COMMAND ----------
 
@@ -266,40 +285,40 @@ except Exception as e:
 # COMMAND ----------
 
 try:
- traces = mlflow.search_traces(
- experiment_names=[EXPERIMENT_NAME],
- filter_string="",
- max_results=50,
- )
+    traces = mlflow.search_traces(
+        experiment_names=[EXPERIMENT_NAME],
+        filter_string="",
+        max_results=50,
+    )
 
- if not traces:
- print("No traces found. Run some queries through the app first.")
- else:
- print(f"Found {len(traces)} traces. Analysing MCP tool call latencies...\n")
- tool_latencies = []
- for trace in traces:
- for span in trace.data.spans:
- if span.span_type in ("TOOL", "RETRIEVER") or "mcp" in span.name.lower():
- duration_ms = (span.end_time_ns - span.start_time_ns) / 1_000_000
- tool_latencies.append({
- "tool_name": span.name[:40],
- "duration_ms": round(duration_ms, 0),
- "status": span.status.status_code if span.status else "unknown",
- "trace_id": trace.info.trace_id[:12] + "...",
- })
+    if not traces:
+        print("No traces found. Run some queries through the app first.")
+    else:
+        print(f"Found {len(traces)} traces. Analysing MCP tool call latencies...\n")
+        tool_latencies = []
+        for trace in traces:
+            for span in trace.data.spans:
+                if span.span_type in ("TOOL", "RETRIEVER") or "mcp" in span.name.lower():
+                    duration_ms = (span.end_time_ns - span.start_time_ns) / 1_000_000
+                    tool_latencies.append({
+                        "tool_name": span.name[:40],
+                        "duration_ms": round(duration_ms, 0),
+                        "status": span.status.status_code if span.status else "unknown",
+                        "trace_id": trace.info.trace_id[:12] + "...",
+                    })
 
- if tool_latencies:
- tool_latencies.sort(key=lambda x: x["duration_ms"], reverse=True)
- print(f"{'Tool name':<42} {'Duration ms':>12} {'Status':<12} {'Trace'}")
- print("-" * 90)
- for row in tool_latencies[:15]:
- print(f"{row['tool_name']:<42} {row['duration_ms']:>12.0f} {str(row['status']):<12} {row['trace_id']}")
- else:
- print("No MCP tool spans found. Ensure app.py has MLflow autolog or manual tracing enabled.")
+        if tool_latencies:
+            tool_latencies.sort(key=lambda x: x["duration_ms"], reverse=True)
+            print(f"{'Tool name':<42} {'Duration ms':>12} {'Status':<12} {'Trace'}")
+            print("-" * 90)
+            for row in tool_latencies[:15]:
+                print(f"{row['tool_name']:<42} {row['duration_ms']:>12.0f} {str(row['status']):<12} {row['trace_id']}")
+        else:
+            print("No MCP tool spans found. Ensure app.py has MLflow autolog or manual tracing enabled.")
 
 except Exception as e:
- print(f"Trace query failed: {e}")
- print(f"MLflow search_traces requires MLflow 2.17+. Installed: {mlflow.__version__}")
+    print(f"Trace query failed: {e}")
+    print(f"MLflow search_traces requires MLflow 2.17+. Installed: {mlflow.__version__}")
 
 # COMMAND ----------
 
@@ -309,36 +328,36 @@ except Exception as e:
 # COMMAND ----------
 
 try:
- traces = mlflow.search_traces(
- experiment_names=[EXPERIMENT_NAME],
- filter_string="",
- max_results=100,
- )
+    traces = mlflow.search_traces(
+        experiment_names=[EXPERIMENT_NAME],
+        filter_string="",
+        max_results=100,
+    )
 
- failed_spans = []
- for trace in traces:
- for span in trace.data.spans:
- status = span.status.status_code if span.status else "UNSET"
- if str(status) in ("ERROR", "INTERNAL_ERROR", "UNSET"):
- failed_spans.append({
- "trace_id": trace.info.trace_id[:16] + "...",
- "span_name": span.name[:40],
- "status": str(status),
- "error": (span.attributes or {}).get("exception.message", "—")[:60],
- })
+    failed_spans = []
+    for trace in traces:
+        for span in trace.data.spans:
+            status = span.status.status_code if span.status else "UNSET"
+            if str(status) in ("ERROR", "INTERNAL_ERROR", "UNSET"):
+                failed_spans.append({
+                    "trace_id": trace.info.trace_id[:16] + "...",
+                    "span_name": span.name[:40],
+                    "status": str(status),
+                    "error": (span.attributes or {}).get("exception.message", "—")[:60],
+                })
 
- if not failed_spans:
- print("No failed spans found in recent traces. All MCP tool calls completed successfully.")
- else:
- print(f"Found {len(failed_spans)} failed span(s):\n")
- for row in failed_spans:
- print(f" Trace: {row['trace_id']}")
- print(f" Span: {row['span_name']}")
- print(f" Status: {row['status']}")
- print(f" Error: {row['error']}\n")
+    if not failed_spans:
+        print("No failed spans found in recent traces. All MCP tool calls completed successfully.")
+    else:
+        print(f"Found {len(failed_spans)} failed span(s):\n")
+        for row in failed_spans:
+            print(f"  Trace: {row['trace_id']}")
+            print(f"  Span:  {row['span_name']}")
+            print(f"  Status: {row['status']}")
+            print(f"  Error: {row['error']}\n")
 
 except Exception as e:
- print(f"Trace query failed: {e}")
+    print(f"Trace query failed: {e}")
 
 # COMMAND ----------
 
@@ -442,32 +461,32 @@ print(sql_asset_access)
 # COMMAND ----------
 
 try:
- df = spark.sql("""
- SELECT
- request_params.toolName AS tool_name,
- COUNT(DISTINCT user_identity.email) AS distinct_callers,
- COUNT(*) AS total_calls,
- MIN(event_time) AS first_call,
- MAX(event_time) AS last_call
- FROM system.access.audit
- WHERE service_name = 'mcpServer'
- AND action_name = 'mcpToolsCall'
- AND event_time >= CURRENT_TIMESTAMP - INTERVAL 24 HOURS
- GROUP BY request_params.toolName
- ORDER BY total_calls DESC
- """)
+    df = spark.sql("""
+        SELECT
+            request_params.toolName AS tool_name,
+            COUNT(DISTINCT user_identity.email) AS distinct_callers,
+            COUNT(*) AS total_calls,
+            MIN(event_time) AS first_call,
+            MAX(event_time) AS last_call
+        FROM system.access.audit
+        WHERE service_name = 'mcpServer'
+          AND action_name = 'mcpToolsCall'
+          AND event_time >= CURRENT_TIMESTAMP - INTERVAL 24 HOURS
+        GROUP BY request_params.toolName
+        ORDER BY total_calls DESC
+    """)
 
- if df.count() == 0:
- print("No MCP tool calls found in the last 24 hours.")
- print("Trigger some queries through the app or notebook, then re-run.")
- else:
- print("MCP tool calls — last 24 hours:\n")
- df.show(truncate=50)
+    if df.count() == 0:
+        print("No MCP tool calls found in the last 24 hours.")
+        print("Trigger some queries through the app or notebook, then re-run.")
+    else:
+        print("MCP tool calls — last 24 hours:\n")
+        df.show(truncate=50)
 
 except Exception as e:
- print(f"Could not query system.access.audit: {e}")
- print("\nEnsure you have USAGE privilege on the system catalog.")
- print("Ask your workspace admin: GRANT USAGE ON CATALOG system TO <your-user>")
+    print(f"Could not query system.access.audit: {e}")
+    print("\nEnsure you have USAGE privilege on the system catalog.")
+    print("Ask your workspace admin: GRANT USAGE ON CATALOG system TO <your-user>")
 
 # COMMAND ----------
 
@@ -541,3 +560,25 @@ print(sql_after_hours)
 # MAGIC - App permissions use SSO groups — onboarding/offboarding via AD
 # MAGIC
 # MAGIC **Workshop 2c complete.** You have built, deployed, and governed an MCP agent end to end — Lab 01 setup, Lab 02 UC Functions as tools, Lab 03 multi-MCP LangGraph agent, Lab 04 Databricks App, Lab 05 monitoring and audit. The full stack runs in Australia East. Every call is attributable. Every tool is governed by Unity Catalog.
+
+# COMMAND ----------
+
+# MAGIC %md
+# MAGIC <div style="background: linear-gradient(135deg, #1B3A6B 0%, #00843D 100%); color: white; padding: 24px 28px; border-radius: 12px; margin-top: 20px;">
+# MAGIC   <h2 style="color: white; margin: 0 0 10px 0; font-family: 'DM Sans', sans-serif;">Workshop 2c Complete</h2>
+# MAGIC   <p style="color: rgba(255,255,255,0.88); margin: 0 0 8px 0;">You have built, deployed, and governed an MCP agent end to end.</p>
+# MAGIC   <table style="color: white; width: 100%; border-collapse: collapse; font-size: 0.95em;">
+# MAGIC     <tr style="border-bottom: 1px solid rgba(255,255,255,0.3);">
+# MAGIC       <th style="text-align: left; padding: 6px 10px;">Lab</th>
+# MAGIC       <th style="text-align: left; padding: 6px 10px;">What you built</th>
+# MAGIC       <th style="text-align: left; padding: 6px 10px;">Status</th>
+# MAGIC     </tr>
+# MAGIC     <tr style="border-bottom: 1px solid rgba(255,255,255,0.15);"><td style="padding: 5px 10px;">Lab 01</td><td style="padding: 5px 10px;">Architecture, env setup</td><td style="padding: 5px 10px;">Complete ✅</td></tr>
+# MAGIC     <tr style="border-bottom: 1px solid rgba(255,255,255,0.15);"><td style="padding: 5px 10px;">Lab 02</td><td style="padding: 5px 10px;">Low-level MCP client</td><td style="padding: 5px 10px;">Complete ✅</td></tr>
+# MAGIC     <tr style="border-bottom: 1px solid rgba(255,255,255,0.15);"><td style="padding: 5px 10px;">Lab 03</td><td style="padding: 5px 10px;">LangGraph ReAct agent</td><td style="padding: 5px 10px;">Complete ✅</td></tr>
+# MAGIC     <tr style="border-bottom: 1px solid rgba(255,255,255,0.15);"><td style="padding: 5px 10px;">Lab 04</td><td style="padding: 5px 10px;">Databricks App deploy</td><td style="padding: 5px 10px;">Complete ✅</td></tr>
+# MAGIC     <tr><td style="padding: 5px 10px;">Lab 05</td><td style="padding: 5px 10px;">Monitoring and audit</td><td style="padding: 5px 10px;">Complete ✅</td></tr>
+# MAGIC   </table>
+# MAGIC </div>
+
+# COMMAND ----------

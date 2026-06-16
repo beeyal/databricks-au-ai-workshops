@@ -36,7 +36,7 @@ GENIE_SPACE_ID   = dbutils.widgets.get("genie_space_id").strip()
 DATA_PATH        = dbutils.widgets.get("data_path")
 
 ctx   = dbutils.notebook.entry_point.getDbutils().notebook().getContext()
-HOST  = ctx.apiUrl().get().replace("https://", "")
+HOST  = ctx.apiUrl().get().rstrip("/")
 TOKEN = ctx.apiToken().get()
 
 print(f"Catalog    : {CATALOG}.{SCHEMA_AEMO}")
@@ -46,6 +46,22 @@ print(f"Data path  : {DATA_PATH}")
 print()
 print("Upload AEMO CSVs to DBFS first if not already there:")
 print(f"  databricks fs cp -r ./data/sample_data/aemo/ {DATA_PATH}/")
+
+# COMMAND ----------
+
+# Preflight: verify DBFS data path is populated before starting
+try:
+    files     = dbutils.fs.ls(DATA_PATH)
+    csv_files = [f.name for f in files if f.name.endswith(".csv")]
+    if len(csv_files) < 6:
+        raise FileNotFoundError(f"Only {len(csv_files)} CSV(s) found at {DATA_PATH}; need 6.")
+    print(f"Preflight OK: {len(csv_files)} CSV files found at {DATA_PATH}")
+except Exception as exc:
+    raise RuntimeError(
+        f"STOP: Cannot read data from {DATA_PATH}:\n  {exc}\n\n"
+        f"Upload CSVs first (from the repo root):\n"
+        f"  databricks fs cp -r ./data/sample_data/aemo/ {DATA_PATH}/"
+    ) from exc
 
 # COMMAND ----------
 
@@ -222,7 +238,7 @@ print(f"✅ {ok} column comments set ({err} errors)")
 import requests
 
 def check_pt_endpoint(endpoint_name: str, host: str, token: str) -> None:
-    url     = f"https://{host}/api/2.0/serving-endpoints/{endpoint_name}"
+    url     = f"{host}/api/2.0/serving-endpoints/{endpoint_name}"
     headers = {"Authorization": f"Bearer {token}", "Content-Type": "application/json"}
     resp    = requests.get(url, headers=headers)
 
@@ -262,7 +278,7 @@ def check_pt_endpoint(endpoint_name: str, host: str, token: str) -> None:
     else:
         print(f"⚠️  PT endpoint '{endpoint_name}' exists but state = {state}.")
         print("   Wait for it to reach READY before starting Lab 03.")
-        print(f"   Check: https://{host}/ml/endpoints/{endpoint_name}")
+        print(f"   Check: {host}/ml/endpoints/{endpoint_name}")
 
 
 check_pt_endpoint(PT_ENDPOINT, HOST, TOKEN)
@@ -325,6 +341,230 @@ if participants:
 # COMMAND ----------
 
 # MAGIC %md
+# MAGIC ## Step 6a: Create Vector Search endpoint and index
+# MAGIC
+# MAGIC Creates the `workshop_vs` endpoint (if missing) and a Delta Sync index on
+# MAGIC `market_notices.reason` using `databricks-gte-large-en` embeddings.
+# MAGIC Allow **5–10 minutes** for the index to reach ONLINE status.
+
+# COMMAND ----------
+
+import time
+import datetime
+from databricks.sdk import WorkspaceClient
+from databricks.sdk.service.vectorsearch import (
+    EndpointStatusState, EndpointType,
+    DeltaSyncVectorIndexSpecRequest, EmbeddingSourceColumn,
+    VectorIndexType, PipelineType,
+)
+
+ws_sdk = WorkspaceClient()
+VS_INDEX_NAME  = f"{CATALOG}.{SCHEMA_AEMO}.aemo_market_notices_index"
+EMBEDDING_MODEL = "databricks-gte-large-en"
+
+# Enable CDF on source table (required for Delta Sync index)
+spark.sql(
+    f"ALTER TABLE {CATALOG}.{SCHEMA_AEMO}.market_notices "
+    f"SET TBLPROPERTIES (delta.enableChangeDataFeed = true)"
+)
+print(f"CDF enabled on {CATALOG}.{SCHEMA_AEMO}.market_notices")
+
+# Create endpoint if missing
+try:
+    ep = ws_sdk.vector_search_endpoints.get_endpoint(VS_ENDPOINT)
+    print(f"VS endpoint '{VS_ENDPOINT}' exists (state={ep.endpoint_status.state})")
+except Exception:
+    print(f"Creating VS endpoint '{VS_ENDPOINT}'...")
+    ws_sdk.vector_search_endpoints.create_endpoint_and_wait(
+        name=VS_ENDPOINT,
+        endpoint_type=EndpointType.STANDARD,
+        timeout=datetime.timedelta(minutes=20),
+    )
+
+# Wait for ONLINE
+for _ in range(40):
+    ep = ws_sdk.vector_search_endpoints.get_endpoint(VS_ENDPOINT)
+    if ep.endpoint_status.state == EndpointStatusState.ONLINE:
+        print(f"VS endpoint ONLINE.")
+        break
+    print(f"  waiting... state={ep.endpoint_status.state}")
+    time.sleep(30)
+else:
+    raise RuntimeError(f"Endpoint '{VS_ENDPOINT}' not ONLINE after 20 min.")
+
+# Create or sync index
+try:
+    ws_sdk.vector_search_indexes.get_index(index_name=VS_INDEX_NAME)
+    print(f"VS index exists — triggering sync.")
+    ws_sdk.vector_search_indexes.sync_index(index_name=VS_INDEX_NAME)
+except Exception:
+    ws_sdk.vector_search_indexes.create_index(
+        name=VS_INDEX_NAME,
+        endpoint_name=VS_ENDPOINT,
+        index_type=VectorIndexType.DELTA_SYNC,
+        delta_sync_index_spec=DeltaSyncVectorIndexSpecRequest(
+            source_table=f"{CATALOG}.{SCHEMA_AEMO}.market_notices",
+            primary_key="notice_id",
+            pipeline_type=PipelineType.TRIGGERED,
+            embedding_source_columns=[
+                EmbeddingSourceColumn(
+                    name="reason",
+                    embedding_model_endpoint_name=EMBEDDING_MODEL,
+                )
+            ],
+        ),
+    )
+    print(f"VS index creation triggered. Polling for ONLINE status (max 20 min)...")
+
+# Poll until ONLINE
+for _ in range(40):
+    idx_info = ws_sdk.vector_search_indexes.get_index(index_name=VS_INDEX_NAME)
+    ready    = getattr(idx_info.status, "ready_for_search", False)
+    if ready:
+        print(f"VS index ONLINE and ready for search.")
+        break
+    print(f"  waiting... index not yet ready")
+    time.sleep(30)
+else:
+    raise RuntimeError(
+        f"VS index '{VS_INDEX_NAME}' not ONLINE after 20 min. "
+        f"Check the Vector Search UI for errors."
+    )
+
+print(f"\nVS index name: {VS_INDEX_NAME}")
+
+# COMMAND ----------
+
+# MAGIC %md
+# MAGIC ## Step 6b: Register UC Functions for NEM calculations
+# MAGIC
+# MAGIC Registers three functions in `{CATALOG}.{SCHEMA_AEMO}` and grants EXECUTE
+# MAGIC to all participant emails. Lab 02 and Lab 03 discover these via the UC
+# MAGIC Functions MCP server.
+
+# COMMAND ----------
+
+# calculate_peak_demand
+spark.sql(f"""
+CREATE OR REPLACE FUNCTION {CATALOG}.{SCHEMA_AEMO}.calculate_peak_demand(
+    region STRING COMMENT 'NEM region code. Values: NSW1, VIC1, QLD1, SA1, TAS1',
+    date   STRING COMMENT 'Date in YYYY-MM-DD format (AEST)'
+)
+RETURNS STRING
+COMMENT 'Calculate peak spot price and total dispatch for a NEM region on a given date.
+Returns JSON: region, date, peak_price_mwh, peak_interval, avg_price_mwh, total_dispatch_mw.
+Not for trend analysis over time windows (use Genie for those).'
+LANGUAGE SQL
+RETURN (
+    SELECT to_json(named_struct(
+        'region',           region,
+        'date',             date,
+        'peak_price_mwh',   round(max(sp.rrp), 2),
+        'peak_interval',    cast(max_by(sp.settlement_date, sp.rrp) AS STRING),
+        'avg_price_mwh',    round(avg(sp.rrp), 2),
+        'total_dispatch_mw',round(coalesce((
+            SELECT sum(di.dispatch_mw)
+            FROM   {CATALOG}.{SCHEMA_AEMO}.dispatch_intervals di
+            WHERE  di.region_id = region
+            AND    date(di.settlement_date) = date
+        ), 0.0), 1)
+    ))
+    FROM {CATALOG}.{SCHEMA_AEMO}.spot_prices sp
+    WHERE sp.region_id = region
+    AND   date(sp.settlement_date) = date
+)
+""")
+
+# get_region_summary
+spark.sql(f"""
+CREATE OR REPLACE FUNCTION {CATALOG}.{SCHEMA_AEMO}.get_region_summary(
+    region STRING COMMENT 'NEM region code. Values: NSW1, VIC1, QLD1, SA1, TAS1',
+    days   INT    COMMENT 'Rolling window in days. Typical: 7, 30, 90'
+)
+RETURNS STRING
+COMMENT 'Return JSON summary of NEM region for a rolling window: avg_price_mwh,
+spike_count (>$300/MWh), peak_demand_interval, top_3_fuel_types.
+Not for single-day spot prices (use calculate_peak_demand). Not for market notices.'
+LANGUAGE SQL
+RETURN (
+    WITH sp AS (
+        SELECT *
+        FROM   {CATALOG}.{SCHEMA_AEMO}.spot_prices
+        WHERE  region_id = region
+        AND    settlement_date >= date_sub(current_date(), days)
+    ),
+    fuel AS (
+        SELECT fuel_type, sum(dispatch_mw) AS total_mw
+        FROM   {CATALOG}.{SCHEMA_AEMO}.dispatch_intervals
+        WHERE  region_id = region
+        AND    settlement_date >= date_sub(current_date(), days)
+        GROUP  BY fuel_type
+        ORDER  BY total_mw DESC
+        LIMIT  3
+    ),
+    grand AS (SELECT sum(total_mw) AS grand_total FROM fuel)
+    SELECT to_json(named_struct(
+        'region',               region,
+        'days',                 days,
+        'avg_price_mwh',        round(avg(sp.rrp), 2),
+        'spike_count',          cast(sum(case when sp.rrp > 300 then 1 else 0 end) AS INT),
+        'peak_demand_interval', cast(max_by(sp.settlement_date, sp.rrp) AS STRING),
+        'top_fuel_types',       (SELECT collect_list(named_struct(
+                                    'fuel_type', fuel.fuel_type,
+                                    'pct',       round(fuel.total_mw / grand.grand_total * 100, 1)
+                                 )) FROM fuel CROSS JOIN grand)
+    ))
+    FROM sp
+)
+""")
+
+# lookup_duid_info
+spark.sql(f"""
+CREATE OR REPLACE FUNCTION {CATALOG}.{SCHEMA_AEMO}.lookup_duid_info(
+    duid STRING COMMENT 'Dispatchable Unit Identifier e.g. TORRB1, PELICAN1'
+)
+RETURNS STRING
+COMMENT 'Look up generator details by DUID. Returns JSON: duid, station_name,
+participant_id, region_id, fuel_type, registered_capacity_mw, dispatch_type.
+Not for searching by station name (use Genie for that).'
+LANGUAGE SQL
+RETURN (
+    SELECT to_json(named_struct(
+        'duid',                   gr.duid,
+        'station_name',           gr.station_name,
+        'participant_id',         gr.participant_id,
+        'region_id',              gr.region_id,
+        'fuel_type',              gr.fuel_type,
+        'registered_capacity_mw', gr.registered_capacity_mw,
+        'dispatch_type',          gr.dispatch_type
+    ))
+    FROM {CATALOG}.{SCHEMA_AEMO}.generator_registration gr
+    WHERE gr.duid = duid
+    LIMIT 1
+)
+""")
+
+print(f"Registered 3 UC Functions in {CATALOG}.{SCHEMA_AEMO}")
+
+# EXECUTE grants
+raw_emails   = dbutils.widgets.get("participant_emails")
+participants = [e.strip().lower() for e in raw_emails.split(",") if e.strip()]
+for fn in ["calculate_peak_demand", "get_region_summary", "lookup_duid_info"]:
+    for email in participants:
+        try:
+            spark.sql(
+                f"GRANT EXECUTE ON FUNCTION "
+                f"{CATALOG}.{SCHEMA_AEMO}.{fn} TO `{email}`"
+            )
+        except Exception as exc:
+            print(f"  {email}.{fn}: {exc}")
+
+if participants:
+    print(f"EXECUTE grants applied to {len(participants)} participant(s).")
+
+# COMMAND ----------
+
+# MAGIC %md
 # MAGIC ## Step 6: Smoke test — verify row counts
 
 # COMMAND ----------
@@ -366,12 +606,15 @@ else:
 
 # COMMAND ----------
 
-uc_mcp_url    = f"https://{HOST}/api/2.0/mcp/functions/{CATALOG}/{SCHEMA_AEMO}"
+uc_mcp_url    = f"{HOST}/api/2.0/mcp/functions/{CATALOG}/{SCHEMA_AEMO}"
 genie_mcp_url = (
-    f"https://{HOST}/api/2.0/mcp/genie/{GENIE_SPACE_ID}"
+    f"{HOST}/api/2.0/mcp/genie/{GENIE_SPACE_ID}"
     if GENIE_SPACE_ID
-    else f"https://{HOST}/api/2.0/mcp/genie/<SPACE_ID>"
+    else f"{HOST}/api/2.0/mcp/genie/<SPACE_ID>"
 )
+vs_index_name = f"{CATALOG}.{SCHEMA_AEMO}.aemo_market_notices_index"
+vs_parts      = vs_index_name.split(".")
+vs_mcp_url    = f"{HOST}/api/2.0/mcp/vector-search/{'/'.join(vs_parts)}"
 
 print("=" * 70)
 print("  MCP ENDPOINT URLS — share these with participants")
@@ -388,12 +631,18 @@ if not GENIE_SPACE_ID:
     print("     to see the full URL. Find the ID in the browser URL when you")
     print("     open your Genie Space: .../genie/spaces/{id})")
 print()
-print(f"  Authentication for both:")
+print(f"  Vector Search MCP server:")
+print(f"    {vs_mcp_url}")
+print()
+print(f"  Vector Search index name (paste into Lab 02 'vs_index' widget):")
+print(f"    {vs_index_name}")
+print()
+print(f"  Authentication for all MCP servers:")
 print(f"    Header: Authorization: Bearer <personal-access-token>")
 print(f"    PAT:    User Settings → Developer → Access tokens → Generate new token")
 print()
-print(f"  Workspace:  https://{HOST}")
-print(f"  PT endpoint: https://{HOST}/ml/endpoints/{PT_ENDPOINT}")
+print(f"  Workspace:  {HOST}")
+print(f"  PT endpoint: {HOST}/ml/endpoints/{PT_ENDPOINT}")
 print()
 print("=" * 70)
 print("  Session 4 setup complete. Ready for labs.")
