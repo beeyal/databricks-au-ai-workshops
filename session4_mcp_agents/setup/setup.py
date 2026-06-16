@@ -35,9 +35,10 @@ VS_ENDPOINT      = dbutils.widgets.get("vs_endpoint")
 GENIE_SPACE_ID   = dbutils.widgets.get("genie_space_id").strip()
 DATA_PATH        = dbutils.widgets.get("data_path")
 
+# Extract workspace URL and PAT from the running notebook context
 ctx   = dbutils.notebook.entry_point.getDbutils().notebook().getContext()
-HOST  = ctx.apiUrl().get().rstrip("/")
-TOKEN = ctx.apiToken().get()
+HOST  = ctx.apiUrl().get().rstrip("/")  # strip trailing slash for clean URL joins
+TOKEN = ctx.apiToken().get()  # notebook-scoped token, not a PAT
 
 print(f"Catalog    : {CATALOG}.{SCHEMA_AEMO}")
 print(f"PT endpoint: {PT_ENDPOINT}")
@@ -52,7 +53,7 @@ print(f"  databricks fs cp -r ./data/sample_data/aemo/ {DATA_PATH}/")
 # Preflight: verify DBFS data path is populated before starting
 try:
     files     = dbutils.fs.ls(DATA_PATH)
-    csv_files = [f.name for f in files if f.name.endswith(".csv")]
+    csv_files = [f.name for f in files if f.name.endswith(".csv")]  # ignore non-CSV files
     if len(csv_files) < 6:
         raise FileNotFoundError(f"Only {len(csv_files)} CSV(s) found at {DATA_PATH}; need 6.")
     print(f"Preflight OK: {len(csv_files)} CSV files found at {DATA_PATH}")
@@ -120,6 +121,7 @@ for table_name, partitions, description in AEMO_TABLES:
     fqn  = f"{CATALOG}.{SCHEMA_AEMO}.{table_name}"
     path = f"{DATA_PATH}/{table_name}.csv"
     try:
+        # Read CSV; multiLine+escape handles quoted fields with embedded newlines
         df = (
             spark.read
             .option("header", "true")
@@ -130,6 +132,7 @@ for table_name, partitions, description in AEMO_TABLES:
         )
         row_count = df.count()
 
+        # CDF enabled so the VS Delta Sync index can track row-level changes
         writer = (
             df.write
             .format("delta")
@@ -137,6 +140,7 @@ for table_name, partitions, description in AEMO_TABLES:
             .option("overwriteSchema", "true")
             .option("delta.enableChangeDataFeed", "true")
         )
+        # Only partition large tables; small ones don't benefit from partitioning
         if row_count >= 2000 and partitions:
             writer = writer.partitionBy(*partitions)
         writer.saveAsTable(fqn)
@@ -213,6 +217,7 @@ COLUMN_COMMENTS = {
     },
 }
 
+# Apply per-column comments so Genie/MCP can surface accurate field descriptions
 ok = err = 0
 for table_fqn, columns in COLUMN_COMMENTS.items():
     for col, comment in columns.items():
@@ -238,6 +243,7 @@ print(f"✅ {ok} column comments set ({err} errors)")
 import requests
 
 def check_pt_endpoint(endpoint_name: str, host: str, token: str) -> None:
+    # Serving endpoints REST API — no SDK wrapper needed for a simple status check
     url     = f"{host}/api/2.0/serving-endpoints/{endpoint_name}"
     headers = {"Authorization": f"Bearer {token}", "Content-Type": "application/json"}
     resp    = requests.get(url, headers=headers)
@@ -264,9 +270,10 @@ def check_pt_endpoint(endpoint_name: str, host: str, token: str) -> None:
         return
 
     data  = resp.json()
-    state = data.get("state", {}).get("ready", "UNKNOWN")
+    state = data.get("state", {}).get("ready", "UNKNOWN")  # nested under "state.ready"
     model = None
     try:
+        # Path varies; guard against missing keys for non-FM endpoints
         model = data["config"]["served_entities"][0]["foundation_model"]["name"]
     except Exception:
         pass
@@ -297,6 +304,7 @@ check_pt_endpoint(PT_ENDPOINT, HOST, TOKEN)
 # COMMAND ----------
 
 raw_emails = dbutils.widgets.get("participant_emails")
+# Normalise to lowercase; skip blank entries from trailing commas
 participants = [e.strip().lower() for e in raw_emails.split(",") if e.strip()]
 
 if not participants:
@@ -305,6 +313,7 @@ if not participants:
 else:
     print(f"Granting access to {len(participants)} participant(s):\n")
 
+    # Four grants needed: catalog navigation + schema navigation + read + write
     grants = [
         f"GRANT USE CATALOG ON CATALOG {CATALOG} TO",
         f"GRANT USE SCHEMA ON SCHEMA {CATALOG}.{SCHEMA_AEMO} TO",
@@ -315,7 +324,7 @@ else:
     ok = err = 0
     for email in participants:
         for grant_prefix in grants:
-            stmt = f"{grant_prefix} `{email}`"
+            stmt = f"{grant_prefix} `{email}`"  # backtick-quote email for UC identity
             try:
                 spark.sql(stmt)
                 ok += 1
@@ -358,9 +367,9 @@ from databricks.sdk.service.vectorsearch import (
     VectorIndexType, PipelineType,
 )
 
-ws_sdk = WorkspaceClient()
+ws_sdk = WorkspaceClient()  # uses env/profile auth; no explicit token needed
 VS_INDEX_NAME  = f"{CATALOG}.{SCHEMA_AEMO}.aemo_market_notices_index"
-EMBEDDING_MODEL = "databricks-gte-large-en"
+EMBEDDING_MODEL = "databricks-gte-large-en"  # in-region embedding model for AU East
 
 # Enable CDF on source table (required for Delta Sync index)
 spark.sql(
@@ -369,7 +378,7 @@ spark.sql(
 )
 print(f"CDF enabled on {CATALOG}.{SCHEMA_AEMO}.market_notices")
 
-# Create endpoint if missing
+# Create endpoint if missing; get_endpoint raises if it doesn't exist
 try:
     ep = ws_sdk.vector_search_endpoints.get_endpoint(VS_ENDPOINT)
     print(f"VS endpoint '{VS_ENDPOINT}' exists (state={ep.endpoint_status.state})")
@@ -377,38 +386,38 @@ except Exception:
     print(f"Creating VS endpoint '{VS_ENDPOINT}'...")
     ws_sdk.vector_search_endpoints.create_endpoint_and_wait(
         name=VS_ENDPOINT,
-        endpoint_type=EndpointType.STANDARD,
+        endpoint_type=EndpointType.STANDARD,  # STANDARD supports both sync and delta-sync
         timeout=datetime.timedelta(minutes=20),
     )
 
-# Wait for ONLINE
+# Poll until ONLINE — provisioning typically takes 3–5 min; 40×30 s = 20 min max
 for _ in range(40):
     ep = ws_sdk.vector_search_endpoints.get_endpoint(VS_ENDPOINT)
     if ep.endpoint_status.state == EndpointStatusState.ONLINE:
         print(f"VS endpoint ONLINE.")
         break
     print(f"  waiting... state={ep.endpoint_status.state}")
-    time.sleep(30)
+    time.sleep(30)  # 30-second poll interval
 else:
     raise RuntimeError(f"Endpoint '{VS_ENDPOINT}' not ONLINE after 20 min.")
 
-# Create or sync index
+# Re-use existing index if present; otherwise create with delta_sync spec
 try:
     ws_sdk.vector_search_indexes.get_index(index_name=VS_INDEX_NAME)
     print(f"VS index exists — triggering sync.")
-    ws_sdk.vector_search_indexes.sync_index(index_name=VS_INDEX_NAME)
+    ws_sdk.vector_search_indexes.sync_index(index_name=VS_INDEX_NAME)  # refresh embeddings
 except Exception:
     ws_sdk.vector_search_indexes.create_index(
         name=VS_INDEX_NAME,
         endpoint_name=VS_ENDPOINT,
-        index_type=VectorIndexType.DELTA_SYNC,
+        index_type=VectorIndexType.DELTA_SYNC,  # syncs automatically from Delta table
         delta_sync_index_spec=DeltaSyncVectorIndexSpecRequest(
             source_table=f"{CATALOG}.{SCHEMA_AEMO}.market_notices",
-            primary_key="notice_id",
-            pipeline_type=PipelineType.TRIGGERED,
+            primary_key="notice_id",  # must be unique; drives upsert/delete
+            pipeline_type=PipelineType.TRIGGERED,  # manual sync, not continuous
             embedding_source_columns=[
                 EmbeddingSourceColumn(
-                    name="reason",
+                    name="reason",  # free-text field to embed for semantic search
                     embedding_model_endpoint_name=EMBEDDING_MODEL,
                 )
             ],
@@ -416,10 +425,10 @@ except Exception:
     )
     print(f"VS index creation triggered. Polling for ONLINE status (max 20 min)...")
 
-# Poll until ONLINE
+# Poll until ready_for_search — initial backfill can take up to 10 min
 for _ in range(40):
     idx_info = ws_sdk.vector_search_indexes.get_index(index_name=VS_INDEX_NAME)
-    ready    = getattr(idx_info.status, "ready_for_search", False)
+    ready    = getattr(idx_info.status, "ready_for_search", False)  # attr absent until ONLINE
     if ready:
         print(f"VS index ONLINE and ready for search.")
         break
@@ -444,7 +453,7 @@ print(f"\nVS index name: {VS_INDEX_NAME}")
 
 # COMMAND ----------
 
-# calculate_peak_demand
+# calculate_peak_demand: single-day aggregation of spot prices + dispatch for one region
 spark.sql(f"""
 CREATE OR REPLACE FUNCTION {CATALOG}.{SCHEMA_AEMO}.calculate_peak_demand(
     region STRING COMMENT 'NEM region code. Values: NSW1, VIC1, QLD1, SA1, TAS1',
@@ -460,14 +469,15 @@ RETURN (
         'region',           region,
         'date',             date,
         'peak_price_mwh',   round(max(sp.rrp), 2),
-        'peak_interval',    cast(max_by(sp.settlement_date, sp.rrp) AS STRING),
+        'peak_interval',    cast(max_by(sp.settlement_date, sp.rrp) AS STRING),  -- interval with highest RRP
         'avg_price_mwh',    round(avg(sp.rrp), 2),
         'total_dispatch_mw',round(coalesce((
+            -- Correlated subquery: sum 5-min dispatch across all DUIDs for the day
             SELECT sum(di.dispatch_mw)
             FROM   {CATALOG}.{SCHEMA_AEMO}.dispatch_intervals di
             WHERE  di.region_id = region
             AND    date(di.settlement_date) = date
-        ), 0.0), 1)
+        ), 0.0), 1)  -- coalesce guards against regions with no dispatch rows
     ))
     FROM {CATALOG}.{SCHEMA_AEMO}.spot_prices sp
     WHERE sp.region_id = region
@@ -475,7 +485,7 @@ RETURN (
 )
 """)
 
-# get_region_summary
+# get_region_summary: rolling-window stats; CTEs split price/fuel work before joining
 spark.sql(f"""
 CREATE OR REPLACE FUNCTION {CATALOG}.{SCHEMA_AEMO}.get_region_summary(
     region STRING COMMENT 'NEM region code. Values: NSW1, VIC1, QLD1, SA1, TAS1',
@@ -488,12 +498,14 @@ Not for single-day spot prices (use calculate_peak_demand). Not for market notic
 LANGUAGE SQL
 RETURN (
     WITH sp AS (
+        -- Spot prices for the region within the rolling window
         SELECT *
         FROM   {CATALOG}.{SCHEMA_AEMO}.spot_prices
         WHERE  region_id = region
         AND    settlement_date >= date_sub(current_date(), days)
     ),
     fuel AS (
+        -- Top-3 fuel types by total MW dispatched in the window
         SELECT fuel_type, sum(dispatch_mw) AS total_mw
         FROM   {CATALOG}.{SCHEMA_AEMO}.dispatch_intervals
         WHERE  region_id = region
@@ -502,23 +514,23 @@ RETURN (
         ORDER  BY total_mw DESC
         LIMIT  3
     ),
-    grand AS (SELECT sum(total_mw) AS grand_total FROM fuel)
+    grand AS (SELECT sum(total_mw) AS grand_total FROM fuel)  -- denominator for % share
     SELECT to_json(named_struct(
         'region',               region,
         'days',                 days,
         'avg_price_mwh',        round(avg(sp.rrp), 2),
-        'spike_count',          cast(sum(case when sp.rrp > 300 then 1 else 0 end) AS INT),
+        'spike_count',          cast(sum(case when sp.rrp > 300 then 1 else 0 end) AS INT),  -- $300/MWh threshold
         'peak_demand_interval', cast(max_by(sp.settlement_date, sp.rrp) AS STRING),
         'top_fuel_types',       (SELECT collect_list(named_struct(
                                     'fuel_type', fuel.fuel_type,
                                     'pct',       round(fuel.total_mw / grand.grand_total * 100, 1)
-                                 )) FROM fuel CROSS JOIN grand)
+                                 )) FROM fuel CROSS JOIN grand)  -- CROSS JOIN is safe: grand is 1 row
     ))
     FROM sp
 )
 """)
 
-# lookup_duid_info
+# lookup_duid_info: point-lookup by DUID; LIMIT 1 guards against duplicate registrations
 spark.sql(f"""
 CREATE OR REPLACE FUNCTION {CATALOG}.{SCHEMA_AEMO}.lookup_duid_info(
     duid STRING COMMENT 'Dispatchable Unit Identifier e.g. TORRB1, PELICAN1'
@@ -546,7 +558,7 @@ RETURN (
 
 print(f"Registered 3 UC Functions in {CATALOG}.{SCHEMA_AEMO}")
 
-# EXECUTE grants
+# Grant EXECUTE on all three functions so participants can invoke them via MCP
 raw_emails   = dbutils.widgets.get("participant_emails")
 participants = [e.strip().lower() for e in raw_emails.split(",") if e.strip()]
 for fn in ["calculate_peak_demand", "get_region_summary", "lookup_duid_info"]:
@@ -570,6 +582,7 @@ if participants:
 # COMMAND ----------
 
 print("Table row counts:")
+# Minimum row thresholds — lab queries need enough data to return non-trivial results
 expected = {
     "dispatch_intervals":     5_000,
     "spot_prices":            1_000,
@@ -606,14 +619,17 @@ else:
 
 # COMMAND ----------
 
+# UC Functions MCP URL: path = /functions/{catalog}/{schema}
 uc_mcp_url    = f"{HOST}/api/2.0/mcp/functions/{CATALOG}/{SCHEMA_AEMO}"
+# Genie MCP URL requires a space ID; show a placeholder if not provided
 genie_mcp_url = (
     f"{HOST}/api/2.0/mcp/genie/{GENIE_SPACE_ID}"
     if GENIE_SPACE_ID
     else f"{HOST}/api/2.0/mcp/genie/<SPACE_ID>"
 )
+# VS MCP URL: dot-separated index name is split into 3 path segments
 vs_index_name = f"{CATALOG}.{SCHEMA_AEMO}.aemo_market_notices_index"
-vs_parts      = vs_index_name.split(".")
+vs_parts      = vs_index_name.split(".")  # ["catalog", "schema", "index"]
 vs_mcp_url    = f"{HOST}/api/2.0/mcp/vector-search/{'/'.join(vs_parts)}"
 
 print("=" * 70)

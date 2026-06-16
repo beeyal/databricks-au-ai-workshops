@@ -267,6 +267,7 @@ dbutils.library.restartPython()
 
 # COMMAND ----------
 
+# Declare notebook widgets so instructors can override defaults without editing code
 dbutils.widgets.text("catalog",         "workshop_au",               "Catalog name")
 dbutils.widgets.text("schema_aemo",     "aemo",                      "AEMO schema name")
 dbutils.widgets.text("pt_endpoint",     "au_east_llm_inregion",      "PT endpoint name")
@@ -274,6 +275,7 @@ dbutils.widgets.text("genie_space_id",  "",                          "Genie Spac
 dbutils.widgets.text("vs_index",        "workshop_au.aemo.aemo_market_notices_index",
                                                                       "VS index (3-part name)")
 
+# Read widget values into module-level constants used throughout the lab
 CATALOG        = dbutils.widgets.get("catalog")
 SCHEMA_AEMO    = dbutils.widgets.get("schema_aemo")
 PT_ENDPOINT    = dbutils.widgets.get("pt_endpoint")
@@ -281,8 +283,8 @@ GENIE_SPACE_ID = dbutils.widgets.get("genie_space_id")
 VS_INDEX_NAME  = dbutils.widgets.get("vs_index")
 
 from databricks.sdk import WorkspaceClient
-ws   = WorkspaceClient()
-HOST = ws.config.host.rstrip("/")
+ws   = WorkspaceClient()  # auto-authenticates from cluster env; no token needed inside notebooks
+HOST = ws.config.host.rstrip("/")  # strip trailing slash so URL joins are safe
 
 print("Workshop configuration")
 print("=" * 55)
@@ -323,6 +325,7 @@ import sys
 print(f"Python {sys.version.split()[0]}")
 print()
 
+# One entry per required symbol: (module_path, attribute_to_probe)
 imports_to_check = [
     ("databricks.sdk",         "WorkspaceClient"),
     ("databricks_mcp",         "DatabricksMCPClient"),
@@ -338,7 +341,7 @@ all_ok = True
 for module, name in imports_to_check:
     try:
         mod = __import__(module, fromlist=[name])
-        getattr(mod, name) if name != "mlflow" else mod
+        getattr(mod, name) if name != "mlflow" else mod  # mlflow is both module and attr name
         print(f"  OK   {module}.{name}")
     except Exception as e:
         print(f"  FAIL {module}.{name} — {e}")
@@ -388,7 +391,7 @@ else:
 from databricks.sdk import WorkspaceClient
 
 ws = WorkspaceClient()
-me = ws.current_user.me()
+me = ws.current_user.me()  # REST call to /api/2.0/preview/scim/v2/Me
 
 print("Workspace connection verified.")
 print()
@@ -397,6 +400,7 @@ print(f"  User        : {me.user_name}")
 print(f"  Display name: {me.display_name}")
 print()
 
+# Infer cloud provider from host domain suffix
 if "azuredatabricks.net" in HOST:
     print("  Cloud       : Azure Databricks")
 elif "gcp.databricks.com" in HOST:
@@ -405,7 +409,7 @@ elif "cloud.databricks.com" in HOST:
     print("  Cloud       : AWS Databricks")
 
 try:
-    tables = list(ws.tables.list(catalog_name=CATALOG, schema_name=SCHEMA_AEMO))
+    tables = list(ws.tables.list(catalog_name=CATALOG, schema_name=SCHEMA_AEMO))  # UC permission check
     print(f"  Catalog     : {CATALOG}.{SCHEMA_AEMO} — accessible ({len(tables)} tables visible)")
 except Exception as e:
     print(f"  Catalog     : {CATALOG}.{SCHEMA_AEMO} — WARNING: {e}")
@@ -438,13 +442,14 @@ import json
 def check_mcp_server(name: str, url: str) -> bool:
     """Makes a JSON-RPC tools/list call to confirm the MCP server responds."""
     try:
-        token   = ws.config.token
+        token   = ws.config.token  # reuses existing SDK credential; no extra auth needed
         headers = {"Authorization": f"Bearer {token}", "Content-Type": "application/json"}
+        # tools/list is the standard MCP discovery method; safe to call with no side-effects
         payload = {"jsonrpc": "2.0", "id": 1, "method": "tools/list", "params": {}}
         resp    = requests.post(url, headers=headers, json=payload, timeout=15)
 
         if resp.status_code == 200:
-            tools = resp.json().get("result", {}).get("tools", [])
+            tools = resp.json().get("result", {}).get("tools", [])  # extract tool name list
             print(f"  OK    {name}")
             print(f"        Tools : {[t['name'] for t in tools]}")
             return True
@@ -464,6 +469,7 @@ servers_to_check = [
      f"{HOST}/api/2.0/mcp/functions/{CATALOG}/{SCHEMA_AEMO}"),
 ]
 
+# Genie MCP URL requires a valid space ID — skip silently if widget not filled
 if GENIE_SPACE_ID != "":
     servers_to_check.append(
         ("Genie Space (AEMO NEM Operations)",
@@ -472,6 +478,7 @@ if GENIE_SPACE_ID != "":
 else:
     print("  SKIP  Genie Space — GENIE_SPACE_ID not set")
 
+# VS MCP URL uses slash-separated 3-part index name, not dot-notation
 vs_parts = VS_INDEX_NAME.split(".")
 servers_to_check.append(
     ("Vector Search (market notices)",
@@ -524,6 +531,7 @@ print(f"Reachable: {sum(results)}/{len(results)} MCP servers")
 import json
 from pathlib import Path
 
+# Snapshot all widget values so Labs 02 and 03 don't need to re-declare widgets
 config = {
     "HOST":           HOST,
     "CATALOG":        CATALOG,
@@ -533,8 +541,9 @@ config = {
     "VS_INDEX_NAME":  VS_INDEX_NAME,
 }
 
+# /tmp is driver-local; survives across cells but NOT across cluster restarts
 config_path = Path("/tmp/workshop2c_config.json")
-config_path.write_text(json.dumps(config, indent=2))
+config_path.write_text(json.dumps(config, indent=2))  # pretty-print for easy manual inspection
 
 print(f"Configuration saved to {config_path}")
 print()

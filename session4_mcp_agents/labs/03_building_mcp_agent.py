@@ -204,18 +204,19 @@ if not VS_INDEX_NAME:
         "Format: catalog.schema.index_name  e.g. workshop_au.aemo.market_notices_index"
     )
 
+# Build the MCP URL from the 3-part index name (catalog.schema.index).
 vs_parts   = VS_INDEX_NAME.split(".")
 vs_mcp_url = f"{HOST}/api/2.0/mcp/vector-search/{'/'.join(vs_parts)}"
 
-vs_client = DatabricksMCPClient(vs_mcp_url, ws)
+vs_client = DatabricksMCPClient(vs_mcp_url, ws)  # authenticates via WorkspaceClient PAT
 vs_tools  = vs_client.list_tools()
-VS_TOOL_NAME = vs_tools[0].name
+VS_TOOL_NAME = vs_tools[0].name  # VS MCP exposes exactly one tool per index
 
 print(f"Connected to: {vs_mcp_url}")
 print(f"Search tool : {VS_TOOL_NAME}\n")
 
 _test_query  = "LOR2 reserve shortfall Victoria"
-_test_result = vs_client.call_tool(VS_TOOL_NAME, {"query": _test_query, "num_results": 3})
+_test_result = vs_client.call_tool(VS_TOOL_NAME, {"query": _test_query, "num_results": 3})  # MCP tool call returns dict with "content" list
 
 print(f"Test query: '{_test_query}'\n")
 if _test_result and not _test_result.get("isError"):
@@ -254,6 +255,7 @@ else:
 
 import json as _json
 
+# "ONLY the context" and "cite notice_id" prevent hallucination on low-score retrievals.
 SYSTEM_PROMPT = """You are an AEMO market operations analyst assistant.
 
 Answer questions using ONLY the market notices provided in the context below.
@@ -269,29 +271,31 @@ Rules:
 
 def retrieve_chunks(question: str, top_k: int = 5, min_score: float = 0.5) -> list:
     """Call Vector Search MCP and return chunks above the minimum similarity score."""
-    result = vs_client.call_tool(VS_TOOL_NAME, {"query": question, "num_results": top_k})
+    result = vs_client.call_tool(VS_TOOL_NAME, {"query": question, "num_results": top_k})  # synchronous MCP round-trip
 
     if not result or result.get("isError"):
         return []
 
+    # Extract the first text content item — MCP wraps payload in a "content" list.
     raw = ""
     for item in result.get("content", []):
         if item.get("type") == "text":
             raw = item["text"]
             break
 
+    # MCP servers may return a JSON array, a {"result": [...]} envelope, or NDJSON.
     chunks = []
     try:
         data = _json.loads(raw)
         chunks = data if isinstance(data, list) else data.get("result", [data])
     except Exception:
-        for line in raw.strip().splitlines():
+        for line in raw.strip().splitlines():  # fall back to newline-delimited JSON
             try:
                 chunks.append(_json.loads(line))
             except Exception:
                 pass
 
-    return [c for c in chunks if c.get("score", 1.0) >= min_score]
+    return [c for c in chunks if c.get("score", 1.0) >= min_score]  # drop low-relevance noise
 
 
 def format_context(chunks: list) -> str:
@@ -299,13 +303,14 @@ def format_context(chunks: list) -> str:
     if not chunks:
         return "(No relevant market notices found.)"
 
+    # Numbered brackets let the LLM cite "[1]" and map back to notice_id.
     lines = []
     for i, c in enumerate(chunks, 1):
         lines.append(f"[{i}] Notice ID: {c.get('notice_id', 'unknown')}")
         lines.append(f"    Type    : {c.get('notice_type', '')}")
         lines.append(f"    Region  : {c.get('region_id', 'NEM-wide')}")
         lines.append(f"    Issued  : {c.get('issue_time', '')}")
-        lines.append(f"    Text    : {c.get('reason', c.get('text', ''))[:400]}")
+        lines.append(f"    Text    : {c.get('reason', c.get('text', ''))[:400]}")  # 400-char cap prevents token overflow
         lines.append("")
     return "\n".join(lines)
 
@@ -315,9 +320,12 @@ def rag_answer(question: str, top_k: int = 5) -> dict:
     Three-step RAG pipeline over AEMO market notices.
     Returns: {"answer": str, "sources": list, "chunk_count": int}
     """
+    # Step 1 — Retrieve: fetch relevant chunks from Vector Search.
     chunks = retrieve_chunks(question, top_k=top_k)
+    # Step 2 — Augment: embed chunks in the user message as numbered context.
     context = format_context(chunks)
 
+    # Step 3 — Generate: single LLM call; temperature=0.1 for factual consistency.
     response = llm.chat.completions.create(
         model=PT_ENDPOINT,
         messages=[
@@ -330,7 +338,7 @@ def rag_answer(question: str, top_k: int = 5) -> dict:
 
     return {
         "answer":      response.choices[0].message.content,
-        "sources":     chunks,
+        "sources":     chunks,  # returned so caller can audit which notices were used
         "chunk_count": len(chunks),
     }
 
@@ -442,10 +450,11 @@ if not GENIE_SPACE_ID:
         "Find it in the browser URL when you open your Genie Space: .../genie/spaces/{id}"
     )
 
+# Build the Genie MCP URL using the Space ID from the widget.
 genie_mcp_url = f"{HOST}/api/2.0/mcp/genie/{GENIE_SPACE_ID}"
 genie_client  = DatabricksMCPClient(genie_mcp_url, ws)
 genie_tools   = genie_client.list_tools()
-GENIE_TOOL    = genie_tools[0].name
+GENIE_TOOL    = genie_tools[0].name  # Genie MCP exposes one NL-to-SQL tool per space
 
 print(f"Connected  : {genie_mcp_url}")
 print(f"Genie tool : {GENIE_TOOL}")
@@ -468,20 +477,22 @@ Australian date format: DD/MM/YYYY. Numbers: 2 decimal places.
 
 def ask_genie(question: str) -> str:
     """Send a natural-language question to Genie and return the answer text."""
-    result = genie_client.call_tool(GENIE_TOOL, {"question": question})
+    result = genie_client.call_tool(GENIE_TOOL, {"question": question})  # Genie translates NL to SQL internally
     if not result or result.get("isError"):
         return "(Genie query failed)"
     for item in result.get("content", []):
         if item.get("type") == "text":
-            return item["text"][:1000]
+            return item["text"][:1000]  # cap to avoid overwhelming the combined prompt
     return "(no text in Genie response)"
 
 
 def hybrid_answer(question: str, top_k: int = 4) -> dict:
     """RAG + Genie — document context plus live SQL data, synthesised by the LLM."""
+    # Both tools called in parallel logic; you decide, not the LLM (contrast with ReAct).
     chunks     = retrieve_chunks(question, top_k=top_k)
     genie_text = ask_genie(question)
 
+    # NOTICES and DATA sections labelled so the LLM distinguishes source types.
     response = llm.chat.completions.create(
         model=PT_ENDPOINT,
         messages=[
@@ -492,7 +503,7 @@ def hybrid_answer(question: str, top_k: int = 4) -> dict:
                 f"Question: {question}"
             )},
         ],
-        max_tokens=600,
+        max_tokens=600,  # slightly higher than core RAG to handle combined context
         temperature=0.1,
     )
 
@@ -578,9 +589,11 @@ from langchain_core.tools import tool
 from langchain_databricks import ChatDatabricks
 from langgraph.prebuilt import create_react_agent
 
-mlflow.langchain.autolog()
+mlflow.langchain.autolog()  # captures every LLM + tool span to MLflow automatically
 
 
+# @tool exposes the function to LangGraph; the docstring is what the LLM reads
+# to decide WHEN and WHETHER to call each tool — make it accurate and specific.
 @tool
 def search_market_notices(query: str) -> str:
     """
@@ -617,9 +630,10 @@ print(f"Tools registered: {[t.name for t in tools]}")
 react_model = ChatDatabricks(
     endpoint=PT_ENDPOINT,
     temperature=0.1,
-    max_tokens=1024,
+    max_tokens=1024,  # higher limit — ReAct may chain several tool results before answering
 )
 
+# create_react_agent builds the Reason→Act loop; state_modifier is the system prompt.
 react_agent = create_react_agent(
     model=react_model,
     tools=tools,
@@ -650,14 +664,15 @@ with mlflow.start_run(run_name="react_agent_test"):
         print(f"Question: {question}")
         print('='*60)
 
-        response = react_agent.invoke({"messages": [("human", question)]})
+        response = react_agent.invoke({"messages": [("human", question)]})  # runs full ReAct loop synchronously
 
+        # Walk the message history — ai messages show tool calls or the final answer.
         for msg in response["messages"]:
             role = getattr(msg, "type", type(msg).__name__)
             if role == "ai":
                 if msg.tool_calls:
                     for tc in msg.tool_calls:
-                        arg_preview = tc["args"].get("query") or tc["args"].get("question", "")
+                        arg_preview = tc["args"].get("query") or tc["args"].get("question", "")  # either param name is valid
                         print(f"\n  Tool call : {tc['name']}('{arg_preview[:60]}')")
                 else:
                     print(f"\n  Answer    :\n  {msg.content}")

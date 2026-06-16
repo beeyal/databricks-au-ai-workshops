@@ -62,14 +62,15 @@
 import json
 from pathlib import Path
 
+# Load shared config written by Lab 01; fall back to empty dict if missing.
 _cfg_path = Path("/tmp/workshop2c_config.json")
 if _cfg_path.exists():
-    _cfg = json.loads(_cfg_path.read_text())
+    _cfg = json.loads(_cfg_path.read_text())  # deserialise JSON into plain dict
     print(f"Loaded config from {_cfg_path}")
 else:
     print("WARNING: /tmp/workshop2c_config.json not found.")
     print("Re-run Lab 01 on this cluster, or fill in the widgets manually.")
-    _cfg = {}
+    _cfg = {}  # widgets will use hardcoded defaults below
 
 dbutils.widgets.text("catalog",           _cfg.get("CATALOG",           "workshop_au"),                              "Catalog name")
 dbutils.widgets.text("schema_aemo",       _cfg.get("SCHEMA_AEMO",       "aemo"),                                     "AEMO schema name")
@@ -84,8 +85,8 @@ APP_NAME          = dbutils.widgets.get("app_name")
 MLFLOW_EXPERIMENT = dbutils.widgets.get("mlflow_experiment")
 
 from databricks.sdk import WorkspaceClient
-ws = WorkspaceClient()
-HOST = ws.config.host.rstrip("/")
+ws = WorkspaceClient()  # uses env/profile auth; no args needed inside Databricks
+HOST = ws.config.host.rstrip("/")  # strip trailing slash for clean URL concatenation
 
 print(f"Workspace host    : {HOST}")
 print(f"Catalog.Schema    : {CATALOG}.{SCHEMA_AEMO}")
@@ -135,6 +136,7 @@ print(f"MLflow experiment : {MLFLOW_EXPERIMENT}")
 
 # COMMAND ----------
 
+# AI Gateway names the inference table by replacing hyphens with underscores in the endpoint name.
 INFERENCE_TABLE = f"{CATALOG}.{SCHEMA_AEMO}.inference_{PT_ENDPOINT.replace('-', '_')}"
 print(f"Inference table: {INFERENCE_TABLE}\n")
 
@@ -162,6 +164,7 @@ print(sql_usage_summary)
 
 # COMMAND ----------
 
+# Query the inference table to rank callers by token consumption over 7 days.
 try:
     df = spark.sql(f"""
         SELECT
@@ -170,11 +173,11 @@ try:
             SUM(usage.total_tokens) AS total_tokens,
             ROUND(AVG(databricks_output.latency_ms), 0) AS avg_latency_ms,
             MAX(databricks_output.latency_ms) AS max_latency_ms,
-            SUM(CASE WHEN status_code != 200 THEN 1 ELSE 0 END) AS errors
+            SUM(CASE WHEN status_code != 200 THEN 1 ELSE 0 END) AS errors  -- non-200 = any error/rate-limit
         FROM {INFERENCE_TABLE}
         WHERE timestamp >= CURRENT_TIMESTAMP - INTERVAL 7 DAYS
         GROUP BY client_user_id
-        ORDER BY total_tokens DESC
+        ORDER BY total_tokens DESC  -- surface highest consumers first
         LIMIT 10
     """)
     print(f"Top callers to {PT_ENDPOINT} — last 7 days:\n")
@@ -251,25 +254,28 @@ except Exception as e:
 import mlflow
 from mlflow.entities import ViewType
 
+# MLFLOW_EXPERIMENT widget may be overridden per-user; alias for clarity below.
 EXPERIMENT_NAME = MLFLOW_EXPERIMENT
 
 try:
-    experiment = mlflow.get_experiment_by_name(EXPERIMENT_NAME)
+    experiment = mlflow.get_experiment_by_name(EXPERIMENT_NAME)  # returns None if path not found
     if experiment is None:
         print(f"Experiment '{EXPERIMENT_NAME}' not found.")
         print("Run some queries through the deployed app first, then re-run this cell.")
     else:
         print(f"Experiment found: {experiment.name} (ID: {experiment.experiment_id})\n")
+        # Fetch the 20 most recent runs; empty filter_string = no tag/metric constraints.
         recent_runs = mlflow.search_runs(
             experiment_ids=[experiment.experiment_id],
-            filter_string="",
-            run_view_type=ViewType.ACTIVE_ONLY,
+            filter_string="",  # no additional filter — return all runs
+            run_view_type=ViewType.ACTIVE_ONLY,  # exclude deleted runs
             max_results=20,
             order_by=["start_time DESC"],
         )
         if recent_runs.empty:
             print("No runs found yet. Run queries through the app to generate traces.")
         else:
+            # Keep only informative columns — drops raw artifact/tag noise.
             display_cols = [c for c in recent_runs.columns
                             if any(k in c for k in ["start_time", "end_time", "status", "metrics", "params"])]
             print(f"Recent runs ({len(recent_runs)}):\n")
@@ -284,10 +290,11 @@ except Exception as e:
 
 # COMMAND ----------
 
+# Fetch recent traces; empty filter returns all regardless of status or tags.
 try:
     traces = mlflow.search_traces(
         experiment_names=[EXPERIMENT_NAME],
-        filter_string="",
+        filter_string="",  # no span-level filter; we filter in Python below
         max_results=50,
     )
 
@@ -298,17 +305,19 @@ try:
         tool_latencies = []
         for trace in traces:
             for span in trace.data.spans:
+                # Match TOOL/RETRIEVER span types OR any span whose name contains "mcp".
                 if span.span_type in ("TOOL", "RETRIEVER") or "mcp" in span.name.lower():
+                    # Span times are nanoseconds; convert to milliseconds for readability.
                     duration_ms = (span.end_time_ns - span.start_time_ns) / 1_000_000
                     tool_latencies.append({
                         "tool_name": span.name[:40],
                         "duration_ms": round(duration_ms, 0),
                         "status": span.status.status_code if span.status else "unknown",
-                        "trace_id": trace.info.trace_id[:12] + "...",
+                        "trace_id": trace.info.trace_id[:12] + "...",  # truncate for display
                     })
 
         if tool_latencies:
-            tool_latencies.sort(key=lambda x: x["duration_ms"], reverse=True)
+            tool_latencies.sort(key=lambda x: x["duration_ms"], reverse=True)  # slowest first
             print(f"{'Tool name':<42} {'Duration ms':>12} {'Status':<12} {'Trace'}")
             print("-" * 90)
             for row in tool_latencies[:15]:
@@ -327,6 +336,7 @@ except Exception as e:
 
 # COMMAND ----------
 
+# Wider sample (100 traces) to surface infrequent failures reliably.
 try:
     traces = mlflow.search_traces(
         experiment_names=[EXPERIMENT_NAME],
@@ -337,12 +347,14 @@ try:
     failed_spans = []
     for trace in traces:
         for span in trace.data.spans:
+            # UNSET is included — uninstrumented spans default to UNSET, not OK.
             status = span.status.status_code if span.status else "UNSET"
             if str(status) in ("ERROR", "INTERNAL_ERROR", "UNSET"):
                 failed_spans.append({
                     "trace_id": trace.info.trace_id[:16] + "...",
                     "span_name": span.name[:40],
                     "status": str(status),
+                    # OpenTelemetry standard attribute for exception text.
                     "error": (span.attributes or {}).get("exception.message", "—")[:60],
                 })
 
@@ -460,10 +472,12 @@ print(sql_asset_access)
 
 # COMMAND ----------
 
+# service_name='mcpServer' isolates MCP rows; action_name='mcpToolsCall' is
+# the only action type for tool invocations — other MCP actions exist (e.g. list).
 try:
     df = spark.sql("""
         SELECT
-            request_params.toolName AS tool_name,
+            request_params.toolName AS tool_name,  -- specific UC function called
             COUNT(DISTINCT user_identity.email) AS distinct_callers,
             COUNT(*) AS total_calls,
             MIN(event_time) AS first_call,
@@ -495,6 +509,8 @@ except Exception as e:
 
 # COMMAND ----------
 
+# CONVERT_TIMEZONE shifts stored UTC timestamps to AEST/AEDT before the HOUR() test,
+# so the 7–19 window is correct regardless of daylight-saving offset.
 sql_after_hours = """
 -- MCP calls outside business hours (before 7am or after 7pm AEST)
 SELECT
@@ -507,9 +523,9 @@ WHERE service_name = 'mcpServer'
  AND action_name = 'mcpToolsCall'
  AND event_time >= CURRENT_TIMESTAMP - INTERVAL 30 DAYS
  AND (
- HOUR(CONVERT_TIMEZONE('UTC', 'Australia/Sydney', event_time)) < 7
+ HOUR(CONVERT_TIMEZONE('UTC', 'Australia/Sydney', event_time)) < 7   -- before 7am AEST
  OR
- HOUR(CONVERT_TIMEZONE('UTC', 'Australia/Sydney', event_time)) > 19
+ HOUR(CONVERT_TIMEZONE('UTC', 'Australia/Sydney', event_time)) > 19  -- after 7pm AEST
  )
 ORDER BY event_time DESC
 LIMIT 20

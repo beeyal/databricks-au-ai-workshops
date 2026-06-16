@@ -66,8 +66,9 @@ import json
 from pathlib import Path
 
 _config_path = Path('/tmp/workshop2c_config.json')
-_saved = json.loads(_config_path.read_text()) if _config_path.exists() else {}
+_saved = json.loads(_config_path.read_text()) if _config_path.exists() else {}  # reuse values from prior labs
 
+# Seed widgets from saved config so re-runs don't reset user values
 dbutils.widgets.text('catalog',        _saved.get('CATALOG',        'workshop_au'),           'Catalog name')
 dbutils.widgets.text('schema_aemo',    _saved.get('SCHEMA_AEMO',    'aemo'),                  'AEMO schema name')
 dbutils.widgets.text('pt_endpoint',    _saved.get('PT_ENDPOINT',    'au_east_llm_inregion'),  'PT endpoint name')
@@ -81,8 +82,8 @@ GENIE_SPACE_ID = dbutils.widgets.get('genie_space_id')
 APP_NAME       = dbutils.widgets.get('app_name')
 
 from databricks.sdk import WorkspaceClient
-ws = WorkspaceClient()
-HOST = ws.config.host.rstrip("/")
+ws = WorkspaceClient()  # auto-discovers credentials from the cluster env
+HOST = ws.config.host.rstrip("/")  # strip trailing slash for clean URL concatenation
 
 print(f"Workspace host : {HOST}")
 print(f"Catalog.Schema : {CATALOG}.{SCHEMA_AEMO}")
@@ -252,18 +253,19 @@ import mlflow
 # ---------------------------------------------------------------------------
 PT_ENDPOINT    = os.environ.get("PT_ENDPOINT",    "au_east_llm_inregion")
 GENIE_SPACE_ID = os.environ.get("GENIE_SPACE_ID", "")
-WORKSPACE_URL  = os.environ.get("DATABRICKS_HOST", "").rstrip("/")
+WORKSPACE_URL  = os.environ.get("DATABRICKS_HOST", "").rstrip("/")  # injected by Apps runtime
 CATALOG        = os.environ.get("CATALOG",        "workshop_au")
 SCHEMA_AEMO    = os.environ.get("SCHEMA_AEMO",    "aemo")
 VS_INDEX_NAME  = os.environ.get("VS_INDEX_NAME",  "workshop_au.aemo.aemo_market_notices_index")
 
-mlflow.set_experiment("/Apps/aemo-operations-agent")
+mlflow.set_experiment("/Apps/aemo-operations-agent")  # traces land under /Apps, not /Users
 
 # ---------------------------------------------------------------------------
 # Agent builder
 # ---------------------------------------------------------------------------
 
 async def build_agent():
+    # Always add UC-function tools; conditionally add Genie + Vector Search
     servers = [
         DatabricksMCPServer.from_uc_function(
             catalog=CATALOG,
@@ -276,12 +278,13 @@ async def build_agent():
         servers.append(
             DatabricksMCPServer(
                 name="aemo-genie",
-                url=f"{WORKSPACE_URL}/api/2.0/mcp/genie/{GENIE_SPACE_ID}",
+                url=f"{WORKSPACE_URL}/api/2.0/mcp/genie/{GENIE_SPACE_ID}",  # Genie MCP endpoint
             )
         )
 
     if VS_INDEX_NAME:
-        vs_parts = VS_INDEX_NAME.split(".")
+        vs_parts = VS_INDEX_NAME.split(".")  # split "catalog.schema.index" into 3 parts
+        # Build VS MCP URL: /api/2.0/mcp/vector-search/catalog/schema/index
         servers.append(
             DatabricksMCPServer(
                 name="aemo-market-notices",
@@ -289,9 +292,10 @@ async def build_agent():
             )
         )
 
+    # Connect to all MCP servers and collect their tool manifests
     async with DatabricksMultiServerMCPClient(servers) as client:
         tools = await client.get_tools()
-    llm = ChatDatabricks(endpoint=PT_ENDPOINT)
+    llm = ChatDatabricks(endpoint=PT_ENDPOINT)  # routes to in-region PT endpoint
 
     system_prompt = (
         "You are the AEMO NEM Operations Assistant. "
@@ -304,7 +308,7 @@ async def build_agent():
     return create_react_agent(
         model=llm,
         tools=tools,
-        state_modifier=system_prompt,
+        state_modifier=system_prompt,  # prepended as system message on every invoke
     )
 
 
@@ -313,12 +317,13 @@ async def build_agent():
 # ---------------------------------------------------------------------------
 
 def chat(message: str, history: list) -> str:
+    # Gradio calls a sync function; bridge to async agent with asyncio.run
     async def run():
         agent = await build_agent()
         result = await agent.ainvoke(
             {"messages": [{"role": "user", "content": message}]}
         )
-        return result["messages"][-1].content
+        return result["messages"][-1].content  # last message is the final AI reply
 
     return asyncio.run(run())
 
@@ -353,6 +358,7 @@ demo = gr.ChatInterface(
 # ---------------------------------------------------------------------------
 
 if __name__ == "__main__":
+    # 0.0.0.0 + port 8080 required — Apps proxy only forwards to this address/port
     demo.launch(server_name="0.0.0.0", server_port=8080, show_error=True)
 '''
 
@@ -367,8 +373,9 @@ print(APP_PY_CONTENT)
 
 import os
 
+# /Workspace path is POSIX-accessible from the driver; dbutils.fs uses DBFS, not workspace files
 APP_FOLDER = f"/Workspace/Users/{ws.current_user.me().user_name}/apps/aemo-operations-agent"
-os.makedirs(APP_FOLDER, exist_ok=True)
+os.makedirs(APP_FOLDER, exist_ok=True)  # safe to re-run; won't fail if folder exists
 with open(f"{APP_FOLDER}/app.py", "w") as f:
     f.write(APP_PY_CONTENT)
 print(f"app.py written to: {APP_FOLDER}/app.py")
@@ -390,7 +397,7 @@ mlflow>=2.17.0
 """
 
 with open(f"{APP_FOLDER}/requirements.txt", "w") as f:
-    f.write(REQUIREMENTS_CONTENT)
+    f.write(REQUIREMENTS_CONTENT)  # installed at app startup, not at deploy time
 print(f"requirements.txt written to: {APP_FOLDER}/requirements.txt")
 print(REQUIREMENTS_CONTENT)
 
@@ -403,7 +410,7 @@ print(REQUIREMENTS_CONTENT)
 
 # COMMAND ----------
 
-VS_INDEX_NAME_VALUE = f"{CATALOG}.{SCHEMA_AEMO}.aemo_market_notices_index"
+VS_INDEX_NAME_VALUE = f"{CATALOG}.{SCHEMA_AEMO}.aemo_market_notices_index"  # fully-qualified index name for env var
 
 APP_YAML_CONTENT = f"""command: ["python", "app.py"]
 
@@ -429,7 +436,7 @@ resources:
 """
 
 with open(f"{APP_FOLDER}/app.yaml", "w") as f:
-    f.write(APP_YAML_CONTENT)
+    f.write(APP_YAML_CONTENT)  # resources block auto-grants SP CAN_QUERY on PT endpoint
 print(f"app.yaml written to: {APP_FOLDER}/app.yaml")
 print(APP_YAML_CONTENT)
 
@@ -442,13 +449,14 @@ print(APP_YAML_CONTENT)
 
 import os as _os
 
-names = set(_os.listdir(APP_FOLDER))
+names = set(_os.listdir(APP_FOLDER))  # set for O(1) membership checks below
 print(f"Files in {APP_FOLDER}:\n")
 for fname in sorted(names):
     fpath = f"{APP_FOLDER}/{fname}"
-    size_kb = _os.path.getsize(fpath) / 1024
+    size_kb = _os.path.getsize(fpath) / 1024  # bytes → KB for readable output
     print(f"  {fname:<25} {size_kb:>6.1f} KB")
 
+# Fail fast here rather than discover missing files only after a deploy attempt
 assert "app.py" in names, "app.py missing"
 assert "requirements.txt" in names, "requirements.txt missing"
 assert "app.yaml" in names, "app.yaml missing"
@@ -550,9 +558,10 @@ print("=" * 65)
 
 try:
     app_info = ws.apps.get(APP_NAME)
-    sp_name = app_info.service_principal_name
+    sp_name = app_info.service_principal_name  # unique SP created per app at deploy time
     print(f"App service principal: {sp_name}")
     print()
+    # Print GRANT statements — must be run as a UC admin or catalog owner
     print("Run this SQL in a SQL cell or DBSQL editor:\n")
     print(f"  GRANT USE CATALOG ON CATALOG {CATALOG} TO `{sp_name}`;")
     print(f"  GRANT USE SCHEMA ON SCHEMA {CATALOG}.{SCHEMA_AEMO} TO `{sp_name}`;")
@@ -611,7 +620,7 @@ import urllib.request, urllib.error
 
 try:
     app_info = ws.apps.get(APP_NAME)
-    app_url = app_info.url
+    app_url = app_info.url  # permanent URL, stable across redeployments
     print(f"App URL: {app_url}")
     print(f"Status: {app_info.compute_status.state if app_info.compute_status else 'unknown'}")
 
@@ -628,9 +637,10 @@ try:
         'APP_NAME': APP_NAME,
         'APP_URL': app_url,
     })
-    _config_path.write_text(json.dumps(_saved, indent=2))
+    _config_path.write_text(json.dumps(_saved, indent=2))  # persist for downstream labs
     print(f"APP_URL saved to config: {app_url}")
 
+    # Unauthenticated probe — 302 to OAuth is correct; anything else signals a problem
     try:
         with urllib.request.urlopen(f"{app_url}/", timeout=10) as resp:
             print(f"HTTP {resp.status} — app is reachable.")
@@ -707,7 +717,7 @@ print("-" * 100)
 
 try:
     for app in ws.apps.list():
-        state = app.compute_status.state if app.compute_status else "—"
+        state = app.compute_status.state if app.compute_status else "—"  # None until first deploy
         url = app.url or "—"
         print(f"{app.name:<35} {str(state):<15} {url}")
 except Exception as e:

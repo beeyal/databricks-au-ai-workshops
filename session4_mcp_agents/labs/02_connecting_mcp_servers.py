@@ -60,8 +60,9 @@ import json
 from pathlib import Path
 
 _config_path = Path("/tmp/workshop2c_config.json")
-_saved = json.loads(_config_path.read_text()) if _config_path.exists() else {}
+_saved = json.loads(_config_path.read_text()) if _config_path.exists() else {}  # reuse Lab 01 values if present
 
+# Pre-populate widgets from saved config so reruns don't lose Lab 01 values
 dbutils.widgets.text("catalog",         _saved.get("CATALOG",        "workshop_au"),      "Catalog name")
 dbutils.widgets.text("schema_aemo",     _saved.get("SCHEMA_AEMO",    "aemo"),             "AEMO schema name")
 dbutils.widgets.text("pt_endpoint",     _saved.get("PT_ENDPOINT",    "au_east_llm_inregion"), "PT endpoint name")
@@ -81,7 +82,7 @@ VS_MCP_AVAILABLE    = False
 
 from databricks.sdk import WorkspaceClient
 ws   = WorkspaceClient()
-HOST = ws.config.host.rstrip("/")
+HOST = ws.config.host.rstrip("/")  # strip trailing slash; used in every MCP URL
 
 print("Configuration loaded.")
 print(f"  HOST           : {HOST}")
@@ -137,17 +138,18 @@ if GENIE_SPACE_ID == "":
 from databricks_mcp import DatabricksMCPClient
 import json
 
+# UC Functions MCP URL: catalog + schema selects which functions are exposed
 uc_mcp_url = f"{HOST}/api/2.0/mcp/functions/{CATALOG}/{SCHEMA_AEMO}"
 
 print(f"UC Functions MCP endpoint:\n  {uc_mcp_url}\n")
 
 # WorkspaceClient() auto-authenticates from notebook context.
 client = DatabricksMCPClient(uc_mcp_url, ws)
-tools  = client.list_tools()
+tools  = client.list_tools()  # fetches all tools advertised by the MCP server
 
 print(f"Discovered {len(tools)} tool(s) in {CATALOG}.{SCHEMA_AEMO}:\n")
 for t in tools:
-    desc_preview = (t.description or "")[:100]
+    desc_preview = (t.description or "")[:100]  # truncate long UC COMMENT fields
     params = list((t.inputSchema or {}).get("properties", {}).keys()) if hasattr(t, "inputSchema") else []
     print(f"  Tool: {t.name}")
     print(f"  Desc: {desc_preview}...")
@@ -182,6 +184,7 @@ for t in tools:
 
 # COMMAND ----------
 
+# Find the target tool by partial name match; None-safe for missing functions
 target_tool = next((t for t in tools if "calculate_peak_demand" in t.name), None)
 
 if target_tool:
@@ -190,7 +193,7 @@ if target_tool:
     print(f"Description:\n  {target_tool.description}\n")
     if hasattr(target_tool, "inputSchema") and target_tool.inputSchema:
         print("Input schema (JSON Schema):")
-        print(json.dumps(target_tool.inputSchema, indent=2))
+        print(json.dumps(target_tool.inputSchema, indent=2))  # shows required params and types
 else:
     print("Tool not found — check CATALOG and SCHEMA_AEMO widget values.")
 
@@ -221,16 +224,17 @@ else:
 
 from datetime import date, timedelta
 
-query_date = (date.today() - timedelta(days=1)).strftime("%Y-%m-%d")
-tool_name  = f"{CATALOG}__{SCHEMA_AEMO}__calculate_peak_demand"
+query_date = (date.today() - timedelta(days=1)).strftime("%Y-%m-%d")  # yesterday; today may be incomplete
+tool_name  = f"{CATALOG}__{SCHEMA_AEMO}__calculate_peak_demand"  # double-underscores replace dots in UC names
 
 print(f"Calling: {tool_name}")
 print(f"Args   : region='VIC1', date='{query_date}'\n")
 
+# Direct tool invocation — returns the standard MCP content envelope
 result = client.call_tool(tool_name, {"region": "VIC1", "date": query_date})
 
 print("Raw MCP response:")
-print(json.dumps(result, indent=2, default=str))
+print(json.dumps(result, indent=2, default=str))  # default=str handles date objects
 
 # COMMAND ----------
 
@@ -252,10 +256,11 @@ print(json.dumps(result, indent=2, default=str))
 
 # COMMAND ----------
 
+# Guard: only parse when the call succeeded and content is present
 if result and not result.get("isError", False) and "content" in result:
-    raw_text = result["content"][0]["text"]
+    raw_text = result["content"][0]["text"]  # MCP text payload; may be JSON string
     try:
-        parsed = json.loads(raw_text)
+        parsed = json.loads(raw_text)  # UC functions return JSON-encoded text
         print(f"Parsed result for VIC1 on {query_date}:\n")
         print(f"  Region              : {parsed.get('region', 'n/a')}")
         print(f"  Peak price ($/MWh)  : {parsed.get('peak_price_mwh', 'n/a')}")
@@ -263,9 +268,9 @@ if result and not result.get("isError", False) and "content" in result:
         print(f"  Avg price ($/MWh)   : {parsed.get('avg_price_mwh', 'n/a')}")
         print(f"  Total dispatch (MW) : {parsed.get('total_dispatch_mw', 'n/a')}")
         peak = parsed.get("peak_price_mwh", 0)
-        print(f"\n  {'SPIKE' if float(peak) > 300 else 'No spike'}: peak ${peak}/MWh (threshold $300/MWh)")
+        print(f"\n  {'SPIKE' if float(peak) > 300 else 'No spike'}: peak ${peak}/MWh (threshold $300/MWh)")  # $300 = AEMO high-price threshold
     except json.JSONDecodeError:
-        print("Result is plain text:", raw_text)
+        print("Result is plain text:", raw_text)  # some UC functions return raw strings
 elif result and result.get("isError"):
     print("Error:", result.get("content", [{}])[0].get("text", ""))
 
@@ -292,9 +297,10 @@ elif result and result.get("isError"):
 
 # COMMAND ----------
 
+# Single-function URL: append /function_name to restrict to exactly one tool
 single_fn_url  = f"{HOST}/api/2.0/mcp/functions/{CATALOG}/{SCHEMA_AEMO}/calculate_peak_demand"
 single_client  = DatabricksMCPClient(single_fn_url, ws)
-single_tools   = single_client.list_tools()
+single_tools   = single_client.list_tools()  # should return exactly 1 tool
 
 print(f"Single-function endpoint exposes {len(single_tools)} tool(s):")
 for t in single_tools:
@@ -352,9 +358,10 @@ if GENIE_SPACE_ID == "":
     print("Genie Space ID not set — skipping Section 2.")
     GENIE_MCP_AVAILABLE = False
 else:
+    # Genie MCP URL includes the Space ID; each Space is a separate endpoint
     genie_mcp_url  = f"{HOST}/api/2.0/mcp/genie/{GENIE_SPACE_ID}"
     genie_client   = DatabricksMCPClient(genie_mcp_url, ws)
-    genie_tools    = genie_client.list_tools()
+    genie_tools    = genie_client.list_tools()  # always returns exactly 1 NL-to-SQL tool
 
     print(f"Genie MCP endpoint: {genie_mcp_url}\n")
     print(f"Discovered {len(genie_tools)} tool(s):\n")
@@ -364,7 +371,7 @@ else:
         if hasattr(t, "inputSchema") and t.inputSchema:
             for pname, pschema in t.inputSchema.get("properties", {}).items():
                 print(f"    Parameter '{pname}': {pschema.get('description','')}")
-    GENIE_MCP_AVAILABLE = True
+    GENIE_MCP_AVAILABLE = True  # flag used by Sections 2.2–4.1
 
 # COMMAND ----------
 
@@ -391,18 +398,19 @@ else:
 if not GENIE_MCP_AVAILABLE:
     print("Skipping — Genie Space not configured.")
 else:
-    genie_tool_name = genie_tools[0].name
+    genie_tool_name = genie_tools[0].name  # Genie always has exactly one tool
     question = "What was the average spot price per region for the last 7 days in the dataset?"
 
     print(f"Calling: {genie_tool_name}")
     print(f"Question: {question}\n")
 
+    # Genie translates the natural-language question to SQL and returns results + SQL
     genie_result = genie_client.call_tool(genie_tool_name, {"question": question})
 
     if genie_result and "content" in genie_result:
         for item in genie_result["content"]:
             print(f"[{item.get('type','?')}]")
-            print(item.get("text","")[:600])
+            print(item.get("text","")[:600])  # truncate to avoid wall-of-text output
             print()
 
 # COMMAND ----------
@@ -446,7 +454,7 @@ else:
 
     if spike_result and "content" in spike_result:
         for item in spike_result["content"]:
-            if item.get("type") == "text":
+            if item.get("type") == "text":  # skip non-text items (e.g. image charts)
                 print(item["text"][:800])
 
 # COMMAND ----------
@@ -499,18 +507,20 @@ else:
 
 # COMMAND ----------
 
+# Split 3-part index name to build the VS MCP URL path segments
 vs_parts = VS_INDEX_NAME.split(".")
 if len(vs_parts) != 3:
     raise ValueError(
         f"VS_INDEX_NAME must be a 3-part name (catalog.schema.index_name), got: '{VS_INDEX_NAME}'. "
         "Update the 'vs_index' widget."
     )
+# VS MCP URL uses forward slashes between catalog, schema, and index name
 vs_mcp_url = f"{HOST}/api/2.0/mcp/vector-search/{'/'.join(vs_parts)}"
 
 print(f"Vector Search MCP endpoint:\n  {vs_mcp_url}\n")
 
 vs_client = DatabricksMCPClient(vs_mcp_url, ws)
-vs_tools  = vs_client.list_tools()
+vs_tools  = vs_client.list_tools()  # returns 0 tools if index is still syncing
 
 if not vs_tools:
     print("WARNING: Vector Search index returned 0 tools.")
@@ -525,8 +535,8 @@ else:
         if hasattr(t, "inputSchema") and t.inputSchema:
             for pname, pschema in t.inputSchema.get("properties", {}).items():
                 print(f"    '{pname}': {pschema.get('description','')}")
-    vs_tool_name = vs_tools[0].name
-    VS_MCP_AVAILABLE = True
+    vs_tool_name = vs_tools[0].name  # VS always exposes exactly 1 search tool
+    VS_MCP_AVAILABLE = True  # flag guards Sections 3.2, 3.3, and 4.1
     print(f"\nTool ready: {vs_tool_name}")
 
 # COMMAND ----------
@@ -559,13 +569,14 @@ else:
     print(f"Calling : {vs_tool_name}")
     print(f"Query   : {search_query}\n")
 
+    # num_results=5 controls how many nearest neighbours are returned
     vs_result = vs_client.call_tool(vs_tool_name, {"query": search_query, "num_results": 5})
 
     if vs_result and "content" in vs_result and not vs_result.get("isError"):
         for item in vs_result["content"]:
             if item.get("type") == "text":
                 print("Search results:")
-                print(item["text"][:1200])
+                print(item["text"][:1200])  # results are JSON-serialised hit list
     else:
         print("Search result:", vs_result)
 
@@ -603,13 +614,13 @@ else:
         print(f"  Query: '{query}'")
         if result and "content" in result:
             try:
-                hits = json.loads(result["content"][0]["text"])
+                hits = json.loads(result["content"][0]["text"])  # results arrive as JSON string
                 for hit in hits[:2]:
                     score = hit.get("score", "?")
-                    title = hit.get("title", hit.get("notice_text", "?")[:60])
+                    title = hit.get("title", hit.get("notice_text", "?")[:60])  # fallback to notice_text if no title
                     print(f"    Score {score:.4f}: {title}")
             except Exception:
-                print(f"    {result['content'][0]['text'][:120]}")
+                print(f"    {result['content'][0]['text'][:120]}")  # raw fallback on parse failure
         print()
 
 # COMMAND ----------
@@ -670,19 +681,20 @@ else:
 import asyncio
 from databricks_langchain import DatabricksMCPServer, DatabricksMultiServerMCPClient
 
-# Server 1: UC Functions
+# Server 1: UC Functions — helper builds the URL from catalog+schema automatically
 uc_server = DatabricksMCPServer.from_uc_function(
     catalog=CATALOG,
     schema=SCHEMA_AEMO,
     name="aemo-uc-tools",
     timeout=30.0,
-    handle_tool_error=True,
+    handle_tool_error=True,  # tool errors surface as text, not raised exceptions
 )
 print(f"Server config 1: {uc_server.name}")
 
 # Server 2: Genie Space (conditional)
 servers = [uc_server]
 if GENIE_SPACE_ID != "":
+    # Genie queries can take several seconds; use a longer timeout than UC functions
     genie_server = DatabricksMCPServer(
         name="aemo-nem-genie",
         url=f"{HOST}/api/2.0/mcp/genie/{GENIE_SPACE_ID}",
@@ -726,11 +738,13 @@ print(f"\nTotal MCP servers configured: {len(servers)}")
 
 async def inspect_all_tools():
     """Connect to all configured MCP servers and collect the combined tool list."""
+    # async context manager connects to all servers concurrently at entry
     async with DatabricksMultiServerMCPClient(servers) as multi_client:
-        all_tools = await multi_client.get_tools()
+        all_tools = await multi_client.get_tools()  # aggregated tool list from all servers
 
         print(f"Total tools across {len(servers)} MCP server(s): {len(all_tools)}\n")
         for t in all_tools:
+            # Infer server origin from naming convention (catalog prefix vs ask_/search_)
             if t.name.startswith(f"{CATALOG}__"):   origin = "UC Functions"
             elif t.name.startswith("ask_"):          origin = "Genie Space"
             elif t.name.startswith("search_"):       origin = "Vector Search"
@@ -740,7 +754,7 @@ async def inspect_all_tools():
 
         return all_tools
 
-all_tools = asyncio.run(inspect_all_tools())
+all_tools = asyncio.run(inspect_all_tools())  # run the async function from sync notebook context
 
 # COMMAND ----------
 
@@ -765,7 +779,7 @@ all_tools = asyncio.run(inspect_all_tools())
 
 # COMMAND ----------
 
-tool_budget   = 20
+tool_budget   = 20  # Databricks agent hard limit across all servers
 current_tools = len(all_tools)
 remaining     = tool_budget - current_tools
 
@@ -780,6 +794,7 @@ print("  2. Split into specialised sub-agents with an orchestrator")
 print("  3. Multiple Genie Spaces — each still costs only 1 tool")
 print("  4. Consolidate UC functions with a 'mode' parameter")
 
+# Count tools per origin type using naming conventions as proxy for server type
 uc_count    = sum(1 for t in all_tools if t.name.startswith(f"{CATALOG}__"))
 genie_count = sum(1 for t in all_tools if t.name.startswith("ask_"))
 vs_count    = sum(1 for t in all_tools if t.name.startswith("search_"))
@@ -808,12 +823,13 @@ import json
 from pathlib import Path
 
 config_path = Path("/tmp/workshop2c_config.json")
-config = json.loads(config_path.read_text()) if config_path.exists() else {}
+config = json.loads(config_path.read_text()) if config_path.exists() else {}  # merge; don't lose Lab 01 keys
 
 # vs_mcp_url is constructed in Section 3.1; provide a fallback if that cell was skipped
 _vs_mcp_url = vs_mcp_url if 'vs_mcp_url' in dir() else \
-    f"{HOST}/api/2.0/mcp/vector-search/{'/'.join(VS_INDEX_NAME.split('.'))}"
+    f"{HOST}/api/2.0/mcp/vector-search/{'/'.join(VS_INDEX_NAME.split('.'))}"  # reconstruct from widget
 
+# Upsert all derived MCP URLs so Lab 03 can import them without recomputing
 config.update({
     "HOST":           HOST,
     "CATALOG":        CATALOG,
@@ -824,10 +840,10 @@ config.update({
     "VS_MCP_URL":     _vs_mcp_url,
     "GENIE_MCP_URL":  f"{HOST}/api/2.0/mcp/genie/{GENIE_SPACE_ID}" if GENIE_SPACE_ID != "" else None,
     "UC_MCP_URL":     f"{HOST}/api/2.0/mcp/functions/{CATALOG}/{SCHEMA_AEMO}",
-    "TOOL_COUNT":     len(all_tools) if 'all_tools' in dir() else None,
+    "TOOL_COUNT":     len(all_tools) if 'all_tools' in dir() else None,  # None if Section 4 was skipped
 })
 
-config_path.write_text(json.dumps(config, indent=2))
+config_path.write_text(json.dumps(config, indent=2))  # atomic overwrite of the JSON file
 
 print(f"Configuration updated and saved to {config_path}")
 print(f"\n  UC Functions MCP  : {config['UC_MCP_URL']}")

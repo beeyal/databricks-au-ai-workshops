@@ -36,10 +36,11 @@ dbutils.widgets.dropdown("dry_run",   "true", ["true", "false"], "Dry run (true 
 CATALOG    = dbutils.widgets.get("catalog")
 SCHEMA     = dbutils.widgets.get("schema_aemo")
 SCHEMA_GOV = dbutils.widgets.get("schema_gov")
-DRY_RUN    = dbutils.widgets.get("dry_run") == "true"
+DRY_RUN    = dbutils.widgets.get("dry_run") == "true"  # compare string; widget always returns str
 
+# Pull workspace URL and PAT from the notebook execution context
 ctx     = dbutils.notebook.entry_point.getDbutils().notebook().getContext()
-HOST    = ctx.apiUrl().get().rstrip("/")
+HOST    = ctx.apiUrl().get().rstrip("/")  # strip trailing slash for clean URL joins
 TOKEN   = ctx.apiToken().get()
 HEADERS = {"Authorization": f"Bearer {TOKEN}", "Content-Type": "application/json"}
 
@@ -60,7 +61,7 @@ def do(label: str, fn) -> None:
             fn()
             print(f"  ✅ {label}")
         except Exception as e:
-            print(f"  ⚠️  {label}: {e}")
+            print(f"  ⚠️  {label}: {e}")  # non-fatal: log and continue cleanup
 
 # COMMAND ----------
 
@@ -76,7 +77,8 @@ try:
     funcs = spark.sql(f"SHOW FUNCTIONS IN {CATALOG}.{SCHEMA}").collect()
     if funcs:
         for f in funcs:
-            fn_fqn = f.function
+            fn_fqn = f.function  # fully-qualified name e.g. workshop_au.aemo.fn
+            # Default arg captures fq at loop time, avoiding closure-over-loop-var bug
             do(f"DROP FUNCTION IF EXISTS {fn_fqn}",
                lambda fq=fn_fqn: spark.sql(f"DROP FUNCTION IF EXISTS {fq}"))
     else:
@@ -88,6 +90,7 @@ print()
 
 print(f"Tables in {CATALOG}.{SCHEMA}:")
 try:
+    # Collect table names only; schema may not exist if a previous run already dropped it
     tables = [r.tableName for r in spark.sql(f"SHOW TABLES IN {CATALOG}.{SCHEMA}").collect()]
     for t in tables:
         print(f"  • {CATALOG}.{SCHEMA}.{t}")
@@ -97,10 +100,12 @@ except Exception:
 
 print()
 
+# Drop tables individually first; CASCADE on schema is a safety net
 for t in tables:
     fqn = f"{CATALOG}.{SCHEMA}.{t}"
     do(f"DROP TABLE {fqn}", lambda f=fqn: spark.sql(f"DROP TABLE IF EXISTS {f}"))
 
+# CASCADE removes any remaining tables/views the explicit loop may have missed
 do(
     f"DROP SCHEMA {CATALOG}.{SCHEMA} CASCADE",
     lambda: spark.sql(f"DROP SCHEMA IF EXISTS {CATALOG}.{SCHEMA} CASCADE"),
@@ -121,7 +126,7 @@ if config_path.exists():
     if DRY_RUN:
         print(f"  [DRY RUN] Would remove {config_path}")
     else:
-        config_path.unlink()
+        config_path.unlink()  # driver-local file; no distributed delete needed
         print(f"  ✅ Removed {config_path}")
 else:
     print(f"  {config_path} not found — already removed or never created.")
@@ -145,12 +150,13 @@ w = WorkspaceClient(host=HOST, token=TOKEN)
 # Delete the index first (must be removed before the endpoint can be deleted)
 print(f"Vector Search index: {VS_INDEX_NAME}")
 try:
-    w.vector_search_indexes.get(VS_INDEX_NAME)
+    w.vector_search_indexes.get(VS_INDEX_NAME)  # probe existence; raises NotFound if absent
     do(
         f"Delete VS index '{VS_INDEX_NAME}'",
         lambda: w.vector_search_indexes.delete(VS_INDEX_NAME),
     )
 except NotFound:
+    # SDK raises NotFound when the resource doesn't exist — treat as already clean
     print(f"  VS index '{VS_INDEX_NAME}' not found — already removed or never created.")
 except Exception as e:
     print(f"  ⚠️  Could not check VS index: {e}")
@@ -160,12 +166,13 @@ print()
 # Delete the endpoint (no-op if index deletion is dry-run — endpoint may still have the index)
 print(f"Vector Search endpoint: {VS_ENDPOINT_NAME}")
 try:
-    w.vector_search_endpoints.get_endpoint(VS_ENDPOINT_NAME)
+    w.vector_search_endpoints.get_endpoint(VS_ENDPOINT_NAME)  # probe before delete
     do(
         f"Delete VS endpoint '{VS_ENDPOINT_NAME}'",
         lambda: w.vector_search_endpoints.delete(VS_ENDPOINT_NAME),
     )
 except NotFound:
+    # Same NotFound pattern as index — idempotent cleanup
     print(f"  VS endpoint '{VS_ENDPOINT_NAME}' not found — already removed or never created.")
 except Exception as e:
     print(f"  ⚠️  Could not check VS endpoint: {e}")
@@ -185,13 +192,13 @@ import requests
 
 print("Fetching Databricks Apps in this workspace...")
 
-apps_resp = requests.get(f"{HOST}/api/2.0/apps", headers=HEADERS)
+apps_resp = requests.get(f"{HOST}/api/2.0/apps", headers=HEADERS)  # list all workspace apps
 
 if apps_resp.status_code != 200:
     print(f"⚠️  Could not list apps: HTTP {apps_resp.status_code} {apps_resp.text[:200]}")
     all_apps = []
 else:
-    all_apps = apps_resp.json().get("apps", [])
+    all_apps = apps_resp.json().get("apps", [])  # default to empty list if key absent
 
 if not all_apps:
     print("  No Databricks Apps found in this workspace.")
@@ -201,7 +208,7 @@ else:
     print(f"  {'-'*40} {'-'*15} {'-'*30}")
     for app in all_apps:
         name    = app.get("name", "?")
-        status  = app.get("compute_status", {}).get("state", "?")
+        status  = app.get("compute_status", {}).get("state", "?")  # nested status field
         creator = app.get("creator", "?")
         print(f"  {name:<40} {status:<15} {creator}")
     print()
@@ -211,7 +218,7 @@ else:
 
 dbutils.widgets.text("apps_to_delete", "", "App names to delete (comma-separated, exact match)")
 raw_apps      = dbutils.widgets.get("apps_to_delete")
-apps_to_delete = [a.strip() for a in raw_apps.split(",") if a.strip()]
+apps_to_delete = [a.strip() for a in raw_apps.split(",") if a.strip()]  # skip blank entries
 
 if not apps_to_delete:
     print("No app names specified — skipping app deletion.")
@@ -228,7 +235,7 @@ else:
             print(f"  [DRY RUN] Would delete app: '{app_name}'")
         else:
             del_resp = requests.delete(f"{HOST}/api/2.0/apps/{app_name}", headers=HEADERS)
-            if del_resp.status_code in (200, 204):
+            if del_resp.status_code in (200, 204):  # both codes indicate successful deletion
                 print(f"  ✅ Deleted app: '{app_name}'")
             else:
                 print(f"  ⚠️  Could not delete '{app_name}': HTTP {del_resp.status_code} {del_resp.text[:120]}")
@@ -247,7 +254,7 @@ from mlflow.tracking import MlflowClient
 EXPERIMENT_NAME = "/Apps/aemo-operations-agent"
 
 mlflow_client = MlflowClient()
-experiment = mlflow_client.get_experiment_by_name(EXPERIMENT_NAME)
+experiment = mlflow_client.get_experiment_by_name(EXPERIMENT_NAME)  # returns None if absent
 
 if experiment is None:
     print(f"  MLflow experiment '{EXPERIMENT_NAME}' not found — nothing to delete.")
@@ -256,7 +263,7 @@ else:
     if DRY_RUN:
         print(f"  [DRY RUN] Would delete MLflow experiment '{EXPERIMENT_NAME}' (ID: {exp_id})")
     else:
-        mlflow_client.delete_experiment(exp_id)
+        mlflow_client.delete_experiment(exp_id)  # soft-delete; recoverable for 30 days
         print(f"  ✅ Deleted MLflow experiment '{EXPERIMENT_NAME}' (ID: {exp_id})")
         print(f"     (Experiment is soft-deleted and can be restored within 30 days via client.restore_experiment())")
 
@@ -269,6 +276,7 @@ else:
 # COMMAND ----------
 
 raw_revoke  = dbutils.widgets.get("revoke_emails")
+# Normalise to lowercase so email casing doesn't cause REVOKE to silently miss the principal
 revoke_list = [e.strip().lower() for e in raw_revoke.split(",") if e.strip()]
 
 if not revoke_list:
@@ -286,7 +294,7 @@ else:
     ]
     for email in revoke_list:
         for stmt_prefix in revoke_stmts:
-            stmt = f"{stmt_prefix} `{email}`"
+            stmt = f"{stmt_prefix} `{email}`"  # backtick-quote email to handle special chars
             do(stmt, lambda s=stmt: spark.sql(s))
         print(f"  {'[DRY RUN] Would revoke' if DRY_RUN else '✅ Revoked'}: {email}")
 
@@ -303,9 +311,10 @@ registry_fqn = f"{CATALOG}.{SCHEMA_GOV}.genie_space_registry"
 try:
     exists = spark.catalog.tableExists(registry_fqn)
 except Exception:
-    exists = False
+    exists = False  # governance schema absent in single-session workshops
 
 if exists:
+    # Match by session number OR name to handle registry rows written either way
     do(
         f"Delete Session 4 row from {registry_fqn}",
         lambda: spark.sql(
@@ -313,7 +322,7 @@ if exists:
         ),
     )
     if not DRY_RUN:
-        remaining = spark.table(registry_fqn).count()
+        remaining = spark.table(registry_fqn).count()  # confirm other sessions untouched
         print(f"  Registry now has {remaining} entries")
 else:
     print(f"  Registry table not found — nothing to clean up")
