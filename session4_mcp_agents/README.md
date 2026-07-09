@@ -72,6 +72,20 @@ workloads must not route inference cross-geo.
 | Databricks Apps | In-region (AU East) | App container + OAuth handled in AU East |
 | FMAPI Pay-Per-Token | **Cross-geo** | **Do not use as the agent's or judge's LLM backend** |
 
+### Choosing the agent model (Australia East)
+
+In the [Databricks region docs](https://learn.microsoft.com/en-us/azure/databricks/resources/feature-region-support), a `⥂` on a model means it **requires cross-geography routing** — it leaves the region, so it is off-limits for AEMO. In `australiaeast`:
+
+| Model | In-region? | Use as the agent LLM? |
+|-------|-----------|-----------------------|
+| **`databricks-gpt-oss-120b`** | ✅ in-region (pay-per-token **and** provisioned throughput) | ✅ **Recommended** — reliable tool calling; ran all five labs clean |
+| `databricks-gpt-oss-20b` | ✅ in-region | ✅ (lighter/faster) |
+| Claude (Opus 4.6–4.8, Sonnet 4.5/4.6, Haiku 4.5) | ✅ in-region (Databricks security perimeter) | ⚠️ excellent at tools, but `databricks-langchain` currently mis-serializes the tool result for the Anthropic endpoint (`tool_result…id: Extra inputs are not permitted`) — prefer GPT-OSS until that's fixed |
+| Llama 3.1/3.3/4, Qwen3/3.5, Claude Sonnet 5 / Fable 5 | ❌ `⥂` cross-geo | ❌ breaks residency (Llama also emitted malformed tool calls in testing) |
+| Gemini, OpenAI GPT | ❌ global / ADI Services | ❌ breaks residency |
+
+**Recommendation:** back the `au_east_llm_inregion` provisioned-throughput endpoint with **GPT-OSS-120B**, and use that same endpoint for the Lab 02/05 LLM judge.
+
 ---
 
 ## The lifecycle spine

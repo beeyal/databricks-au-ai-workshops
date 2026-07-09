@@ -29,6 +29,8 @@
 # MAGIC
 # MAGIC **Prerequisites:**
 # MAGIC - The in-region PT serving endpoint (default `au_east_llm_inregion`) must already exist and be `READY`.
+# MAGIC   For Australia East, back it with **GPT-OSS-120B** — it is in-region (no cross-geo routing) and
+# MAGIC   tool-calls reliably. Avoid Llama here: it is marked cross-geo (`⥂`) in the region table.
 # MAGIC - Stage the CSVs where this notebook can read them and set the `data_path` widget. On workspaces
 # MAGIC   where the DBFS root is disabled, stage them in a Unity Catalog **Volume** (e.g.
 # MAGIC   `/Volumes/workshop_au/aemo/raw`) and point `data_path` there instead of `dbfs:/...`.

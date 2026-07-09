@@ -1,14 +1,20 @@
 command: ["python", "server.py"]
 
 env:
-  # The agent LLM. MUST be an in-region PT endpoint (residency) AND must serve a
-  # model that supports tool/function calling. Note: some Databricks Claude
-  # endpoints reject the ReAct tool-result payload (databricks-langchain sends a
-  # tool_result block with an extra `id` field that the Anthropic-format endpoint
-  # refuses). If your PT endpoint serves Claude and you hit
-  # "tool_result...id: Extra inputs are not permitted", point PT_ENDPOINT at an
-  # OpenAI-format tool-calling model (e.g. a Llama or GPT-OSS PT endpoint) or
-  # upgrade databricks-langchain. Verified working with Llama-3.3-70B.
+  # The agent LLM. It must (a) stay in-region for AU East residency and (b) do
+  # reliable tool/function calling. Per the Databricks region docs, in australiaeast
+  # GPT-OSS is in-region (no cross-geo routing) both pay-per-token AND provisioned
+  # throughput — and it tool-called cleanly across all labs — so it is the
+  # recommended backend. Point au_east_llm_inregion at GPT-OSS-120B (PT), or set
+  # PT_ENDPOINT directly to the shared endpoint below.
+  #   RECOMMENDED (in-region + reliable tool calls): databricks-gpt-oss-120b
+  #   AVOID for AU East: Llama family — marked cross-geo (⥂) in the region table,
+  #     so it breaks residency, and it emitted malformed tool calls in testing.
+  #   Claude models are in-region too, but databricks-langchain currently sends a
+  #     tool_result block with an extra `id` field that the Anthropic-format
+  #     endpoint rejects ("tool_result...id: Extra inputs are not permitted"),
+  #     so prefer GPT-OSS until that is resolved / databricks-langchain is upgraded.
+  # See: https://learn.microsoft.com/en-us/azure/databricks/resources/feature-region-support
   - name: PT_ENDPOINT
     value: au_east_llm_inregion
   - name: CATALOG
