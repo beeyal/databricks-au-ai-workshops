@@ -2,7 +2,10 @@ fastapi>=0.110
 uvicorn[standard]>=0.29
 databricks-langchain>=0.1.0
 databricks-mcp>=0.1.0
-langgraph>=1.0.9
+# langgraph core must be >=1.2: langgraph-prebuilt (the ReAct tool node) imports
+# ExecutionInfo/Runtime.execution_info from langgraph.runtime, which older cores
+# (<=1.0.x) don't expose — pinning too low breaks the agent at tool-execution time.
+langgraph>=1.2,<2
 mlflow>=2.17.0
 psycopg[binary]>=3.1
 databricks-sdk>=0.30.0
