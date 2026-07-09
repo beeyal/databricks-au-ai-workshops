@@ -21,10 +21,11 @@ Creates the `workshop_au` catalog and `energy` + `ai_governance` schemas, loads 
 
 | Lab | File | Description |
 |-----|------|-------------|
-| 01 | `labs/01_ai_gateway_setup.py` | Configure an AI Gateway endpoint with routing rules and rate limits |
-| 02 | `labs/02_rate_limits_guardrails.py` | Add guardrails to block cross-geo models and filter PII patterns |
-| 03 | `labs/03_usage_tracking.py` | Query `system.access.audit` to build an AI activity audit view |
-| 04 | `labs/04_data_residency_compliance.py` | Data residency deep-dive (optional, time-permitting) |
+| 01 | `labs/01_workspace_ai_settings.py` | Inspect and configure AI feature flags; verify geography enforcement |
+| 02 | `labs/02_ai_gateway_setup.py` | Configure an AI Gateway endpoint with routing rules and rate limits |
+| 03 | `labs/03_rate_limits_guardrails.py` | Add guardrails to block cross-geo models and filter PII patterns |
+| 04 | `labs/04_usage_tracking.py` | Query `system.access.audit` to build an AI activity audit view |
+| 05 | `labs/05_data_residency_compliance.py` | Data residency deep-dive (optional, time-permitting) |
 
 **Cleanup:** `setup/cleanup.py`
 Drops the `energy` schema and tables, revokes participant grants, removes the AI Gateway test endpoint.
@@ -35,9 +36,9 @@ Drops the `energy` schema and tables, revokes participant grants, removes the AI
 
 **Folder:** `session2_genie_space/`
 **Audience:** Data engineers, analysts
-**Duration:** 2 hours
+**Duration:** 2.5 hours
 
-**Slide deck:** https://docs.google.com/presentation/d/1Kw-mwE8kVvc-j70mXzFOVnUAURVoYBaoDKIVF6MKFoU/edit
+**Slide deck:** TBD
 
 **Setup:** `setup/setup.py`
 Creates `workshop_au.aemo`, loads the 5 AEMO NEM tables from DBFS CSVs, adds column comments and table descriptions, grants participant access. Expected runtime: ~5 minutes.
@@ -74,28 +75,32 @@ Virtual session: 24 June 09:00–12:00 AEST. Contact your Databricks account tea
 ## Session 4: MCP Agents (optional)
 
 **Folder:** `session4_mcp_agents/`
-**Audience:** Data engineers
-**Duration:** Half day
+**Audience:** Data engineers, analysts, ML engineers
+**Level:** 200 (guided) · **Duration:** ~2.5–3 hours
 
 **Slide deck:** https://docs.google.com/presentation/d/1vwV4xr3xFJ6ypqL0hKe-up7hH0rsGEvCraEfwGbQQ4M/edit
 
+Reframed around the agent lifecycle **Build → Evaluate → Govern → Deploy → Improve** — one lab per phase, Lab 05 loops back to Lab 02.
+
 **Setup:** `setup/setup.py`
-Verifies that the AEMO Genie Space from Session 2 is live, confirms the PT endpoint is in `READY` state, creates the Vector Search endpoint and index (allow 5–10 minutes for index build), registers UC Functions for NEM calculations, grants participant `EXECUTE` on UC Functions.
+Creates the `workshop_au.aemo` catalog and loads the six AEMO tables, confirms the PT endpoint is `READY`, creates the Vector Search endpoint and `aemo_market_notices_index` (allow 5–10 minutes), registers the NEM UC functions, and grants participant access (`SELECT` + `EXECUTE`).
 
 **Labs:**
 
-| Lab | File | Description |
-|-----|------|-------------|
-| 01 | `labs/01_agent_architecture_mcp.py` | Conceptual walkthrough + MCP tools explorer in the UI |
-| 02 | `labs/02_connecting_mcp_servers.py` | Connect to Genie Space, Vector Search, and UC Functions MCP servers; call each tool directly |
-| 03 | `labs/03_building_mcp_agent.py` | Build a LangGraph ReAct agent wiring all three MCP tools |
-| 04 | `labs/04_deploy_as_databricks_app.py` | Package as a Databricks App with Gradio UI; deploy via UI |
-| 05 | `labs/05_monitoring_governance.py` | Inspect MLflow traces, AI Gateway metrics, and audit log events |
+| Lab | File | Lifecycle | Description |
+|-----|------|-----------|-------------|
+| 01 | `labs/01_build_agent.py` | **Build** | LangGraph ReAct agent on the PT endpoint + 3 MCP servers, then Lakebase short-term memory + a multi-turn follow-up |
+| 02 | `labs/02_evaluate_agent.py` | **Evaluate** | `mlflow.genai.evaluate()` with LLM-judge scorers against `eval/golden_questions.jsonl` |
+| 03 | `labs/03_govern_agent.py` | **Govern** | Residency/cross-geo block, AI Gateway, PII/safety guardrails, UC access, `system.access.audit` |
+| 04 | `labs/04_deploy_react_app.py` | **Deploy** | Build + deploy the React app in `app/` as a Databricks App (SSO, service principal) |
+| 05 | `labs/05_improve_feedback_loop.py` | **Improve** | Human feedback → new eval cases → re-run Lab 02; close the loop |
 
-**App files:** `app.py` + `app.yaml` — the Databricks App used in Lab 04.
+**App:** `app/` — a React + TypeScript SPA with a FastAPI backend (streaming chat, sources panel, Lakebase memory), deployed as a Databricks App. Build the frontend with `cd app/frontend && npm install && npm run build`.
+
+**Eval set:** `eval/golden_questions.jsonl` — 10 AEMO NEM questions with `inputs` + `expectations`.
 
 **Cleanup:** `setup/cleanup.py`
-Deletes the Vector Search endpoint and index, deregisters UC Functions, revokes EXECUTE grants, removes the Databricks App.
+Deletes the Vector Search endpoint and index, drops the UC functions, revokes grants, and removes the Databricks App.
 
 ---
 
@@ -117,15 +122,16 @@ Confirms the `workshop_au` catalog is accessible and Genie Code is enabled in th
 | Lab | File | Description |
 |-----|------|-------------|
 | 01 | `labs/01_custom_instructions.py` | Write AEMO-specific personal instructions for Genie Code |
-| 02 | `labs/02_skills_walkthrough.py` | Create two SKILL.md files: `energy-operations`, `regulatory-compliance` |
+| 02 | `labs/02_skills_walkthrough.py` | Create three SKILL.md files: `energy-analytics`, `regulatory-compliance`, `genie-space-creator` |
 | 03 | `labs/03_mcp_intro.py` | MCP concepts and `DatabricksMCPClient.list_tools()` demo |
 
 **Skills (installed during Lab 02):**
 
 | Skill | Trigger keywords |
 |-------|-----------------|
-| `energy-operations` | SAIDI, SAIFI, spot price, RRP, dispatch, LOR, NEM analysis, NMI, NEM12, meter data |
-| `regulatory-compliance` | SOCI Act, AESCSF, Australian regulatory requirements, compliance, AER, Privacy Act, STPIS, NER, CIRMP, data residency |
+| `energy-analytics` | SAIDI, SAIFI, spot price, RRP, dispatch, LOR, NEM analysis |
+| `regulatory-compliance` | Australian regulatory requirements, compliance, AER, Privacy Act, STPIS, NER obligations |
+| `genie-space-creator` | create Genie Space, golden queries, NL-to-SQL, Genie API |
 
 **Cleanup:** `setup/cleanup.py`
 Removes the custom instructions file and skill files from the participant's workspace home directory.

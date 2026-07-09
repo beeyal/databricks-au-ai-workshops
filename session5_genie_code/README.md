@@ -53,9 +53,9 @@ NEM12 quality flags, SAIDI/SAIFI/CAIDI formulas, NEM spot price reference, 5-min
 Auto-loads on: SAIDI, SAIFI, spot price, RRP, dispatch, LOR, NEM analysis, NMI, meter data.
 
 ### `regulatory-compliance`
-SOCI Act 2018 CIRMP obligations, AESCSF framework, Privacy Act APP 6 and APP 11 for NMI data, NER Chapter 7 retention (7 years), AER STPIS benchmarks, data residency classification table, and AU East in-region vs cross-geo feature matrix. Includes UC audit log queries for evidence.
+critical infrastructure risk-management (CIRMP) obligations, AESCSF framework, Privacy Act APP 6 and APP 11 for NMI data, NER Chapter 7 retention (7 years), AER STPIS benchmarks, data residency classification table, and AU East in-region vs cross-geo feature matrix. Includes UC audit log queries for evidence.
 
-Auto-loads on: Australian regulatory requirements, compliance, SOCI Act, AER, Privacy Act, STPIS, AESCSF, NER, data residency, CIRMP.
+Auto-loads on: Australian regulatory requirements, compliance, AER, Privacy Act, STPIS, AESCSF, NER, data residency, CIRMP.
 
 ---
 
@@ -99,7 +99,7 @@ All three endpoints run on Azure Australia East — no data leaves the region.
 /Users/{email}/.assistant_instructions.md ← loads every session
 /Users/{email}/.assistant/skills/
  energy-operations/SKILL.md ← NEM12, SAIDI/SAIFI, spot price, SQL patterns
- regulatory-compliance/SKILL.md ← SOCI Act, AESCSF, Privacy Act, AER/STPIS, data residency
+ regulatory-compliance/SKILL.md ← Australian regulatory requirements, AESCSF, Privacy Act, AER/STPIS, data residency
 ```
 
 ---

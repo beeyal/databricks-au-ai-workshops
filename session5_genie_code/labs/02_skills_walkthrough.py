@@ -4,24 +4,24 @@
 
 # MAGIC %md
 # MAGIC <div style="background: linear-gradient(135deg, #1B3139 0%, #243447 100%); padding: 28px 32px; border-radius: 10px; margin-bottom: 8px;">
-# MAGIC <h1 style="color: #FF6B35; margin: 0 0 8px 0; font-size: 2em; font-family: 'DM Sans', sans-serif;">
-# MAGIC Lab 02: Skills Walkthrough
-# MAGIC </h1>
-# MAGIC <p style="color: #AECBCC; margin: 0; font-size: 1em;">
-# MAGIC Session 5: Extending Genie Code — AEMO Workshop · Australia East
-# MAGIC </p>
+# MAGIC   <h1 style="color: #FF6B35; margin: 0 0 8px 0; font-size: 2em; font-family: 'DM Sans', sans-serif;">
+# MAGIC     Lab 02: Skills Walkthrough
+# MAGIC   </h1>
+# MAGIC   <p style="color: #AECBCC; margin: 0; font-size: 1em;">
+# MAGIC     Session 5: Extending Genie Code — AEMO Workshop · Australia East
+# MAGIC   </p>
 # MAGIC </div>
 # MAGIC
 # MAGIC <div style="display: flex; gap: 12px; margin-top: 16px; flex-wrap: wrap;">
-# MAGIC <div style="background: #f0f4ff; border-left: 4px solid #1B3A6B; padding: 12px 18px; border-radius: 6px; flex: 1; min-width: 160px;">
-# MAGIC <strong style="color: #1B3A6B;">Duration</strong><br>30 minutes
-# MAGIC </div>
-# MAGIC <div style="background: #fff4f0; border-left: 4px solid #FF3621; padding: 12px 18px; border-radius: 6px; flex: 1; min-width: 160px;">
-# MAGIC <strong style="color: #FF3621;">Prerequisites</strong><br>Lab 01 complete
-# MAGIC </div>
-# MAGIC <div style="background: #f0fff4; border-left: 4px solid #00843D; padding: 12px 18px; border-radius: 6px; flex: 1; min-width: 160px;">
-# MAGIC <strong style="color: #00843D;">Skills created</strong><br>energy-analytics, regulatory-compliance, genie-space-creator
-# MAGIC </div>
+# MAGIC   <div style="background: #f0f4ff; border-left: 4px solid #1B3A6B; padding: 12px 18px; border-radius: 6px; flex: 1; min-width: 160px;">
+# MAGIC     <strong style="color: #1B3A6B;">Duration</strong><br>30 minutes
+# MAGIC   </div>
+# MAGIC   <div style="background: #fff4f0; border-left: 4px solid #FF3621; padding: 12px 18px; border-radius: 6px; flex: 1; min-width: 160px;">
+# MAGIC     <strong style="color: #FF3621;">Prerequisites</strong><br>Lab 01 complete
+# MAGIC   </div>
+# MAGIC   <div style="background: #f0fff4; border-left: 4px solid #00843D; padding: 12px 18px; border-radius: 6px; flex: 1; min-width: 160px;">
+# MAGIC     <strong style="color: #00843D;">Skills created</strong><br>energy-analytics, regulatory-compliance, genie-space-creator
+# MAGIC   </div>
 # MAGIC </div>
 # MAGIC
 # MAGIC ### What you will do
@@ -69,9 +69,9 @@ username = spark.sql("SELECT current_user()").collect()[0][0]
 skills_base = f"/Users/{username}/.assistant/skills"
 print(f"Skills base path: {skills_base}")
 print(f"\nThree skills we will create:")
-print(f" {skills_base}/energy-analytics/SKILL.md")
-print(f" {skills_base}/regulatory-compliance/SKILL.md")
-print(f" {skills_base}/genie-space-creator/SKILL.md")
+print(f"  {skills_base}/energy-analytics/SKILL.md")
+print(f"  {skills_base}/regulatory-compliance/SKILL.md")
+print(f"  {skills_base}/genie-space-creator/SKILL.md")
 
 # COMMAND ----------
 
@@ -102,8 +102,8 @@ Interpretation: lower is better — represents minutes of outage per customer pe
 SQL pattern:
 ```sql
 SELECT
- region,
- SUM(duration_minutes * affected_customers) / MAX(total_customers) AS saidi_minutes
+    region,
+    SUM(duration_minutes * affected_customers) / MAX(total_customers) AS saidi_minutes
 FROM workshop_au.energy.outage_events
 WHERE YEAR(start_time) = YEAR(CURRENT_DATE)
 GROUP BY region
@@ -115,8 +115,8 @@ AER benchmark: typically < 1.0 interruption/year for urban networks
 SQL pattern:
 ```sql
 SELECT
- region,
- COUNT(*) * AVG(affected_customers) / MAX(total_customers) AS saifi
+    region,
+    COUNT(*) * AVG(affected_customers) / MAX(total_customers) AS saifi
 FROM workshop_au.energy.outage_events
 WHERE YEAR(start_time) = YEAR(CURRENT_DATE)
 GROUP BY region
@@ -145,12 +145,12 @@ NSW1, VIC1, QLD1, SA1, TAS1 — always use these exact identifiers in queries an
 ### Daily average price by region
 ```sql
 SELECT
- region_id,
- DATE(settlement_date) AS trade_date,
- AVG(rrp) AS avg_price_mwh,
- MAX(rrp) AS max_price_mwh,
- MIN(rrp) AS min_price_mwh,
- COUNT(*) AS intervals
+    region_id,
+    DATE(settlement_date)     AS trade_date,
+    AVG(rrp)                  AS avg_price_mwh,
+    MAX(rrp)                  AS max_price_mwh,
+    MIN(rrp)                  AS min_price_mwh,
+    COUNT(*)                  AS intervals
 FROM workshop_au.aemo.spot_prices
 WHERE region_id = 'VIC1'
 GROUP BY region_id, DATE(settlement_date)
@@ -160,12 +160,12 @@ ORDER BY trade_date DESC
 ### Top dispatched generators (by fuel type)
 ```sql
 SELECT
- gr.fuel_type,
- di.duid,
- gr.station_name,
- SUM(di.dispatch_mw) AS total_mw,
- AVG(di.dispatch_mw) AS avg_mw,
- COUNT(*) AS dispatch_intervals
+    gr.fuel_type,
+    di.duid,
+    gr.station_name,
+    SUM(di.dispatch_mw)       AS total_mw,
+    AVG(di.dispatch_mw)       AS avg_mw,
+    COUNT(*)                  AS dispatch_intervals
 FROM workshop_au.aemo.dispatch_intervals di
 JOIN workshop_au.aemo.generator_registration gr USING (duid)
 WHERE di.settlement_date >= CURRENT_DATE - INTERVAL 7 DAYS
@@ -176,14 +176,14 @@ ORDER BY total_mw DESC
 ### LOR event summary
 ```sql
 SELECT
- notice_type, -- LOR1 / LOR2 / LOR3
- region_id,
- COUNT(*) AS event_count,
- MIN(issue_time) AS earliest_notice,
- MAX(issue_time) AS latest_notice
+    notice_type,    -- LOR1 / LOR2 / LOR3
+    region_id,
+    COUNT(*)       AS event_count,
+    MIN(issue_time)  AS earliest_notice,
+    MAX(issue_time)  AS latest_notice
 FROM workshop_au.aemo.market_notices
 WHERE notice_type LIKE 'LOR%'
- AND issue_time >= CURRENT_DATE - INTERVAL 30 DAYS
+  AND issue_time >= CURRENT_DATE - INTERVAL 30 DAYS
 GROUP BY notice_type, region_id
 ORDER BY notice_type, region_id
 ```
@@ -197,7 +197,7 @@ As of October 2021, AEMO moved to 5-minute settlement (5MS).
 skill_path = f"{skills_base}/energy-analytics/SKILL.md"
 dbutils.fs.put(skill_path, energy_analytics_skill, overwrite=True)
 print(f"Created: {skill_path}")
-print(f"Size : {len(energy_analytics_skill):,} characters")
+print(f"Size   : {len(energy_analytics_skill):,} characters")
 
 # COMMAND ----------
 
@@ -322,31 +322,31 @@ Exclusions must be declared and submitted to AER within 30 business days.
 ### SAIDI performance vs AER target
 ```sql
 SELECT
- region,
- SUM(saidi_minutes) AS total_saidi,
- 25.0 AS aer_target_urban,
- SUM(saidi_minutes) - 25.0 AS variance,
- CASE
- WHEN SUM(saidi_minutes) < 25 THEN 'COMPLIANT'
- WHEN SUM(saidi_minutes) < 30 THEN 'WITHIN TOLERANCE'
- ELSE 'REVIEW REQUIRED'
- END AS compliance_status
+    region,
+    SUM(saidi_minutes)                                          AS total_saidi,
+    25.0                                                        AS aer_target_urban,
+    SUM(saidi_minutes) - 25.0                                   AS variance,
+    CASE
+        WHEN SUM(saidi_minutes) < 25 THEN 'COMPLIANT'
+        WHEN SUM(saidi_minutes) < 30 THEN 'WITHIN TOLERANCE'
+        ELSE 'REVIEW REQUIRED'
+    END                                                         AS compliance_status
 FROM workshop_au.energy.outage_events
 WHERE YEAR(start_time) = YEAR(CURRENT_DATE)
- AND is_major_event_day = FALSE -- MED exclusion applied
+  AND is_major_event_day = FALSE   -- MED exclusion applied
 GROUP BY region
 ```
 
 ### NMI data retention audit (7-year rule)
 ```sql
 SELECT
- MIN(read_date) AS oldest_record,
- MAX(read_date) AS latest_record,
- DATEDIFF(CURRENT_DATE, MIN(read_date)) / 365.25 AS retention_years,
- CASE
- WHEN DATEDIFF(CURRENT_DATE, MIN(read_date)) / 365.25 >= 7 THEN 'RETENTION MET'
- ELSE 'CHECK ARCHIVING POLICY'
- END AS ner_chapter7_status
+    MIN(read_date)                                              AS oldest_record,
+    MAX(read_date)                                             AS latest_record,
+    DATEDIFF(CURRENT_DATE, MIN(read_date)) / 365.25             AS retention_years,
+    CASE
+        WHEN DATEDIFF(CURRENT_DATE, MIN(read_date)) / 365.25 >= 7 THEN 'RETENTION MET'
+        ELSE 'CHECK ARCHIVING POLICY'
+    END                                                         AS ner_chapter7_status
 FROM workshop_au.aemo.interval_reads
 ```
 
@@ -364,7 +364,7 @@ endpoint = w.serving_endpoints.get("au_east_llm_inregion")
 skill_path = f"{skills_base}/regulatory-compliance/SKILL.md"
 dbutils.fs.put(skill_path, regulatory_compliance_skill, overwrite=True)
 print(f"Created: {skill_path}")
-print(f"Size : {len(regulatory_compliance_skill):,} characters")
+print(f"Size   : {len(regulatory_compliance_skill):,} characters")
 
 # COMMAND ----------
 
@@ -423,13 +423,13 @@ import json
 w = WorkspaceClient()
 
 space = w.api_client.do(
- "POST",
- "/api/2.0/genie/spaces",
- body={
- "title": "AEMO NEM Operations",
- "warehouse_id": "<your-sql-warehouse-id>",
- "description": "NL-to-SQL access to NEM spot prices, dispatch, and market notices",
- "instructions": '''This Genie Space provides access to AEMO NEM operational data.
+    "POST",
+    "/api/2.0/genie/spaces",
+    body={
+        "title": "AEMO NEM Operations",
+        "warehouse_id": "<your-sql-warehouse-id>",
+        "description": "NL-to-SQL access to NEM spot prices, dispatch, and market notices",
+        "instructions": '''This Genie Space provides access to AEMO NEM operational data.
 
 REGION CODES: Always use NSW1, VIC1, QLD1, SA1, TAS1 (never NSW, VIC, etc.)
 PRICES: Express in $/MWh. Market price cap is $15,300/MWh. Floor is -$1,000/MWh.
@@ -443,7 +443,7 @@ Available tables:
 - workshop_au.aemo.dispatch_intervals (5-min generator dispatch by DUID)
 - workshop_au.aemo.market_notices (LOR and intervention events)
 - workshop_au.aemo.generator_registration (DUID metadata, fuel_type, capacity)'''
- }
+    }
 )
 space_id = space["space_id"]
 print(f"Created Genie Space: {space_id}")
@@ -452,105 +452,105 @@ print(f"Created Genie Space: {space_id}")
 ### Step 2 — Add tables
 ```python
 tables = [
- "workshop_au.aemo.spot_prices",
- "workshop_au.aemo.dispatch_intervals",
- "workshop_au.aemo.market_notices",
- "workshop_au.aemo.generator_registration",
+    "workshop_au.aemo.spot_prices",
+    "workshop_au.aemo.dispatch_intervals",
+    "workshop_au.aemo.market_notices",
+    "workshop_au.aemo.generator_registration",
 ]
 for table in tables:
- w.api_client.do(
- "POST",
- f"/api/2.0/genie/spaces/{space_id}/datasets",
- body={"table_name": table}
- )
- print(f" Added: {table}")
+    w.api_client.do(
+        "POST",
+        f"/api/2.0/genie/spaces/{space_id}/datasets",
+        body={"table_name": table}
+    )
+    print(f"  Added: {table}")
 ```
 
 ### Step 3 — Add golden queries (5 minimum recommended by AEMO)
 ```python
 golden_queries = [
- {
- "name": "Average spot price by region last 7 days",
- "question": "What was the average spot price by region over the last 7 days?",
- "sql": '''SELECT region_id, ROUND(AVG(rrp), 2) AS avg_price_mwh
+    {
+        "name": "Average spot price by region last 7 days",
+        "question": "What was the average spot price by region over the last 7 days?",
+        "sql": '''SELECT region_id, ROUND(AVG(rrp), 2) AS avg_price_mwh
 FROM workshop_au.aemo.spot_prices
 WHERE settlement_date >= CURRENT_DATE - INTERVAL 7 DAYS
 GROUP BY region_id ORDER BY avg_price_mwh DESC'''
- },
- {
- "name": "Top generators by dispatch last week",
- "question": "Which generators dispatched the most electricity last week?",
- "sql": '''SELECT di.duid, gr.station_name, gr.fuel_type,
- ROUND(SUM(di.dispatch_mw) / 1000, 1) AS total_gwh
+    },
+    {
+        "name": "Top generators by dispatch last week",
+        "question": "Which generators dispatched the most electricity last week?",
+        "sql": '''SELECT di.duid, gr.station_name, gr.fuel_type,
+    ROUND(SUM(di.dispatch_mw) / 1000, 1) AS total_gwh
 FROM workshop_au.aemo.dispatch_intervals di
 JOIN workshop_au.aemo.generator_registration gr USING (duid)
 WHERE di.settlement_date >= CURRENT_DATE - INTERVAL 7 DAYS
 GROUP BY di.duid, gr.station_name, gr.fuel_type
 ORDER BY total_gwh DESC LIMIT 10'''
- },
- {
- "name": "High price events this month",
- "question": "How many high price events above $300/MWh occurred this month?",
- "sql": '''SELECT region_id, COUNT(*) AS high_price_intervals,
- ROUND(MAX(rrp), 2) AS peak_price_mwh
+    },
+    {
+        "name": "High price events this month",
+        "question": "How many high price events above $300/MWh occurred this month?",
+        "sql": '''SELECT region_id, COUNT(*) AS high_price_intervals,
+    ROUND(MAX(rrp), 2) AS peak_price_mwh
 FROM workshop_au.aemo.spot_prices
 WHERE rrp > 300
- AND DATE_TRUNC('month', settlement_date) = DATE_TRUNC('month', CURRENT_DATE)
+  AND DATE_TRUNC('month', settlement_date) = DATE_TRUNC('month', CURRENT_DATE)
 GROUP BY region_id ORDER BY high_price_intervals DESC'''
- },
- {
- "name": "LOR events last 30 days",
- "question": "Show me all LOR events in the last 30 days",
- "sql": '''SELECT notice_id, notice_type, region_id, issue_time, effective_date,
- LEFT(reason, 250) AS reason_preview
+    },
+    {
+        "name": "LOR events last 30 days",
+        "question": "Show me all LOR events in the last 30 days",
+        "sql": '''SELECT notice_id, notice_type, region_id, issue_time, effective_date,
+    LEFT(reason, 250) AS reason_preview
 FROM workshop_au.aemo.market_notices
 WHERE notice_type LIKE 'LOR%'
- AND issue_time >= CURRENT_DATE - INTERVAL 30 DAYS
+  AND issue_time >= CURRENT_DATE - INTERVAL 30 DAYS
 ORDER BY issue_time DESC'''
- },
- {
- "name": "Renewable vs fossil fuel dispatch mix",
- "question": "What is the renewable vs fossil fuel dispatch mix this week?",
- "sql": '''SELECT
- CASE WHEN gr.fuel_type IN ('WIND','SOLAR','HYDRO','BIOMASS') THEN 'Renewable'
- ELSE 'Fossil / Other' END AS generation_type,
- gr.fuel_type,
- ROUND(SUM(di.dispatch_mw) / 1000, 1) AS total_gwh
+    },
+    {
+        "name": "Renewable vs fossil fuel dispatch mix",
+        "question": "What is the renewable vs fossil fuel dispatch mix this week?",
+        "sql": '''SELECT
+    CASE WHEN gr.fuel_type IN ('WIND','SOLAR','HYDRO','BIOMASS') THEN 'Renewable'
+         ELSE 'Fossil / Other' END AS generation_type,
+    gr.fuel_type,
+    ROUND(SUM(di.dispatch_mw) / 1000, 1) AS total_gwh
 FROM workshop_au.aemo.dispatch_intervals di
 JOIN workshop_au.aemo.generator_registration gr USING (duid)
 WHERE di.settlement_date >= CURRENT_DATE - INTERVAL 7 DAYS
 GROUP BY generation_type, gr.fuel_type
 ORDER BY total_gwh DESC'''
- },
+    },
 ]
 
 for gq in golden_queries:
- w.api_client.do(
- "POST",
- f"/api/2.0/genie/spaces/{space_id}/sql-queries",
- body={
- "name": gq["name"],
- "description": gq["question"],
- "query": gq["sql"],
- }
- )
- print(f" Added golden query: {gq['name']}")
+    w.api_client.do(
+        "POST",
+        f"/api/2.0/genie/spaces/{space_id}/sql-queries",
+        body={
+            "name":        gq["name"],
+            "description": gq["question"],
+            "query":       gq["sql"],
+        }
+    )
+    print(f"  Added golden query: {gq['name']}")
 ```
 
 ### Step 4 — Set permissions
 ```python
 # CAN_VIEW for analysts, CAN_EDIT for data engineers
 permissions = [
- {"user_name": "analyst@aemo.com.au", "permission_level": "CAN_VIEW"},
- {"user_name": "data-engineer@aemo.com.au", "permission_level": "CAN_EDIT"},
- {"group_name": "aemo-analysts", "permission_level": "CAN_VIEW"},
+    {"user_name": "analyst@aemo.com.au",       "permission_level": "CAN_VIEW"},
+    {"user_name": "data-engineer@aemo.com.au", "permission_level": "CAN_EDIT"},
+    {"group_name": "aemo-analysts",            "permission_level": "CAN_VIEW"},
 ]
 for p in permissions:
- w.api_client.do(
- "PUT",
- f"/api/2.0/permissions/genie/spaces/{space_id}",
- body={"access_control_list": [p]}
- )
+    w.api_client.do(
+        "PUT",
+        f"/api/2.0/permissions/genie/spaces/{space_id}",
+        body={"access_control_list": [p]}
+    )
 print("Permissions set.")
 ```
 
@@ -571,7 +571,7 @@ See Lab 03 for how to connect this endpoint from a notebook.
 skill_path = f"{skills_base}/genie-space-creator/SKILL.md"
 dbutils.fs.put(skill_path, genie_space_creator_skill, overwrite=True)
 print(f"Created: {skill_path}")
-print(f"Size : {len(genie_space_creator_skill):,} characters")
+print(f"Size   : {len(genie_space_creator_skill):,} characters")
 
 # COMMAND ----------
 
@@ -587,21 +587,21 @@ skill_names = ["energy-analytics", "regulatory-compliance", "genie-space-creator
 print("Skill inventory:\n")
 total_chars = 0
 for name in skill_names:
- path = f"{skills_base}/{name}/SKILL.md"
- try:
- content = dbutils.fs.head(path)
- # Extract the description from the YAML front-matter
- lines = content.split("\n")
- desc_line = next((l for l in lines if l.startswith("description:")), "(not found)")
- size = len(content)
- total_chars += size
- print(f" {name}")
- print(f" Path : {path}")
- print(f" Size : {size:,} chars")
- print(f" Trigger: {desc_line.replace('description: ', '')[:80]}")
- print()
- except Exception as e:
- print(f" {name}: ERROR — {e}\n")
+    path = f"{skills_base}/{name}/SKILL.md"
+    try:
+        content = dbutils.fs.head(path)
+        # Extract the description from the YAML front-matter
+        lines = content.split("\n")
+        desc_line = next((l for l in lines if l.startswith("description:")), "(not found)")
+        size = len(content)
+        total_chars += size
+        print(f"  {name}")
+        print(f"    Path   : {path}")
+        print(f"    Size   : {size:,} chars")
+        print(f"    Trigger: {desc_line.replace('description: ', '')[:80]}")
+        print()
+    except Exception as e:
+        print(f"  {name}: ERROR — {e}\n")
 
 print(f"Total across all skills: {total_chars:,} chars")
 print(f"Remaining budget (20,000 total minus instructions): ~{20000 - total_chars:,} chars")
@@ -671,19 +671,19 @@ print(f"Remaining budget (20,000 total minus instructions): ~{20000 - total_char
 
 summary = """
 Skills installed:
- energy-analytics → SAIDI/SAIFI/CAIDI, spot price ranges, NEM SQL patterns
- regulatory-compliance → Australian regulatory requirements, Privacy Act, NER Chapter 7, STPIS, compliance SQL
- genie-space-creator → REST API patterns, golden queries, permission setup, MCP endpoint
+  energy-analytics       → SAIDI/SAIFI/CAIDI, spot price ranges, NEM SQL patterns
+  regulatory-compliance  → Australian regulatory requirements, Privacy Act, NER Chapter 7, STPIS, compliance SQL
+  genie-space-creator    → REST API patterns, golden queries, permission setup, MCP endpoint
 
 Discovery triggers (any matching phrase loads the skill automatically):
- energy-analytics : SAIDI, SAIFI, CAIDI, spot price, RRP, dispatch, LOR, NEM analysis
- regulatory-compliance : Australian regulatory requirements, Privacy Act, AER, compliance, NER, STPIS, obligations
- genie-space-creator : Genie Space, create space, golden queries, NL-to-SQL, Genie API
+  energy-analytics       : SAIDI, SAIFI, CAIDI, spot price, RRP, dispatch, LOR, NEM analysis
+  regulatory-compliance  : Australian regulatory requirements, Privacy Act, AER, compliance, NER, STPIS, obligations
+  genie-space-creator    : Genie Space, create space, golden queries, NL-to-SQL, Genie API
 
 Explicit invocation (always loads regardless of query):
- @energy-analytics <your question>
- @regulatory-compliance <your question>
- @genie-space-creator <your question>
+  @energy-analytics <your question>
+  @regulatory-compliance <your question>
+  @genie-space-creator <your question>
 """
 print(summary)
 
@@ -691,26 +691,26 @@ print(summary)
 
 # MAGIC %md
 # MAGIC <div style="background: linear-gradient(135deg, #00843D 0%, #1B3A6B 100%); color: white; padding: 20px 24px; border-radius: 10px; margin-top: 24px;">
-# MAGIC <h2 style="color: white; margin: 0 0 10px 0; font-family: 'DM Sans', sans-serif;">Lab 02 Complete — 30 minutes</h2>
-# MAGIC <table style="color: white; width: 100%; border-collapse: collapse; font-size: 0.95em;">
-# MAGIC <tr style="border-bottom: 1px solid rgba(255,255,255,0.2);">
-# MAGIC <td style="padding: 6px 10px; font-weight: bold; width: 35%;">energy-analytics</td>
-# MAGIC <td style="padding: 6px 10px;">SAIDI/SAIFI formulas, price reference, 3 SQL patterns — auto-loads on NEM keywords</td>
-# MAGIC </tr>
-# MAGIC <tr style="border-bottom: 1px solid rgba(255,255,255,0.2);">
-# MAGIC <td style="padding: 6px 10px; font-weight: bold;">regulatory-compliance</td>
-# MAGIC <td style="padding: 6px 10px;">Australian regulatory requirements timelines, Privacy Act NMI rules, NER Chapter 7, STPIS benchmarks</td>
-# MAGIC </tr>
-# MAGIC <tr style="border-bottom: 1px solid rgba(255,255,255,0.2);">
-# MAGIC <td style="padding: 6px 10px; font-weight: bold;">genie-space-creator</td>
-# MAGIC <td style="padding: 6px 10px;">Full REST API pattern with tables, golden queries, permissions, and MCP endpoint note</td>
-# MAGIC </tr>
-# MAGIC <tr>
-# MAGIC <td style="padding: 6px 10px; font-weight: bold;">Key insight</td>
-# MAGIC <td style="padding: 6px 10px;">The <code style="color:#FF6B35;">description:</code> field is what Genie reads for auto-discovery — write it as trigger phrases</td>
-# MAGIC </tr>
-# MAGIC </table>
-# MAGIC <p style="color: rgba(255,255,255,0.85); margin: 14px 0 0 0; font-weight: bold;">
-# MAGIC Next: Lab 03 — MCP Introduction (10 min)
-# MAGIC </p>
+# MAGIC   <h2 style="color: white; margin: 0 0 10px 0; font-family: 'DM Sans', sans-serif;">Lab 02 Complete — 30 minutes</h2>
+# MAGIC   <table style="color: white; width: 100%; border-collapse: collapse; font-size: 0.95em;">
+# MAGIC     <tr style="border-bottom: 1px solid rgba(255,255,255,0.2);">
+# MAGIC       <td style="padding: 6px 10px; font-weight: bold; width: 35%;">energy-analytics</td>
+# MAGIC       <td style="padding: 6px 10px;">SAIDI/SAIFI formulas, price reference, 3 SQL patterns — auto-loads on NEM keywords</td>
+# MAGIC     </tr>
+# MAGIC     <tr style="border-bottom: 1px solid rgba(255,255,255,0.2);">
+# MAGIC       <td style="padding: 6px 10px; font-weight: bold;">regulatory-compliance</td>
+# MAGIC       <td style="padding: 6px 10px;">Australian regulatory requirements timelines, Privacy Act NMI rules, NER Chapter 7, STPIS benchmarks</td>
+# MAGIC     </tr>
+# MAGIC     <tr style="border-bottom: 1px solid rgba(255,255,255,0.2);">
+# MAGIC       <td style="padding: 6px 10px; font-weight: bold;">genie-space-creator</td>
+# MAGIC       <td style="padding: 6px 10px;">Full REST API pattern with tables, golden queries, permissions, and MCP endpoint note</td>
+# MAGIC     </tr>
+# MAGIC     <tr>
+# MAGIC       <td style="padding: 6px 10px; font-weight: bold;">Key insight</td>
+# MAGIC       <td style="padding: 6px 10px;">The <code style="color:#FF6B35;">description:</code> field is what Genie reads for auto-discovery — write it as trigger phrases</td>
+# MAGIC     </tr>
+# MAGIC   </table>
+# MAGIC   <p style="color: rgba(255,255,255,0.85); margin: 14px 0 0 0; font-weight: bold;">
+# MAGIC     Next: Lab 03 — MCP Introduction (10 min)
+# MAGIC   </p>
 # MAGIC </div>

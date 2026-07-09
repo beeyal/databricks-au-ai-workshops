@@ -1,258 +1,242 @@
-# Session 4: Building Production AI Agents with MCP on Databricks
+# Session 4: Building AI Agents with MCP on Databricks
 
 **Track:** Developer / Agent Builder
-**Duration:** 3 hours
-**Audience:** Data engineers, software engineers, and ML engineers building agentic applications on Databricks
-**Format:** Hands-on coding lab with step-by-step UI guidance
+**Level:** 200 (guided, hands-on — no prior agent-building experience required)
+**Duration:** ~2.5–3 hours
+**Audience:** Data engineers, analysts, and ML engineers building their first governed agent on Databricks
+**Format:** Hands-on coding labs with step-by-step UI guidance
 
 ---
 
 ## Overview
 
-This workshop takes you from zero to a production-deployed AI agent in three hours. You will build the **AEMO Operations Agent** — a ReAct agent that combines three Databricks MCP server types to answer natural language questions about Australian electricity market operations, retrieve relevant regulatory documents, and run live computations.
+This session teaches you to build a real AI agent by walking it through its whole lifecycle — one
+lab per phase:
 
-The agent is deployed as a **Databricks App** with a Gradio UI, secured behind Databricks OAuth, with full MLflow tracing enabled and AI Gateway governing every LLM call.
+> **Build → Evaluate → Govern → Deploy → Improve**
+
+You build the **AEMO Operations Agent**: a LangGraph ReAct agent that answers natural-language
+questions about the Australian National Electricity Market (NEM) by calling three Databricks MCP
+servers (Genie, Vector Search, UC Functions). You give it **Lakebase memory** so it handles
+follow-up questions, **evaluate** its answers with LLM judges, **govern** it (residency, guardrails,
+audit), **deploy** it as a React app, and close the loop by turning user feedback into new
+evaluation cases.
+
+Compared with the previous version of this session, this is deliberately **Level 200**: managed,
+guided, fewer raw-plumbing detours, with a clear lifecycle spine and deeper coverage of evaluation
+and memory.
 
 ### What is MCP?
 
-Model Context Protocol (MCP) is an open standard that lets AI agents discover and call tools provided by external servers. In Databricks, MCP enables your agent to interact with Genie Spaces, Vector Search indexes, Unity Catalog Functions, and other resources through a standardised tool interface — without writing custom integration code for each.
+Model Context Protocol (MCP) is an open standard that lets an agent discover and call tools provided
+by external servers. On Databricks, MCP exposes Genie Spaces, Vector Search indexes, and Unity
+Catalog Functions through one standard tool interface — no custom integration code per resource. The
+agent discovers the available tools, picks one based on the question, calls it, and reasons over the
+result (the ReAct loop) until it can answer.
 
-When your agent receives a question, it queries the MCP server to discover available tools, selects the right one based on the question, calls it, and incorporates the result into its response. The agent reasons over this loop (ReAct pattern) until it has enough information to answer.
+### What you'll build
 
-### What You Will Build
-
-The AEMO Operations Agent integrates all three Databricks MCP server types:
-
-| MCP Server | Role in the Agent |
-|------------|------------------|
-| **Genie Space MCP** | Translates natural language questions about spot prices, dispatch data, and settlement into SQL, executes them, and returns structured results |
-| **Vector Search MCP** | Retrieves relevant passages from the AEMO Market Rules, NEM Procedures, and incident reports when the question requires regulatory or procedural context |
-| **UC Functions MCP** | Runs deterministic computations — NEM pricing calculations, SAIDI/SAIFI formulas, load factor estimates — that should not be delegated to the LLM |
-
-The finished agent is deployed as a Databricks App, so business users access it through a browser URL with full Databricks SSO — no API keys, no separate auth, no infrastructure management.
+- A **LangGraph ReAct agent** on an in-region provisioned-throughput (PT) endpoint
+- Wired to **three Databricks MCP servers**: UC Functions, Genie, Vector Search
+- With **Lakebase short-term memory** for multi-turn conversations
+- **Evaluated** with LLM-judge metrics (correctness, relevance, groundedness, no-hallucination)
+- **Governed**: residency guardrail, AI Gateway rate limits, PII/safety guardrails, UC access
+  controls, and a `system.access.audit` trail
+- **Deployed** as a React app in Databricks Apps (SSO + service principal)
+- **Continuously improved** via a human-in-the-loop feedback loop back into evaluation
 
 ---
 
-## Data Residency
+## Australia East residency (read this first)
 
-All five Databricks MCP server types are confirmed available in the **Australia East** (`australiaeast`) region as of May 2026. Every component of this workshop — Genie Space, Vector Search, UC Functions, Model Serving, Databricks Apps — processes data in-region.
+This workshop exists because of a hard rule: **model calls must stay in Australia East**. AEMO
+workloads must not route inference cross-geo.
+
+| Rule | Detail |
+|------|--------|
+| **PT endpoint required** | The agent's LLM MUST be an in-region **provisioned-throughput (PT)** serving endpoint (default `au_east_llm_inregion`). The PT endpoint runs the model inside your workspace region. |
+| **Pay-per-token forbidden** | Pay-per-token / Foundation Model API endpoints may route inference cross-geo and are **not permitted** as the agent's or the judge's LLM backend. |
+| **All MCP servers in-region** | Genie, Vector Search, and UC Functions MCP servers are workspace-local and run in Australia East. |
+| **Judge is in-region too** | The LLM-judge scorers in Lab 02/05 use the same PT endpoint (`databricks:/au_east_llm_inregion`) — the judge is an LLM call and obeys the same rule. |
+
+### Residency reference table
 
 | Component | Residency | Notes |
 |-----------|-----------|-------|
-| Genie Space MCP server | In-region (AU East) | Safe for regulated data |
-| Vector Search MCP server | In-region (AU East) | Safe for regulated data |
-| UC Functions MCP server | In-region (AU East) | Safe for regulated data |
-| LLM (PT endpoint) | In-region (AU East) | Requires PT endpoint — do not use Pay-Per-Token |
-| Databricks Apps | In-region (AU East) | OAuth is handled within AU East |
-| MLflow tracing | In-region (AU East) | Traces stored in workspace-local MLflow |
+| MCP — Genie Space server | In-region (AU East) | Safe for regulated data |
+| MCP — Vector Search server | In-region (AU East) | Safe for regulated data |
+| MCP — UC Functions server | In-region (AU East) | Safe for regulated data |
+| LLM (PT endpoint) | In-region (AU East) | **Requires PT endpoint — pay-per-token forbidden** |
+| MLflow tracing + evaluation | In-region (AU East) | Traces/evals stored in workspace-local MLflow |
+| Lakebase (agent memory) | In-region (AU East) | Managed Postgres in the workspace region |
+| Databricks Apps | In-region (AU East) | App container + OAuth handled in AU East |
+| FMAPI Pay-Per-Token | **Cross-geo** | **Do not use as the agent's or judge's LLM backend** |
 
-> The PT endpoint (`databricks-claude-haiku-4-5` or equivalent) must be deployed and in `READY` state before this workshop begins. Pay-Per-Token models are cross-geo and must not be used as the agent's LLM backend.
+---
+
+## The lifecycle spine
+
+Each lab is one phase. Lab 05 loops back to Lab 02, making the lifecycle a cycle:
+
+```
+   Build   →   Evaluate   →   Govern   →   Deploy   →   Improve
+  (Lab 01)     (Lab 02)      (Lab 03)     (Lab 04)     (Lab 05) ──┐
+     ▲                                                            │
+     └───────────────────── loop back ───────────────────────────┘
+```
+
+---
+
+## Lab sequence
+
+| Lab | Title | File | Duration | Lifecycle phase |
+|-----|-------|------|----------|-----------------|
+| 01 | Build an MCP agent (+ Lakebase memory) | `labs/01_build_agent.py` | 40 min | **Build** |
+| 02 | Evaluate the agent with LLM judges | `labs/02_evaluate_agent.py` | 35 min | **Evaluate** |
+| 03 | Govern: guardrails, residency, audit | `labs/03_govern_agent.py` | 30 min | **Govern** |
+| 04 | Deploy the React app | `labs/04_deploy_react_app.py` | 40 min | **Deploy** |
+| 05 | Improve: human-in-the-loop feedback | `labs/05_improve_feedback_loop.py` | 30 min | **Improve** |
+
+**Total: ~175 minutes of lab time** (~2.9 hours), plus short transitions between labs.
+
+---
+
+## Lab detail
+
+### Lab 01 — BUILD: Your first MCP agent (with Lakebase memory)
+**File:** `labs/01_build_agent.py`
+
+Set up an MLflow experiment for tracing, configure the three MCP servers, and build a LangGraph
+ReAct agent with `create_react_agent` + `ChatDatabricks` on the in-region PT endpoint. Run three
+AEMO questions (Genie / Vector Search / UC Function routing). Then add **Lakebase short-term
+memory**: create `app_memory.conversation_turns(session_id, turn_index, role, content, ts)`, wrap
+the agent so each turn loads prior history and saves the new turn, and demonstrate a multi-turn
+follow-up (*"...and what about NSW?"*). A Delta fallback keeps the lab running if Lakebase is not
+provisioned.
+
+### Lab 02 — EVALUATE: Measure quality with LLM judges
+**File:** `labs/02_evaluate_agent.py`
+
+Load the golden dataset from `../eval/golden_questions.jsonl`, wrap the agent as a `predict_fn`, and
+run `mlflow.genai.evaluate()` with four LLM-judge scorers — **Correctness**, **RelevanceToQuery**
+(answer quality), **RetrievalGroundedness**, and a custom **no-hallucination / faithfulness**
+Guidelines judge — all pinned to the in-region PT endpoint. Read the aggregate metrics and drill
+into per-question traces. Captures `lab02_eval_baseline` for later comparison.
+
+### Lab 03 — GOVERN: Guardrails, residency, and audit
+**File:** `labs/03_govern_agent.py`
+
+Verify the agent's endpoint is PT (in-region) and document how to block the cross-geo pay-per-token
+path. Configure **AI Gateway** (rate limits per service principal, usage tracking, inference
+tables), **content guardrails** (PII, safety), **UC access controls** scoping the agent's service
+principal to `workshop_au.aemo`, and query **`system.access.audit`** to correlate every MCP tool
+call to an identity. Residency-forward throughout.
+
+### Lab 04 — DEPLOY: Ship the agent as a React app
+**File:** `labs/04_deploy_react_app.py`
+
+Deploy the React app in `session4_mcp_agents/app/` (owned/provided; you don't write app code). Build
+the frontend (`cd app/frontend && npm install && npm run build`), review `app/app.yaml` and its
+resources (the `au_east_llm_inregion` endpoint with `CAN_QUERY`), deploy via **both** the Databricks
+Apps UI **and** the CLI (`databricks apps deploy`), verify `/api/health`, and confirm SSO +
+service-principal auth.
+
+### Lab 05 — IMPROVE: Close the feedback loop
+**File:** `labs/05_improve_feedback_loop.py`
+
+Capture thumbs-up/down + free-text corrections from the deployed app into
+`app_feedback.agent_feedback`, convert negatives into **new golden-dataset rows**, re-run the Lab 02
+evaluation to measure improvement against the baseline, and refine the prompt / tool descriptions.
+Explicitly closes the loop back to EVALUATE.
 
 ---
 
 ## Prerequisites
 
-Complete the following before attending this workshop. Ask your facilitator if you need access to any of these.
+Simplified for Level 200 — the facilitator handles most setup.
 
-| Prerequisite | Where to find it | Required for |
-|-------------|-----------------|--------------|
-| Session 5 Labs 01–03 completed (or equivalent Genie Code familiarity) | `session5_genie_code/labs/` | Lab 01 concepts build on Genie Code knowledge |
-| UC Functions created in the workshop catalog | `session5_genie_code/labs/03_mcp_intro.py` | Lab 02 (UC Functions MCP discovery) |
-| PT endpoint running (`databricks-claude-haiku-4-5` or name from your facilitator) | Machine Learning > Serving | All agent labs |
-| AEMO data loaded | `setup/00_workspace_setup.py` with the AEMO section run | Labs 02–04 |
-| Genie Space created and verified | `session3_lob/genie_config/aemo_genie_space_setup.py` | Lab 02 (Genie MCP) |
-| `SELECT` on `workshop_au.aemo.*` | Granted by facilitator during setup | Labs 02–05 |
+| Prerequisite | Where | Required for |
+|--------------|-------|--------------|
+| Setup notebook run | `setup/setup.py` (loads `workshop_au.aemo` tables + grants) | All labs |
+| PT endpoint READY (`au_east_llm_inregion`) | Serving (facilitator deploys) | All labs |
+| Vector Search endpoint (`workshop_vs`) + index on `market_notices` | Facilitator | Labs 01, 02, 05 |
+| Genie Space (optional) — set `genie_space_id` widget | Facilitator | Genie routing (labs still run without it) |
+| Lakebase instance (optional) | Facilitator | Lab 01 memory (Delta fallback otherwise) |
+| Databricks CLI + Node.js | Pre-installed in workshop env | Lab 04 only |
 
-**Your device needs no local installs.** All labs run in Databricks notebooks or the Databricks Apps environment. The only exception is Lab 04, which uses the Databricks CLI for app deployment — the CLI is pre-installed in the workshop environment.
+**No local installs on your device** — labs run in Databricks notebooks. Lab 04 uses the
+pre-installed CLI/Node.js for app deployment.
+
+### Config defaults (widgets)
+
+| Widget | Default |
+|--------|---------|
+| `catalog` | `workshop_au` |
+| `schema_aemo` | `aemo` |
+| `pt_endpoint` | `au_east_llm_inregion` |
+| `vs_endpoint` | `workshop_vs` |
+| `genie_space_id` | *(optional)* |
 
 ---
 
-## Package Requirements
+## Packages
 
-The following packages are used across the labs. They are pre-installed in the workshop cluster environment. If you are running this outside the workshop, install them in your notebook or project environment:
+Pre-installed in the workshop cluster; installed at the top of each lab if needed:
 
 ```
-databricks-mcp>=0.2.0
-databricks-langchain>=0.4.0
-databricks-openai>=0.2.0
-langgraph>=0.2.0
-gradio>=4.0.0
-mlflow>=2.14.0
+databricks-langchain     # ChatDatabricks, DatabricksMCPServer, DatabricksMultiServerMCPClient
+langgraph                # create_react_agent (ReAct loop)
+mlflow>=3.0              # tracing + mlflow.genai.evaluate() LLM-judge scorers
+psycopg2-binary          # Lakebase Postgres connection (Lab 01)
+databricks-sdk           # WorkspaceClient, Lakebase credentials, Apps API
 ```
 
-Install with pip if needed:
+MCP server URLs (constructed in each lab from the workspace host):
 
-```bash
-pip install databricks-mcp databricks-langchain databricks-openai langgraph gradio mlflow
+```
+UC Functions   : {HOST}/api/2.0/mcp/functions/{CATALOG}/{SCHEMA_AEMO}
+Genie          : {HOST}/api/2.0/mcp/genie/{GENIE_SPACE_ID}
+Vector Search  : {HOST}/api/2.0/mcp/vector-search/{VS_ENDPOINT}/{CATALOG}/{SCHEMA_AEMO}
 ```
 
 ---
 
-## Lab Sequence
+## Data
 
-| Lab | Title | Duration | Focus |
-|-----|-------|----------|-------|
-| 01 | Agent Architecture & MCP Ecosystem | 30 min | Concepts, UI exploration, tool discovery |
-| 02 | Connecting to Databricks MCP Servers | 40 min | Tool discovery with all three server types |
-| 03 | Building a Multi-Tool ReAct Agent | 45 min | LangGraph + MCP integration, MLflow traces |
-| 04 | Deploying as a Databricks App | 45 min | `app.py`, `app.yaml`, UI deployment |
-| 05 | Monitoring & Governing MCP Agents | 30 min | AI Gateway, audit logs, trace inspection |
+`workshop_au.aemo` sample tables (loaded by `setup/setup.py`):
 
-**Total: ~190 minutes of lab time.** The remaining ~10 minutes covers transitions and setup verification between labs.
+| Table | Contents |
+|-------|----------|
+| `dispatch_intervals` | 5-min generator dispatch by DUID, fuel type, region |
+| `spot_prices` | Regional Reference Price (`rrp`, $/MWh), demand, interchange |
+| `market_notices` | AEMO bulletins incl. LOR1/LOR2/LOR3 events |
+| `generator_registration` | DUIDs, station names, fuel types, registered capacity |
+| `settlement_amounts` | Energy / FCAS / interconnector settlement in AUD |
 
----
+UC Functions used as agent tools (registered by `setup/setup.py` in the `aemo` schema, exposed via
+the UC Functions MCP server): `calculate_peak_demand`, `count_price_spikes`, `get_generator_info`.
 
-## Lab Detail
-
-### Lab 01 — Agent Architecture & the MCP Ecosystem
-
-**File:** `labs/01_agent_architecture_mcp.py`
-**Duration:** 30 minutes
-**Difficulty:** Beginner to Intermediate
-
-Understand why MCP matters for production agents before writing any code. This lab combines a short conceptual walkthrough with hands-on UI exploration: browsing available MCP tools in the Databricks UI, tracing a sample Genie Space query end-to-end, and sketching the architecture you will build across Labs 02–04.
-
-Key exercises:
-- Navigate to the MCP tools explorer in the Databricks UI and identify the three server types
-- Trace a Genie Space query manually in the UI and correlate it with the SQL that was generated
-- Sketch the AEMO Operations Agent architecture (inputs, tool selection logic, outputs, deployment target)
-- Discussion: when should an agent call a UC Function rather than let the LLM calculate? Three concrete examples from NEM operations
-
-No agent code in this lab — the goal is to build the mental model before the implementation.
+The golden evaluation set is `eval/golden_questions.jsonl` — 10 AEMO questions grounded in these
+tables, with `inputs` (question) and `expectations` (`expected_facts` + a directional reference
+answer).
 
 ---
 
-### Lab 02 — Connecting to Databricks MCP Servers
+## The React app
 
-**File:** `labs/02_connecting_mcp_servers.py`
-**Duration:** 40 minutes
-**Difficulty:** Intermediate
-
-Connect to all three MCP server types and call each tool directly (outside of an agent loop) to understand what they return. This lab is essential foundation work — agents that misbehave almost always have a tool integration issue, not a reasoning issue, and understanding the raw tool output makes debugging much faster.
-
-Key exercises:
-- Connect to the Genie Space MCP server and call `genie_query` with three AEMO questions; inspect the returned SQL and result set
-- Connect to the Vector Search MCP server; call `vector_search_query` with two regulatory question strings; inspect the returned document chunks and relevance scores
-- Connect to the UC Functions MCP server; call `execute_function` for `calculate_nem_spot_price` and `calculate_load_factor`; verify the outputs against known values
-- Understand the tool manifest: name, description, input schema, output schema — all of which become the LLM's decision surface in Lab 03
-
-Common issues in this lab:
-- Genie Space not yet set up — see facilitator
-- UC Function permissions — your user needs `EXECUTE` on the function, not just `SELECT` on the catalog
-- Vector Search index not yet built — index creation takes 5–10 minutes; start it at the beginning of the lab
+The deployed app lives in `session4_mcp_agents/app/` (React frontend + Python backend). It wraps the
+same governed agent, uses Lakebase for multi-turn memory where enabled, exposes `/api/health`, and
+runs in AU East as a managed service principal with `CAN_QUERY` on the in-region PT endpoint only.
+Lab 04 builds and deploys it; you do not author app code.
 
 ---
 
-### Lab 03 — Building a Multi-Tool ReAct Agent
+## What you'll have by the end
 
-**File:** `labs/03_react_agent_langgraph.py`
-**Duration:** 45 minutes
-**Difficulty:** Intermediate to Advanced
+- A working ReAct agent over three MCP servers, with conversation memory in Lakebase
+- A repeatable evaluation harness with LLM judges and a growing golden dataset
+- A governed, residency-compliant deployment (AI Gateway, guardrails, audit, least-privilege SP)
+- A live React app your colleagues can use via SSO
+- A closed feedback loop that turns real user corrections into measurable quality improvement
 
-Build the AEMO Operations Agent using LangGraph's ReAct pattern with the three MCP tools from Lab 02. By the end of this lab, the agent can answer multi-step questions that require combining a Genie query (structured data) with a Vector Search lookup (regulatory context) and a UC Function call (computation).
-
-MLflow autolog is enabled from the first cell so every agent run generates a trace you can inspect in the MLflow UI.
-
-Key exercises:
-- Wire the three MCP tools into a LangGraph `ToolNode` and confirm tool definitions appear in the LLM's context
-- Implement the ReAct loop: reason → select tool → call tool → observe result → reason again
-- Test with three multi-step questions requiring at least two tools each:
-  1. "What was the average spot price in VIC1 last Tuesday, and is that above or below the cap defined in the Market Rules?"
-  2. "How many intervals did the Latrobe Valley region have estimated readings last week, and what's the load factor for those intervals?"
-  3. "Show me the dispatch instructions for unit YWPS4 on the last market day and explain the curtailment procedure that applies."
-- Inspect the MLflow trace for question 1: identify each tool call, its inputs, and the reasoning step that selected it
-- Add a system prompt that grounds the agent in AEMO operational context and prevents it from answering questions outside the NEM domain
-
----
-
-### Lab 04 — Deploying as a Databricks App
-
-**File:** `labs/04_databricks_app_deployment.py`
-**Duration:** 45 minutes
-**Difficulty:** Intermediate
-
-Package the agent from Lab 03 as a Databricks App with a Gradio UI. The deployed app is accessible to all workshop participants via a browser URL with Databricks SSO — no additional authentication setup required.
-
-The lab covers both the Python application structure (`app.py`) and the Databricks App configuration (`app.yaml`), and walks through the UI-based deployment workflow in the Databricks workspace.
-
-Key exercises:
-- Structure `app.py`: Gradio `ChatInterface` wrapping the LangGraph agent, streaming responses enabled, session state for multi-turn conversation
-- Write `app.yaml`: resource declarations for the PT endpoint and UC Functions the app needs, compute size (1 CPU recommended for this workload)
-- Deploy via the Databricks Apps UI: navigate to Compute > Apps, create a new app, point at the `session4_mcp_agents/app/` directory
-- Verify deployment: open the app URL, ask a test question, confirm the MLflow trace appears in the MLflow UI
-- Access control: understand how the app inherits Databricks workspace permissions — participants with `CAN_USE` on the app can access it; the app's service principal handles MCP server calls
-
-Common deployment issues:
-- `app.yaml` resource name does not match the endpoint name in the workspace — names must match exactly
-- Gradio version mismatch — pin to the version in `requirements.txt` in the app directory
-- Cold start on first request — the app container initialises on first call; expect 15–30 seconds on first use
-
----
-
-### Lab 05 — Monitoring & Governing MCP Agents
-
-**File:** `labs/05_monitoring_governance.py`
-**Duration:** 30 minutes
-**Difficulty:** Intermediate
-
-A deployed agent that nobody is watching is a governance gap. This lab covers the three layers of agent observability available in Databricks: AI Gateway usage metrics, `system.access.audit` events for MCP tool calls, and MLflow traces for per-request debugging.
-
-Key exercises:
-- Query `system.ai_gateway.usage` to see request counts, latency distribution, and token usage for the agent's PT endpoint since deployment
-- Query `system.access.audit` to find MCP tool call events — correlate a specific Genie Space query back to the agent session that triggered it
-- Open the MLflow experiment for the agent app and filter traces by duration > 10 seconds (these are the slow requests worth investigating)
-- Inspect a trace where the agent made more than three tool calls — identify whether the extra calls were necessary or indicate a prompt improvement opportunity
-- Add a `cost_centre` tag to all traces from the app (one-line change in `app.py`) so usage can be attributed for financial reporting
-
-Discussion: when would you escalate from trace inspection to a full evaluation run? What would trigger a rollback of the deployed agent?
-
----
-
-## What You Will Have Built by the End
-
-By the end of this workshop, you will have:
-
-- A production-quality AI agent that calls three different Databricks MCP server types in a single reasoning loop
-- A deployed Databricks App accessible via browser with Databricks SSO — shareable with business users immediately
-- Full MLflow tracing on every agent run, queryable via the MLflow UI and `system.access.audit`
-- AI Gateway governance on the agent's LLM calls — rate limits, usage metrics, and cross-geo blocking in place
-- An `app.py` + `app.yaml` pattern you can adapt for other domains and other MCP tool combinations
-
-The AEMO Operations Agent code lives in `session4_mcp_agents/app/` and is ready to be copied to your organisation's repository as a starting point for a real deployment.
-
----
-
-## Facilitator Notes
-
-See `facilitator_notes/` for:
-- Pre-workshop setup checklist (Genie Space verification, Vector Search index build, UC Function permissions)
-- Known issues and mitigations for each lab
-- Timing guidance: Labs 02 and 03 routinely run long if the Genie Space or Vector Search index is not pre-warmed
-- Extension exercises for fast finishers in Labs 03 and 04
-
----
-
-## AU East Residency Reference
-
-Quick reference for questions that arise on the day. Status as of May 2026.
-
-| Feature | Residency | Notes |
-|---------|-----------|-------|
-| MCP — Genie Space server | In-region (AU East) | All 5 MCP server types confirmed in-region |
-| MCP — Vector Search server | In-region (AU East) | |
-| MCP — UC Functions server | In-region (AU East) | |
-| MCP — Model Serving server | In-region (AU East) | |
-| MCP — UC AI Gateway server | In-region (AU East) | |
-| LangGraph (open-source, runs in notebook) | In-region | Library runs on cluster/serverless; no external calls |
-| MLflow tracing | In-region (AU East) | Traces stored in workspace-local MLflow tracking server |
-| Databricks Apps | In-region (AU East) | App container runs in AU East; Gradio traffic stays in-region |
-| FMAPI Pay-Per-Token | **Cross-geo** | **Do not use as the agent's LLM backend** |
-
----
-
-## Next Steps After This Workshop
-
-- Adapt the AEMO Operations Agent for your domain: swap the Genie Space, Vector Search index, and UC Functions for your own data and tools
-- Review the AI Gateway configuration from Session 2 — all agent LLM calls should route through the gateway, not directly to the endpoint
-- Consider adding an evaluation harness: use the `labs/solutions/` examples as your golden dataset and add MLflow `mlflow.evaluate()` to measure answer quality over time
-- If your organisation uses Databricks Agent Bricks, the patterns from this workshop apply directly — Agent Bricks uses the same MCP tool integration under the hood
+Everything runs in **Azure Australia East** on an **in-region PT endpoint** — no cross-geo inference.

@@ -4,24 +4,24 @@
 
 # MAGIC %md
 # MAGIC <div style="background: linear-gradient(135deg, #1B3139 0%, #243447 100%); padding: 28px 32px; border-radius: 10px; margin-bottom: 8px;">
-# MAGIC <h1 style="color: #FF6B35; margin: 0 0 8px 0; font-size: 2em; font-family: 'DM Sans', sans-serif;">
-# MAGIC Lab 01: Custom Instructions for AEMO
-# MAGIC </h1>
-# MAGIC <p style="color: #AECBCC; margin: 0; font-size: 1em;">
-# MAGIC Session 5: Extending Genie Code — AEMO Workshop · Australia East
-# MAGIC </p>
+# MAGIC   <h1 style="color: #FF6B35; margin: 0 0 8px 0; font-size: 2em; font-family: 'DM Sans', sans-serif;">
+# MAGIC     Lab 01: Custom Instructions for AEMO
+# MAGIC   </h1>
+# MAGIC   <p style="color: #AECBCC; margin: 0; font-size: 1em;">
+# MAGIC     Session 5: Extending Genie Code — AEMO Workshop · Australia East
+# MAGIC   </p>
 # MAGIC </div>
 # MAGIC
 # MAGIC <div style="display: flex; gap: 12px; margin-top: 16px; flex-wrap: wrap;">
-# MAGIC <div style="background: #f0f4ff; border-left: 4px solid #1B3A6B; padding: 12px 18px; border-radius: 6px; flex: 1; min-width: 160px;">
-# MAGIC <strong style="color: #1B3A6B;">Duration</strong><br>20 minutes
-# MAGIC </div>
-# MAGIC <div style="background: #fff4f0; border-left: 4px solid #FF3621; padding: 12px 18px; border-radius: 6px; flex: 1; min-width: 160px;">
-# MAGIC <strong style="color: #FF3621;">Prerequisites</strong><br>Session 2 complete, Genie Code enabled
-# MAGIC </div>
-# MAGIC <div style="background: #f0fff4; border-left: 4px solid #00843D; padding: 12px 18px; border-radius: 6px; flex: 1; min-width: 160px;">
-# MAGIC <strong style="color: #00843D;">Data residency</strong><br>All Genie Code inference: AU East
-# MAGIC </div>
+# MAGIC   <div style="background: #f0f4ff; border-left: 4px solid #1B3A6B; padding: 12px 18px; border-radius: 6px; flex: 1; min-width: 160px;">
+# MAGIC     <strong style="color: #1B3A6B;">Duration</strong><br>20 minutes
+# MAGIC   </div>
+# MAGIC   <div style="background: #fff4f0; border-left: 4px solid #FF3621; padding: 12px 18px; border-radius: 6px; flex: 1; min-width: 160px;">
+# MAGIC     <strong style="color: #FF3621;">Prerequisites</strong><br>Session 2 complete, Genie Code enabled
+# MAGIC   </div>
+# MAGIC   <div style="background: #f0fff4; border-left: 4px solid #00843D; padding: 12px 18px; border-radius: 6px; flex: 1; min-width: 160px;">
+# MAGIC     <strong style="color: #00843D;">Data residency</strong><br>All Genie Code inference: AU East
+# MAGIC   </div>
 # MAGIC </div>
 # MAGIC
 # MAGIC ### What you will do
@@ -141,8 +141,8 @@ Do NOT use: NSW, VIC, QLD, SA, TAS, New South Wales, etc.
 
 result = dbutils.fs.put(instructions_path, instructions_content, overwrite=True)
 print(f"Written to: {instructions_path}")
-print(f"Result : {result}")
-print(f"\nLength : {len(instructions_content):,} characters (budget: 20,000 total)")
+print(f"Result    : {result}")
+print(f"\nLength    : {len(instructions_content):,} characters (budget: 20,000 total)")
 
 # COMMAND ----------
 
@@ -169,14 +169,14 @@ files = dbutils.fs.ls(user_folder)
 assistant_files = [f for f in files if ".assistant" in f.name or "instructions" in f.name]
 
 if assistant_files:
- print("Assistant-related files in your user folder:")
- for f in assistant_files:
- print(f" {f.path} ({f.size:,} bytes)")
+    print("Assistant-related files in your user folder:")
+    for f in assistant_files:
+        print(f"  {f.path}  ({f.size:,} bytes)")
 else:
- print("No assistant files yet — the instructions file you just created is the first one.")
- print(f"\nAll files in {user_folder}:")
- for f in files[:10]:
- print(f" {f.name}")
+    print("No assistant files yet — the instructions file you just created is the first one.")
+    print(f"\nAll files in {user_folder}:")
+    for f in files[:10]:
+        print(f"  {f.name}")
 
 # COMMAND ----------
 
@@ -222,10 +222,10 @@ Dates: DD/MM/YYYY | Times: HH:MM AEST/AEDT | Energy: MWh | Prices: $/MWh (2 dp)
 print("--- Workspace instructions preview (admin sets this once) ---")
 print(workspace_instructions_preview)
 print("\nTo write this as admin:")
-print(" 1. Workspace UI → Files → navigate to root")
-print(" 2. Create file: .assistant_workspace_instructions.md")
-print(" 3. Paste the content above")
-print(" 4. Save — all users in the workspace will have this context automatically.")
+print("  1. Workspace UI → Files → navigate to root")
+print("  2. Create file: .assistant_workspace_instructions.md")
+print("  3. Paste the content above")
+print("  4. Save — all users in the workspace will have this context automatically.")
 
 # COMMAND ----------
 
@@ -290,7 +290,7 @@ print(" 4. Save — all users in the workspace will have this context automatica
 additional_content = "\n\n## Team conventions\n- Prefer window functions over self-joins for time-series rolling calculations\n- Add a COMMENT block to every SQL query explaining the business intent\n- UC function COMMENT fields should include 'Use this when asked about...' for LLM discoverability\n"
 
 existing = dbutils.fs.head(instructions_path)
-updated = existing + additional_content
+updated  = existing + additional_content
 
 dbutils.fs.put(instructions_path, updated, overwrite=True)
 print(f"Instructions updated: {len(updated):,} characters total")
@@ -300,26 +300,26 @@ print(f"New section added: ## Team conventions")
 
 # MAGIC %md
 # MAGIC <div style="background: linear-gradient(135deg, #00843D 0%, #1B3A6B 100%); color: white; padding: 20px 24px; border-radius: 10px; margin-top: 24px;">
-# MAGIC <h2 style="color: white; margin: 0 0 10px 0; font-family: 'DM Sans', sans-serif;">Lab 01 Complete — 20 minutes</h2>
-# MAGIC <table style="color: white; width: 100%; border-collapse: collapse; font-size: 0.95em;">
-# MAGIC <tr style="border-bottom: 1px solid rgba(255,255,255,0.2);">
-# MAGIC <td style="padding: 6px 10px; font-weight: bold; width: 40%;">Personal instructions</td>
-# MAGIC <td style="padding: 6px 10px;">Written to <code style="color:#FF6B35;">/Users/{username}/.assistant_instructions.md</code></td>
-# MAGIC </tr>
-# MAGIC <tr style="border-bottom: 1px solid rgba(255,255,255,0.2);">
-# MAGIC <td style="padding: 6px 10px; font-weight: bold;">AEMO context loaded</td>
-# MAGIC <td style="padding: 6px 10px;">NMI format, region codes, $/MWh pricing, DD/MM/YYYY dates, table paths</td>
-# MAGIC </tr>
-# MAGIC <tr style="border-bottom: 1px solid rgba(255,255,255,0.2);">
-# MAGIC <td style="padding: 6px 10px; font-weight: bold;">Workspace pattern seen</td>
-# MAGIC <td style="padding: 6px 10px;">Admin sets once at <code style="color:#FF6B35;">Workspace/.assistant_workspace_instructions.md</code></td>
-# MAGIC </tr>
-# MAGIC <tr>
-# MAGIC <td style="padding: 6px 10px; font-weight: bold;">Tested</td>
-# MAGIC <td style="padding: 6px 10px;">Genie Code uses VIC1, workshop_au.aemo.spot_prices, DD/MM/YYYY without prompting</td>
-# MAGIC </tr>
-# MAGIC </table>
-# MAGIC <p style="color: rgba(255,255,255,0.85); margin: 14px 0 0 0; font-weight: bold;">
-# MAGIC Next: Lab 02 — Skills Walkthrough (30 min)
-# MAGIC </p>
+# MAGIC   <h2 style="color: white; margin: 0 0 10px 0; font-family: 'DM Sans', sans-serif;">Lab 01 Complete — 20 minutes</h2>
+# MAGIC   <table style="color: white; width: 100%; border-collapse: collapse; font-size: 0.95em;">
+# MAGIC     <tr style="border-bottom: 1px solid rgba(255,255,255,0.2);">
+# MAGIC       <td style="padding: 6px 10px; font-weight: bold; width: 40%;">Personal instructions</td>
+# MAGIC       <td style="padding: 6px 10px;">Written to <code style="color:#FF6B35;">/Users/{username}/.assistant_instructions.md</code></td>
+# MAGIC     </tr>
+# MAGIC     <tr style="border-bottom: 1px solid rgba(255,255,255,0.2);">
+# MAGIC       <td style="padding: 6px 10px; font-weight: bold;">AEMO context loaded</td>
+# MAGIC       <td style="padding: 6px 10px;">NMI format, region codes, $/MWh pricing, DD/MM/YYYY dates, table paths</td>
+# MAGIC     </tr>
+# MAGIC     <tr style="border-bottom: 1px solid rgba(255,255,255,0.2);">
+# MAGIC       <td style="padding: 6px 10px; font-weight: bold;">Workspace pattern seen</td>
+# MAGIC       <td style="padding: 6px 10px;">Admin sets once at <code style="color:#FF6B35;">Workspace/.assistant_workspace_instructions.md</code></td>
+# MAGIC     </tr>
+# MAGIC     <tr>
+# MAGIC       <td style="padding: 6px 10px; font-weight: bold;">Tested</td>
+# MAGIC       <td style="padding: 6px 10px;">Genie Code uses VIC1, workshop_au.aemo.spot_prices, DD/MM/YYYY without prompting</td>
+# MAGIC     </tr>
+# MAGIC   </table>
+# MAGIC   <p style="color: rgba(255,255,255,0.85); margin: 14px 0 0 0; font-weight: bold;">
+# MAGIC     Next: Lab 02 — Skills Walkthrough (30 min)
+# MAGIC   </p>
 # MAGIC </div>

@@ -1,0 +1,27 @@
+command: ["python", "server.py"]
+
+env:
+  - name: PT_ENDPOINT
+    value: au_east_llm_inregion
+  - name: CATALOG
+    value: workshop_au
+  - name: SCHEMA_AEMO
+    value: aemo
+  - name: VS_ENDPOINT
+    value: workshop_vs
+  # Vector Search index (3-part name). Uncomment/adjust if your index name
+  # differs from the default {CATALOG}.{SCHEMA_AEMO}.aemo_market_notices_index.
+  # - name: VS_INDEX
+  #   value: workshop_au.aemo.aemo_market_notices_index
+  # GENIE_SPACE_ID: set this via the UI Environment tab after deployment,
+  # or uncomment the lines below and fill in your Space ID. Leave empty to
+  # run with UC Functions + Vector Search only.
+  # - name: GENIE_SPACE_ID
+  #   value: FILL_IN
+
+resources:
+  - name: aemo-pt-endpoint
+    description: In-region (Australia East) provisioned-throughput endpoint for the AEMO agent LLM calls
+    serving_endpoint:
+      name: au_east_llm_inregion
+      permission: CAN_QUERY

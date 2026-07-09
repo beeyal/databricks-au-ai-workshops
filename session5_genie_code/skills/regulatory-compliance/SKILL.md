@@ -1,13 +1,13 @@
 ---
 name: regulatory-compliance
-description: Australian energy sector regulatory context for Databricks AI features — SOCI Act 2018 critical infrastructure obligations, AER reporting requirements, AESCSF cyber security framework, Privacy Act 1988, data residency classification, and audit evidence patterns for AEMO, APA, and DNOs
+description: Australian energy sector regulatory context for Databricks AI features — critical infrastructure obligations, AER reporting requirements, AESCSF cyber security framework, Privacy Act 1988, data residency classification, and audit evidence patterns for AEMO, APA, and DNOs
 ---
 
 # Australian Energy Sector Regulatory Compliance
 
-Use this skill when working with energy sector entities governed by the **SOCI Act 2018** and **AER** regulatory framework: AEMO, APA Group, AusNet, Ausgrid, Endeavour Energy, and other DNOs, TNSPs, or market participants.
+Use this skill when working with energy sector entities governed by Australian critical-infrastructure and **AER** regulatory frameworks: AEMO, APA Group, AusNet, Ausgrid, Endeavour Energy, and other DNOs, TNSPs, or market participants.
 
-> **APRA does not apply to energy sector entities.** APRA governs banks, insurers, and superannuation funds. AEMO, APA, and Australian DNOs are regulated under the SOCI Act, NER, and state energy legislation — not APRA CPS 230/234.
+> **APRA does not apply to energy sector entities.** APRA governs banks, insurers, and superannuation funds. AEMO, APA, and Australian DNOs are regulated under Australian critical-infrastructure law, the NER, and state energy legislation — not APRA CPS 230/234.
 
 ---
 
@@ -15,7 +15,7 @@ Use this skill when working with energy sector entities governed by the **SOCI A
 
 | Framework | Body | What it covers |
 |-----------|------|---------------|
-| SOCI Act 2018 (Cth) | Home Affairs / ASD | Critical infrastructure protection; sector-specific risk management programs (CIRMP) mandatory from Aug 2024 |
+| Critical Infrastructure protection law (Cth) | Home Affairs / ASD | Critical infrastructure protection; sector-specific risk management programs (CIRMP) mandatory from Aug 2024 |
 | AESCSF | AEMO + ASD | Australian Energy Sector Cyber Security Framework — 4-tier maturity model; applies to all NEM participants |
 | Privacy Act 1988 (Cth) | OAIC | APPs covering NMI/customer data; Australian Privacy Principles 6, 11 key for meter data |
 | NER / NERL | AER | National Electricity Rules and Retail Law; Chapter 7 data retention (7 years) |
@@ -59,11 +59,11 @@ Use this skill when working with energy sector entities governed by the **SOCI A
 | Knowledge Assistant (KA) | No committed AU East date as of Jun 2026 | Use Genie Spaces Agent mode instead |
 | Multi-Agent Supervisor (MAS) | No committed AU East date as of Jun 2026 | Build with LangGraph + Databricks MCP |
 
-> **Enforce residency:** Enable "Enforce data processing within workspace Geography" in Account Console → Workspaces → Security and Compliance. This blocks cross-geo AI calls at the platform level — mandatory for SOCI Act CIRMP compliance.
+> **Enforce residency:** Enable "Enforce data processing within workspace Geography" in Account Console → Workspaces → Security and Compliance. This blocks cross-geo AI calls at the platform level — mandatory for critical-infrastructure risk-management (CIRMP) compliance.
 
 ---
 
-## SOCI Act 2018 — Critical Infrastructure Risk Management
+## Critical Infrastructure Risk Management
 
 ### CIRMP Obligations (from Aug 2024)
 
@@ -78,7 +78,7 @@ Responsible entities for critical infrastructure assets (electricity generation 
 
 ### Databricks as a Critical Dependency
 
-If Databricks supports operational systems (e.g. market settlement analysis, dispatch forecasting, outage management), it is a **critical dependency** under SOCI Act CIRMP:
+If Databricks supports operational systems (e.g. market settlement analysis, dispatch forecasting, outage management), it is a **critical dependency** under critical-infrastructure risk-management (CIRMP) obligations:
 - Document Databricks in the supply chain risk section of your CIRMP
 - Maintain a business continuity plan for Databricks unavailability
 - Include Databricks model/feature updates in your change management process
