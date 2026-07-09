@@ -158,6 +158,48 @@ for icon, tbl, msg in results:
 # COMMAND ----------
 
 # MAGIC %md
+# MAGIC ## Step 2b: Shift sample dates to "now"
+# MAGIC The sample CSVs carry fixed 2025 dates. So that relative-time queries
+# MAGIC ("last 30 days", "yesterday") work **whenever** the workshop is run, shift every
+# MAGIC date/timestamp column forward by one global offset so the latest operational
+# MAGIC interval lands on today. Genie and the UC functions both depend on this. Re-run
+# MAGIC the loader (Step 2) before re-shifting if you run setup more than once.
+
+# COMMAND ----------
+
+# (table, column, date_only?) for every temporal column across the AEMO tables.
+DATE_COLUMNS = [
+    ("spot_prices",        "settlement_date",      False),
+    ("dispatch_intervals", "settlement_date",      False),
+    ("market_notices",     "issue_time",           False),
+    ("market_notices",     "effective_date",       False),
+    ("settlement_amounts", "settlement_date",      True),
+    ("constraint_sets",    "activated_datetime",   False),
+    ("constraint_sets",    "deactivated_datetime", False),
+]
+
+# One global offset (days), computed from the newest operational interval, so all
+# tables keep their relative timing after the shift.
+offset = spark.sql(
+    f"SELECT datediff(current_date(), max(to_date(settlement_date))) AS d "
+    f"FROM {CATALOG}.{SCHEMA_AEMO}.spot_prices"
+).collect()[0]["d"]
+
+if offset and offset > 0:
+    for table, col, date_only in DATE_COLUMNS:
+        fqn  = f"{CATALOG}.{SCHEMA_AEMO}.{table}"
+        expr = f"date_add({col}, {offset})" if date_only else f"{col} + make_dt_interval({offset})"
+        try:
+            spark.sql(f"UPDATE {fqn} SET {col} = {expr} WHERE {col} IS NOT NULL")
+        except Exception as e:
+            print(f"  ⚠️  {table}.{col}: {e}")
+    print(f"✅ Shifted all sample dates forward by {offset} days — latest interval is now ~today")
+else:
+    print(f"Sample data already current (offset={offset}); no shift applied")
+
+# COMMAND ----------
+
+# MAGIC %md
 # MAGIC ## Step 3: Set column comments
 
 # COMMAND ----------

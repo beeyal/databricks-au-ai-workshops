@@ -1,6 +1,14 @@
 command: ["python", "server.py"]
 
 env:
+  # The agent LLM. MUST be an in-region PT endpoint (residency) AND must serve a
+  # model that supports tool/function calling. Note: some Databricks Claude
+  # endpoints reject the ReAct tool-result payload (databricks-langchain sends a
+  # tool_result block with an extra `id` field that the Anthropic-format endpoint
+  # refuses). If your PT endpoint serves Claude and you hit
+  # "tool_result...id: Extra inputs are not permitted", point PT_ENDPOINT at an
+  # OpenAI-format tool-calling model (e.g. a Llama or GPT-OSS PT endpoint) or
+  # upgrade databricks-langchain. Verified working with Llama-3.3-70B.
   - name: PT_ENDPOINT
     value: au_east_llm_inregion
   - name: CATALOG
