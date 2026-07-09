@@ -4,24 +4,24 @@
 
 # MAGIC %md
 # MAGIC <div style="background: linear-gradient(135deg, #1B3139 0%, #243447 100%); padding: 28px 32px; border-radius: 10px; margin-bottom: 8px;">
-# MAGIC <h1 style="color: #FF6B35; margin: 0 0 8px 0; font-size: 2em; font-family: 'DM Sans', sans-serif;">
-# MAGIC Lab 03: MCP Introduction
-# MAGIC </h1>
-# MAGIC <p style="color: #AECBCC; margin: 0; font-size: 1em;">
-# MAGIC Session 5: Extending Genie Code — AEMO Workshop · Australia East
-# MAGIC </p>
+# MAGIC   <h1 style="color: #FF6B35; margin: 0 0 8px 0; font-size: 2em; font-family: 'DM Sans', sans-serif;">
+# MAGIC     Lab 03: MCP Introduction
+# MAGIC   </h1>
+# MAGIC   <p style="color: #AECBCC; margin: 0; font-size: 1em;">
+# MAGIC     Session 5: Extending Genie Code — AEMO Workshop · Australia East
+# MAGIC   </p>
 # MAGIC </div>
 # MAGIC
 # MAGIC <div style="display: flex; gap: 12px; margin-top: 16px; flex-wrap: wrap;">
-# MAGIC <div style="background: #f0f4ff; border-left: 4px solid #1B3A6B; padding: 12px 18px; border-radius: 6px; flex: 1; min-width: 160px;">
-# MAGIC <strong style="color: #1B3A6B;">Duration</strong><br>10 minutes
-# MAGIC </div>
-# MAGIC <div style="background: #fff4f0; border-left: 4px solid #FF3621; padding: 12px 18px; border-radius: 6px; flex: 1; min-width: 160px;">
-# MAGIC <strong style="color: #FF3621;">Prerequisites</strong><br>Labs 01 and 02 complete
-# MAGIC </div>
-# MAGIC <div style="background: #f0fff4; border-left: 4px solid #00843D; padding: 12px 18px; border-radius: 6px; flex: 1; min-width: 160px;">
-# MAGIC <strong style="color: #00843D;">Data residency</strong><br>All MCP servers: AU East
-# MAGIC </div>
+# MAGIC   <div style="background: #f0f4ff; border-left: 4px solid #1B3A6B; padding: 12px 18px; border-radius: 6px; flex: 1; min-width: 160px;">
+# MAGIC     <strong style="color: #1B3A6B;">Duration</strong><br>10 minutes
+# MAGIC   </div>
+# MAGIC   <div style="background: #fff4f0; border-left: 4px solid #FF3621; padding: 12px 18px; border-radius: 6px; flex: 1; min-width: 160px;">
+# MAGIC     <strong style="color: #FF3621;">Prerequisites</strong><br>Labs 01 and 02 complete
+# MAGIC   </div>
+# MAGIC   <div style="background: #f0fff4; border-left: 4px solid #00843D; padding: 12px 18px; border-radius: 6px; flex: 1; min-width: 160px;">
+# MAGIC     <strong style="color: #00843D;">Data residency</strong><br>All MCP servers: AU East
+# MAGIC   </div>
 # MAGIC </div>
 # MAGIC
 # MAGIC ### What you will do
@@ -51,13 +51,13 @@
 # MAGIC MCP is to AI agents what USB-C is to devices: **one standard plug that works everywhere**.
 # MAGIC
 # MAGIC ```
-# MAGIC Without MCP With MCP
-# MAGIC ┌─────────────────────────────┐ ┌─────────────────────────────┐
-# MAGIC │ Agent A ─────► Custom SDK │ │ Agent A ─────────┐ │
-# MAGIC │ Agent B ─────► REST wrapper │ │ Agent B ─────────┼──► MCP │
-# MAGIC │ Agent C ─────► Bespoke auth │ │ Agent C ─────────┘ Server│
-# MAGIC │ (each connection unique) │ │ (one interface — any agent)│
-# MAGIC └─────────────────────────────┘ └─────────────────────────────┘
+# MAGIC  Without MCP                          With MCP
+# MAGIC ┌─────────────────────────────┐      ┌─────────────────────────────┐
+# MAGIC │ Agent A ─────► Custom SDK   │      │  Agent A ─────────┐         │
+# MAGIC │ Agent B ─────► REST wrapper │      │  Agent B ─────────┼──► MCP  │
+# MAGIC │ Agent C ─────► Bespoke auth │      │  Agent C ─────────┘   Server│
+# MAGIC │ (each connection unique)    │      │  (one interface — any agent)│
+# MAGIC └─────────────────────────────┘      └─────────────────────────────┘
 # MAGIC ```
 # MAGIC
 # MAGIC ### What MCP gives an AI agent
@@ -106,12 +106,12 @@
 # MAGIC ### How they relate to what you built today
 # MAGIC
 # MAGIC ```
-# MAGIC Lab 01 — Custom Instructions → every conversation
-# MAGIC Lab 02 — Skills → on-demand reference
-# MAGIC Lab 03 — MCP: UC Functions / Genie / VS → executable tools + live data
+# MAGIC  Lab 01 — Custom Instructions                 →  every conversation
+# MAGIC  Lab 02 — Skills                              →  on-demand reference
+# MAGIC  Lab 03 — MCP: UC Functions / Genie / VS      →  executable tools + live data
 # MAGIC
-# MAGIC Skills inform the agent WHAT to do.
-# MAGIC MCP tools give the agent something to DO IT WITH.
+# MAGIC  Skills inform the agent WHAT to do.
+# MAGIC  MCP tools give the agent something to DO IT WITH.
 # MAGIC ```
 # MAGIC
 # MAGIC ### Authentication
@@ -134,23 +134,26 @@
 
 # COMMAND ----------
 
-%pip install databricks-mcp --quiet
-dbutils.library.restartPython()
+# MAGIC %pip install databricks-mcp --quiet
+
+# COMMAND ----------
+
+# MAGIC %restart_python
 
 # COMMAND ----------
 
 dbutils.widgets.text("catalog", "workshop_au", "Catalog name")
-dbutils.widgets.text("schema", "aemo", "Schema name")
+dbutils.widgets.text("schema",  "aemo",        "Schema name")
 
 CATALOG = dbutils.widgets.get("catalog")
-SCHEMA = dbutils.widgets.get("schema")
+SCHEMA  = dbutils.widgets.get("schema")
 
 from databricks.sdk import WorkspaceClient
 w = WorkspaceClient()
 HOST = w.config.host.rstrip("/")
 
 print(f"Workspace: {HOST}")
-print(f"Schema : {CATALOG}.{SCHEMA}")
+print(f"Schema   : {CATALOG}.{SCHEMA}")
 
 # COMMAND ----------
 
@@ -161,7 +164,7 @@ print(f"Schema : {CATALOG}.{SCHEMA}")
 
 from databricks_mcp import DatabricksMCPClient
 
-url = f"{HOST}/api/2.0/mcp/functions/{CATALOG}/{SCHEMA}"
+url    = f"{HOST}/api/2.0/mcp/functions/{CATALOG}/{SCHEMA}"
 client = DatabricksMCPClient(url, w)
 
 print(f"Connecting to MCP server: {url}\n")
@@ -169,17 +172,17 @@ print(f"Connecting to MCP server: {url}\n")
 tools = client.list_tools()
 
 if not tools:
- print("No tools found in this schema.")
- print("This is expected if workshop_au.aemo has no UC functions registered yet.")
- print("\nIf you completed the full skills lab and want to see tools, try:")
- print(f" url = f\"{HOST}/api/2.0/mcp/functions/workshop_au/workshop_lab\"")
+    print("No tools found in this schema.")
+    print("This is expected if workshop_au.aemo has no UC functions registered yet.")
+    print("\nIf you completed the full skills lab and want to see tools, try:")
+    print(f"  url = f\"{HOST}/api/2.0/mcp/functions/workshop_au/workshop_lab\"")
 else:
- print(f"Found {len(tools)} tool(s) in {CATALOG}.{SCHEMA}:\n")
- for tool in tools:
- print(f" Tool: {tool.name}")
- if hasattr(tool, "description") and tool.description:
- print(f" Desc: {tool.description[:100]}...")
- print()
+    print(f"Found {len(tools)} tool(s) in {CATALOG}.{SCHEMA}:\n")
+    for tool in tools:
+        print(f"  Tool: {tool.name}")
+        if hasattr(tool, "description") and tool.description:
+            print(f"  Desc: {tool.description[:100]}...")
+        print()
 
 # COMMAND ----------
 
@@ -190,7 +193,7 @@ else:
 # MAGIC Databricks converts dots to double underscores:
 # MAGIC
 # MAGIC ```
-# MAGIC UC function: workshop_au.aemo.calculate_peak_demand
+# MAGIC UC function:  workshop_au.aemo.calculate_peak_demand
 # MAGIC MCP tool name: workshop_au__aemo__calculate_peak_demand
 # MAGIC ```
 # MAGIC
@@ -219,26 +222,26 @@ else:
 # COMMAND ----------
 
 # Optional — replace with your Genie Space ID to verify its MCP endpoint
-GENIE_SPACE_ID = "" # e.g. "01ef1234abcd5678ef90"
+GENIE_SPACE_ID = ""  # e.g. "01ef1234abcd5678ef90"
 
 if GENIE_SPACE_ID:
- genie_url = f"{HOST}/api/2.0/mcp/genie/{GENIE_SPACE_ID}"
- genie_client = DatabricksMCPClient(genie_url, w)
- genie_tools = genie_client.list_tools()
+    genie_url    = f"{HOST}/api/2.0/mcp/genie/{GENIE_SPACE_ID}"
+    genie_client = DatabricksMCPClient(genie_url, w)
+    genie_tools  = genie_client.list_tools()
 
- print(f"Genie Space MCP endpoint: {genie_url}")
- print(f"Tools exposed: {len(genie_tools)}\n")
- for tool in genie_tools:
- print(f" Tool: {tool.name}")
- if hasattr(tool, "description") and tool.description:
- print(f" Desc: {tool.description}")
+    print(f"Genie Space MCP endpoint: {genie_url}")
+    print(f"Tools exposed: {len(genie_tools)}\n")
+    for tool in genie_tools:
+        print(f"  Tool: {tool.name}")
+        if hasattr(tool, "description") and tool.description:
+            print(f"  Desc: {tool.description}")
 else:
- print("GENIE_SPACE_ID is empty — set it to verify your Genie Space MCP endpoint.")
- print("\nA Genie Space MCP server always exposes exactly one tool:")
- print(" Tool name : ask_question (or similar NL-to-SQL wrapper)")
- print(" Input : question (STRING) — the natural language query")
- print(" Output : query results as structured JSON")
- print("\nThis is how a LangGraph agent would call your Genie Space as one node in a pipeline.")
+    print("GENIE_SPACE_ID is empty — set it to verify your Genie Space MCP endpoint.")
+    print("\nA Genie Space MCP server always exposes exactly one tool:")
+    print("  Tool name : ask_question (or similar NL-to-SQL wrapper)")
+    print("  Input     : question (STRING) — the natural language query")
+    print("  Output    : query results as structured JSON")
+    print("\nThis is how a LangGraph agent would call your Genie Space as one node in a pipeline.")
 
 # COMMAND ----------
 
@@ -258,26 +261,26 @@ else:
 # MAGIC
 # MAGIC ```
 # MAGIC ┌──────────────────────────────────────────────────────────────────────────┐
-# MAGIC │ Session 5: Extending Genie Code │
-# MAGIC │ │
-# MAGIC │ Lab 01 — Custom Instructions │
-# MAGIC │ "What Genie knows about your domain by default" │
-# MAGIC │ → AEMO terminology, region codes, table paths, regulatory context │
-# MAGIC │ → Personal: /Users/{email}/.assistant_instructions.md │
-# MAGIC │ │
-# MAGIC │ Lab 02 — Skills │
-# MAGIC │ "Deep reference loaded on demand" │
-# MAGIC │ → energy-analytics: SAIDI/SAIFI formulas, SQL patterns │
-# MAGIC │ → regulatory-compliance: Australian regulatory requirements, Privacy Act, STPIS │
-# MAGIC │ → genie-space-creator: REST API walkthrough, golden queries │
-# MAGIC │ → Auto-loaded by keyword match or @skill-name invocation │
-# MAGIC │ │
-# MAGIC │ Lab 03 — MCP (this lab) │
-# MAGIC │ "Executable tools — real code runs against real data" │
-# MAGIC │ → UC Functions MCP: Python/SQL functions as callable tools │
-# MAGIC │ → Genie Space MCP: NL-to-SQL for any agent framework │
-# MAGIC │ → Vector Search MCP: semantic search over documents │
-# MAGIC │ → All in-region (Azure Australia East) │
+# MAGIC │  Session 5: Extending Genie Code                                         │
+# MAGIC │                                                                          │
+# MAGIC │  Lab 01 — Custom Instructions                                            │
+# MAGIC │  "What Genie knows about your domain by default"                         │
+# MAGIC │  → AEMO terminology, region codes, table paths, regulatory context       │
+# MAGIC │  → Personal: /Users/{email}/.assistant_instructions.md                  │
+# MAGIC │                                                                          │
+# MAGIC │  Lab 02 — Skills                                                         │
+# MAGIC │  "Deep reference loaded on demand"                                       │
+# MAGIC │  → energy-analytics: SAIDI/SAIFI formulas, SQL patterns                 │
+# MAGIC │  → regulatory-compliance: Australian regulatory requirements, Privacy Act, STPIS                  │
+# MAGIC │  → genie-space-creator: REST API walkthrough, golden queries             │
+# MAGIC │  → Auto-loaded by keyword match or @skill-name invocation                │
+# MAGIC │                                                                          │
+# MAGIC │  Lab 03 — MCP (this lab)                                                 │
+# MAGIC │  "Executable tools — real code runs against real data"                   │
+# MAGIC │  → UC Functions MCP: Python/SQL functions as callable tools              │
+# MAGIC │  → Genie Space MCP: NL-to-SQL for any agent framework                   │
+# MAGIC │  → Vector Search MCP: semantic search over documents                    │
+# MAGIC │  → All in-region (Azure Australia East)                                  │
 # MAGIC └──────────────────────────────────────────────────────────────────────────┘
 # MAGIC ```
 
@@ -285,23 +288,23 @@ else:
 
 # MAGIC %md
 # MAGIC <div style="background: linear-gradient(135deg, #00843D 0%, #1B3A6B 100%); color: white; padding: 20px 24px; border-radius: 10px; margin-top: 24px;">
-# MAGIC <h2 style="color: white; margin: 0 0 10px 0; font-family: 'DM Sans', sans-serif;">Lab 03 Complete — Session 5 Done</h2>
-# MAGIC <table style="color: white; width: 100%; border-collapse: collapse; font-size: 0.95em;">
-# MAGIC <tr style="border-bottom: 1px solid rgba(255,255,255,0.2);">
-# MAGIC <td style="padding: 6px 10px; font-weight: bold; width: 35%;">MCP concept</td>
-# MAGIC <td style="padding: 6px 10px;">Open standard — any MCP-compatible agent can reach your AEMO tools with no custom integration</td>
-# MAGIC </tr>
-# MAGIC <tr style="border-bottom: 1px solid rgba(255,255,255,0.2);">
-# MAGIC <td style="padding: 6px 10px; font-weight: bold;">Three in-region servers</td>
-# MAGIC <td style="padding: 6px 10px;">UC Functions (calculations) · Genie Space (NL-to-SQL) · Vector Search (documents)</td>
-# MAGIC </tr>
-# MAGIC <tr style="border-bottom: 1px solid rgba(255,255,255,0.2);">
-# MAGIC <td style="padding: 6px 10px; font-weight: bold;">Tool discovery</td>
-# MAGIC <td style="padding: 6px 10px;"><code style="color:#FF6B35;">DatabricksMCPClient.list_tools()</code> — the same list an agent sees before deciding what to call</td>
-# MAGIC </tr>
-# MAGIC <tr>
-# MAGIC <td style="padding: 6px 10px; font-weight: bold;">Next session</td>
-# MAGIC <td style="padding: 6px 10px;">Session 4 — build a full multi-tool LangGraph agent with UC Functions + Genie + Vector Search</td>
-# MAGIC </tr>
-# MAGIC </table>
+# MAGIC   <h2 style="color: white; margin: 0 0 10px 0; font-family: 'DM Sans', sans-serif;">Lab 03 Complete — Session 5 Done</h2>
+# MAGIC   <table style="color: white; width: 100%; border-collapse: collapse; font-size: 0.95em;">
+# MAGIC     <tr style="border-bottom: 1px solid rgba(255,255,255,0.2);">
+# MAGIC       <td style="padding: 6px 10px; font-weight: bold; width: 35%;">MCP concept</td>
+# MAGIC       <td style="padding: 6px 10px;">Open standard — any MCP-compatible agent can reach your AEMO tools with no custom integration</td>
+# MAGIC     </tr>
+# MAGIC     <tr style="border-bottom: 1px solid rgba(255,255,255,0.2);">
+# MAGIC       <td style="padding: 6px 10px; font-weight: bold;">Three in-region servers</td>
+# MAGIC       <td style="padding: 6px 10px;">UC Functions (calculations) · Genie Space (NL-to-SQL) · Vector Search (documents)</td>
+# MAGIC     </tr>
+# MAGIC     <tr style="border-bottom: 1px solid rgba(255,255,255,0.2);">
+# MAGIC       <td style="padding: 6px 10px; font-weight: bold;">Tool discovery</td>
+# MAGIC       <td style="padding: 6px 10px;"><code style="color:#FF6B35;">DatabricksMCPClient.list_tools()</code> — the same list an agent sees before deciding what to call</td>
+# MAGIC     </tr>
+# MAGIC     <tr>
+# MAGIC       <td style="padding: 6px 10px; font-weight: bold;">Next session</td>
+# MAGIC       <td style="padding: 6px 10px;">Session 4 — build a full multi-tool LangGraph agent with UC Functions + Genie + Vector Search</td>
+# MAGIC     </tr>
+# MAGIC   </table>
 # MAGIC </div>
