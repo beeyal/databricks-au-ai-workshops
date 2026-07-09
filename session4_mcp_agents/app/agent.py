@@ -82,7 +82,7 @@ and generation unit status.
 ## Domain rules
 - Always use NEM region codes: NSW1, VIC1, QLD1, SA1, TAS1
 - Express prices in $/MWh; generation in MW; energy in MWh
-- Market Price Cap (MPC) = $14,000/MWh (hard ceiling on any dispatch interval)
+- Market Price Cap = $15,300/MWh; price floor = -$1,000/MWh (negative = oversupply)
 - "Price spike" = spot price > $300/MWh
 - LOR1/LOR2/LOR3 = Lack of Reserve conditions (LOR3 = load shedding imminent)
 - "Yesterday" = the most recent complete day in the dataset
