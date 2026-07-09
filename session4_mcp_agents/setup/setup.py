@@ -1,4 +1,13 @@
 # Databricks notebook source
+
+# MAGIC %pip install -q databricks-vectorsearch
+
+# COMMAND ----------
+
+# MAGIC %restart_python
+
+# COMMAND ----------
+
 # MAGIC %md
 # MAGIC <div style="background: linear-gradient(135deg, #1B3139 0%, #243447 100%); padding: 24px; border-radius: 8px; margin-bottom: 8px">
 # MAGIC   <h1 style="color: #FF6B35; margin: 0 0 8px 0; font-size: 26px">MCP Agents Setup</h1>
@@ -80,8 +89,22 @@ except Exception as exc:
 
 # COMMAND ----------
 
-spark.sql(f"CREATE CATALOG IF NOT EXISTS {CATALOG} COMMENT 'AU AI Workshops — energy sector sample data'")
-spark.sql(f"CREATE SCHEMA  IF NOT EXISTS {CATALOG}.{SCHEMA_AEMO} COMMENT 'AEMO NEM wholesale market data for Session 4 MCP labs'")
+# Create the catalog/schema only when missing. On a shared metastore the runner
+# may not hold CREATE CATALOG, and `CREATE ... IF NOT EXISTS` still evaluates that
+# privilege — so an existence check keeps setup re-runnable by non-admins.
+_catalogs = [r[0] for r in spark.sql("SHOW CATALOGS").collect()]
+if CATALOG not in _catalogs:
+    spark.sql(f"CREATE CATALOG IF NOT EXISTS {CATALOG} COMMENT 'AU AI Workshops — energy sector sample data'")
+    print(f"Created catalog {CATALOG}")
+else:
+    print(f"Catalog {CATALOG} already exists — skipping create")
+
+_schemas = [r[0] for r in spark.sql(f"SHOW SCHEMAS IN {CATALOG}").collect()]
+if SCHEMA_AEMO not in _schemas:
+    spark.sql(f"CREATE SCHEMA IF NOT EXISTS {CATALOG}.{SCHEMA_AEMO} COMMENT 'AEMO NEM wholesale market data for Session 4 MCP labs'")
+    print(f"Created schema {CATALOG}.{SCHEMA_AEMO}")
+else:
+    print(f"Schema {CATALOG}.{SCHEMA_AEMO} already exists — skipping create")
 print(f"✅ {CATALOG}.{SCHEMA_AEMO} ready")
 
 # COMMAND ----------
@@ -409,89 +432,46 @@ if participants:
 
 # COMMAND ----------
 
-import time
-import datetime
-from databricks.sdk import WorkspaceClient
-from databricks.sdk.service.vectorsearch import (
-    EndpointStatusState, EndpointType,
-    DeltaSyncVectorIndexSpecRequest, EmbeddingSourceColumn,
-    VectorIndexType, PipelineType,
-)
+# Use VectorSearchClient (databricks-vectorsearch) rather than the databricks-sdk
+# dataclasses: the SDK's EmbeddingSourceColumn signature varies across versions,
+# whereas the VectorSearchClient dict API is stable. *_and_wait handles polling.
+from databricks.vector_search.client import VectorSearchClient
 
-ws_sdk = WorkspaceClient()  # uses env/profile auth; no explicit token needed
-VS_INDEX_NAME  = f"{CATALOG}.{SCHEMA_AEMO}.aemo_market_notices_index"
+VS_INDEX_NAME   = f"{CATALOG}.{SCHEMA_AEMO}.aemo_market_notices_index"
 EMBEDDING_MODEL = "databricks-gte-large-en"  # in-region embedding model for AU East
 
-# Enable CDF on source table (required for Delta Sync index)
+# Delta Sync indexes require Change Data Feed on the source table.
 spark.sql(
     f"ALTER TABLE {CATALOG}.{SCHEMA_AEMO}.market_notices "
     f"SET TBLPROPERTIES (delta.enableChangeDataFeed = true)"
 )
 print(f"CDF enabled on {CATALOG}.{SCHEMA_AEMO}.market_notices")
 
-# Create endpoint if missing; get_endpoint raises if it doesn't exist
-try:
-    ep = ws_sdk.vector_search_endpoints.get_endpoint(VS_ENDPOINT)
-    print(f"VS endpoint '{VS_ENDPOINT}' exists (state={ep.endpoint_status.state})")
-except Exception:
-    print(f"Creating VS endpoint '{VS_ENDPOINT}'...")
-    ws_sdk.vector_search_endpoints.create_endpoint_and_wait(
-        name=VS_ENDPOINT,
-        endpoint_type=EndpointType.STANDARD,  # STANDARD supports both sync and delta-sync
-        timeout=datetime.timedelta(minutes=20),
-    )
+vsc = VectorSearchClient(disable_notice=True)
 
-# Poll until ONLINE — provisioning typically takes 3–5 min; 40×30 s = 20 min max
-for _ in range(40):
-    ep = ws_sdk.vector_search_endpoints.get_endpoint(VS_ENDPOINT)
-    if ep.endpoint_status.state == EndpointStatusState.ONLINE:
-        print(f"VS endpoint ONLINE.")
-        break
-    print(f"  waiting... state={ep.endpoint_status.state}")
-    time.sleep(30)  # 30-second poll interval
-else:
-    raise RuntimeError(f"Endpoint '{VS_ENDPOINT}' not ONLINE after 20 min.")
+existing = [e.get("name") for e in (vsc.list_endpoints() or {}).get("endpoints", [])]
+if VS_ENDPOINT not in existing:
+    print(f"Creating VS endpoint '{VS_ENDPOINT}' (typically 3-5 min)...")
+    vsc.create_endpoint_and_wait(name=VS_ENDPOINT, endpoint_type="STANDARD")
+print(f"VS endpoint '{VS_ENDPOINT}' ready.")
 
-# Re-use existing index if present; otherwise create with delta_sync spec
 try:
-    ws_sdk.vector_search_indexes.get_index(index_name=VS_INDEX_NAME)
-    print(f"VS index exists — triggering sync.")
-    ws_sdk.vector_search_indexes.sync_index(index_name=VS_INDEX_NAME)  # refresh embeddings
+    idx = vsc.get_index(endpoint_name=VS_ENDPOINT, index_name=VS_INDEX_NAME)
+    print("VS index exists — triggering a sync.")
+    idx.sync()
 except Exception:
-    ws_sdk.vector_search_indexes.create_index(
-        name=VS_INDEX_NAME,
+    print(f"Creating Delta Sync index '{VS_INDEX_NAME}' (backfill can take ~10 min)...")
+    vsc.create_delta_sync_index_and_wait(
         endpoint_name=VS_ENDPOINT,
-        index_type=VectorIndexType.DELTA_SYNC,  # syncs automatically from Delta table
-        delta_sync_index_spec=DeltaSyncVectorIndexSpecRequest(
-            source_table=f"{CATALOG}.{SCHEMA_AEMO}.market_notices",
-            primary_key="notice_id",  # must be unique; drives upsert/delete
-            pipeline_type=PipelineType.TRIGGERED,  # manual sync, not continuous
-            embedding_source_columns=[
-                EmbeddingSourceColumn(
-                    name="reason",  # free-text field to embed for semantic search
-                    embedding_model_endpoint_name=EMBEDDING_MODEL,
-                )
-            ],
-        ),
-    )
-    print(f"VS index creation triggered. Polling for ONLINE status (max 20 min)...")
-
-# Poll until ready_for_search — initial backfill can take up to 10 min
-for _ in range(40):
-    idx_info = ws_sdk.vector_search_indexes.get_index(index_name=VS_INDEX_NAME)
-    ready    = getattr(idx_info.status, "ready_for_search", False)  # attr absent until ONLINE
-    if ready:
-        print(f"VS index ONLINE and ready for search.")
-        break
-    print(f"  waiting... index not yet ready")
-    time.sleep(30)
-else:
-    raise RuntimeError(
-        f"VS index '{VS_INDEX_NAME}' not ONLINE after 20 min. "
-        f"Check the Vector Search UI for errors."
+        index_name=VS_INDEX_NAME,
+        source_table_name=f"{CATALOG}.{SCHEMA_AEMO}.market_notices",
+        pipeline_type="TRIGGERED",   # manual sync, not continuous
+        primary_key="notice_id",     # unique key; drives upsert/delete
+        embedding_source_column="reason",             # free-text field to embed
+        embedding_model_endpoint_name=EMBEDDING_MODEL,
     )
 
-print(f"\nVS index name: {VS_INDEX_NAME}")
+print(f"\nVS index ready: {VS_INDEX_NAME}")
 
 # COMMAND ----------
 

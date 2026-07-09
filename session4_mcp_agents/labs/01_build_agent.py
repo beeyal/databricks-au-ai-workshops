@@ -84,7 +84,7 @@
 
 # COMMAND ----------
 
-# MAGIC %pip install -q databricks-langchain "langgraph>=1.2" mlflow psycopg2-binary databricks-sdk
+# MAGIC %pip install -q databricks-langchain "langgraph>=1.2" mlflow psycopg2-binary databricks-sdk nest_asyncio
 # MAGIC %restart_python
 
 # COMMAND ----------
@@ -245,6 +245,8 @@ print(f"System prompt ready ({len(AEMO_SYSTEM_PROMPT):,} characters).")
 # COMMAND ----------
 
 import asyncio
+import nest_asyncio
+nest_asyncio.apply()  # allow asyncio.run() inside the notebook's running event loop
 from langchain_core.messages import HumanMessage, AIMessage
 from langgraph.prebuilt import create_react_agent
 from databricks_langchain import ChatDatabricks
@@ -260,11 +262,12 @@ async def run_agent(question: str, history: list | None = None, run_name: str = 
     that is prepended so the agent has conversational context. Section 4 wires this to Lakebase.
     """
     messages = list(history or []) + [HumanMessage(content=question)]
-    async with DatabricksMultiServerMCPClient(all_servers) as multi_client:
-        tools = await multi_client.get_tools()
-        agent = create_react_agent(model=llm, tools=tools, prompt=AEMO_SYSTEM_PROMPT)
-        with mlflow.start_run(run_name=run_name, nested=True):
-            result = await agent.ainvoke({"messages": messages})
+    # langchain-mcp-adapters >=0.1.0 removed context-manager support on the client.
+    multi_client = DatabricksMultiServerMCPClient(all_servers)
+    tools = await multi_client.get_tools()
+    agent = create_react_agent(model=llm, tools=tools, prompt=AEMO_SYSTEM_PROMPT)
+    with mlflow.start_run(run_name=run_name, nested=True):
+        result = await agent.ainvoke({"messages": messages})
     return result["messages"][-1].content
 
 

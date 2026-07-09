@@ -61,7 +61,7 @@
 
 # COMMAND ----------
 
-# MAGIC %pip install -q databricks-langchain "langgraph>=1.2" "mlflow>=3.0"
+# MAGIC %pip install -q databricks-langchain "langgraph>=1.2" "mlflow>=3.0" nest_asyncio
 # MAGIC %restart_python
 
 # COMMAND ----------
@@ -124,9 +124,17 @@ from pathlib import Path
 _candidates = [
     Path("../eval/golden_questions.jsonl"),
     Path.cwd().parent / "eval" / "golden_questions.jsonl",
-    Path("/Workspace") / "Repos",  # placeholder; falls through to the working candidate
 ]
-golden_path = next((p for p in _candidates if p.exists()), _candidates[0])
+try:  # resolve relative to this notebook's own workspace path (labs/ -> ../eval/)
+    _nb = dbutils.notebook.entry_point.getDbutils().notebook().getContext().notebookPath().get()
+    _candidates.append(Path("/Workspace" + _nb).parent.parent / "eval" / "golden_questions.jsonl")
+except Exception:
+    pass
+golden_path = next((p for p in _candidates if p.is_file()), None)
+if golden_path is None:
+    raise FileNotFoundError(
+        "golden_questions.jsonl not found — ensure the repo's eval/ folder sits next to labs/. "
+        "Tried: " + ", ".join(str(p) for p in _candidates))
 
 eval_dataset = []
 with open(golden_path) as f:
@@ -152,6 +160,8 @@ for i, row in enumerate(eval_dataset[:3], 1):
 # COMMAND ----------
 
 import asyncio
+import nest_asyncio
+nest_asyncio.apply()  # allow asyncio.run() inside the notebook's running event loop
 from langchain_core.messages import HumanMessage
 from langgraph.prebuilt import create_react_agent
 from databricks_langchain import (
@@ -178,10 +188,11 @@ if GENIE_MCP_URL:
 
 
 async def _answer(question: str) -> str:
-    async with DatabricksMultiServerMCPClient(all_servers) as client:
-        tools = await client.get_tools()
-        agent = create_react_agent(model=llm, tools=tools, prompt=AEMO_SYSTEM_PROMPT)
-        result = await agent.ainvoke({"messages": [HumanMessage(content=question)]})
+    # langchain-mcp-adapters >=0.1.0 removed context-manager support on the client.
+    client = DatabricksMultiServerMCPClient(all_servers)
+    tools = await client.get_tools()
+    agent = create_react_agent(model=llm, tools=tools, prompt=AEMO_SYSTEM_PROMPT)
+    result = await agent.ainvoke({"messages": [HumanMessage(content=question)]})
     return result["messages"][-1].content
 
 
