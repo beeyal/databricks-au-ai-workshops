@@ -53,7 +53,7 @@
 
 # COMMAND ----------
 
-# MAGIC %pip install -q databricks-langchain langgraph "mlflow>=3.0"
+# MAGIC %pip install -q databricks-langchain "langgraph>=1.2" "mlflow>=3.0"
 # MAGIC %restart_python
 
 # COMMAND ----------

@@ -84,7 +84,7 @@
 
 # COMMAND ----------
 
-# MAGIC %pip install -q databricks-langchain langgraph mlflow psycopg2-binary databricks-sdk
+# MAGIC %pip install -q databricks-langchain "langgraph>=1.2" mlflow psycopg2-binary databricks-sdk
 # MAGIC %restart_python
 
 # COMMAND ----------

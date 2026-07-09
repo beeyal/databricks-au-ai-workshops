@@ -9,13 +9,22 @@
 # MAGIC
 # MAGIC It:
 # MAGIC 1. Creates the `workshop_au.aemo` catalog and schema
-# MAGIC 2. Loads six AEMO tables from DBFS
+# MAGIC 2. Loads six AEMO tables from the staged CSVs — then shifts their dates so the data ends "today"
 # MAGIC 3. Sets column comments for Genie / MCP query quality
 # MAGIC 4. Checks your Provisioned Throughput endpoint is `READY`
-# MAGIC 5. Grants participant access (SELECT + CREATE TABLE — needed for MCP agent tools)
-# MAGIC 6. Prints MCP endpoint URLs for the labs
+# MAGIC 5. Grants participant access (SELECT + EXECUTE + CREATE TABLE — needed for MCP agent tools)
+# MAGIC 6. Creates the Vector Search endpoint and `aemo_market_notices_index`
+# MAGIC 7. Registers the NEM UC functions the agent calls as tools
+# MAGIC 8. Smoke-tests row counts
+# MAGIC 9. Prints MCP endpoint URLs for the labs
 # MAGIC
-# MAGIC Expected runtime: ~5 minutes
+# MAGIC **Prerequisites:**
+# MAGIC - The in-region PT serving endpoint (default `au_east_llm_inregion`) must already exist and be `READY`.
+# MAGIC - Stage the CSVs where this notebook can read them and set the `data_path` widget. On workspaces
+# MAGIC   where the DBFS root is disabled, stage them in a Unity Catalog **Volume** (e.g.
+# MAGIC   `/Volumes/workshop_au/aemo/raw`) and point `data_path` there instead of `dbfs:/...`.
+# MAGIC
+# MAGIC Expected runtime: ~5–10 minutes (the Vector Search index build is the long pole)
 
 # COMMAND ----------
 
@@ -392,7 +401,7 @@ if participants:
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC ## Step 6a: Create Vector Search endpoint and index
+# MAGIC ## Step 6: Create Vector Search endpoint and index
 # MAGIC
 # MAGIC Creates the `workshop_vs` endpoint (if missing) and a Delta Sync index on
 # MAGIC `market_notices.reason` using `databricks-gte-large-en` embeddings.
@@ -487,7 +496,7 @@ print(f"\nVS index name: {VS_INDEX_NAME}")
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC ## Step 6b: Register UC Functions for NEM calculations
+# MAGIC ## Step 7: Register UC Functions for NEM calculations
 # MAGIC
 # MAGIC Registers three functions in `{CATALOG}.{SCHEMA_AEMO}` and grants EXECUTE
 # MAGIC to all participant emails. Lab 02 and Lab 03 discover these via the UC
@@ -637,7 +646,7 @@ if participants:
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC ## Step 6: Smoke test — verify row counts
+# MAGIC ## Step 8: Smoke test — verify row counts
 
 # COMMAND ----------
 
@@ -675,7 +684,7 @@ else:
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC ## Step 7: MCP endpoint URLs for participants
+# MAGIC ## Step 9: MCP endpoint URLs for participants
 
 # COMMAND ----------
 
