@@ -295,7 +295,7 @@ else:
 # MAGIC | `service_name` | `mcpServer` for all MCP calls |
 # MAGIC | `action_name` | `mcpToolsCall` for tool invocations |
 # MAGIC | `request_params.toolName` | The specific MCP tool called |
-# MAGIC | `response.statusCode` | 200 = success, 4xx/5xx = error |
+# MAGIC | `response.status_code` | 200 = success, 4xx/5xx = error |
 
 # COMMAND ----------
 
@@ -305,7 +305,7 @@ else:
 # MAGIC   event_time,
 # MAGIC   user_identity.email       AS caller,
 # MAGIC   request_params.toolName   AS tool_name,
-# MAGIC   response.statusCode       AS http_status
+# MAGIC   response.status_code       AS http_status
 # MAGIC FROM system.access.audit
 # MAGIC WHERE service_name = 'mcpServer'
 # MAGIC   AND action_name  = 'mcpToolsCall'
@@ -326,8 +326,8 @@ try:
             request_params.toolName             AS tool_name,
             user_identity.email                 AS caller,
             COUNT(*)                            AS calls,
-            SUM(CASE WHEN response.statusCode = 200 THEN 1 ELSE 0 END) AS ok,
-            SUM(CASE WHEN response.statusCode != 200 THEN 1 ELSE 0 END) AS errors,
+            SUM(CASE WHEN response.status_code = 200 THEN 1 ELSE 0 END) AS ok,
+            SUM(CASE WHEN response.status_code != 200 THEN 1 ELSE 0 END) AS errors,
             MAX(event_time)                     AS last_seen
         FROM system.access.audit
         WHERE service_name = 'mcpServer'
