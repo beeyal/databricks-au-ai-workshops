@@ -465,23 +465,30 @@ Returns JSON: region, date, peak_price_mwh, peak_interval, avg_price_mwh, total_
 Not for trend analysis over time windows (use Genie for those).'
 LANGUAGE SQL
 RETURN (
+    -- Price and dispatch are aggregated in separate CTEs and combined via a
+    -- 1-row CROSS JOIN. (A correlated dispatch subquery nested inside the
+    -- aggregate SELECT trips SCALAR_SUBQUERY_IS_IN_GROUP_BY_OR_AGGREGATE_FUNCTION.)
+    WITH price AS (
+        SELECT round(max(rrp), 2)                              AS peak_price_mwh,
+               cast(max_by(settlement_date, rrp) AS STRING)    AS peak_interval,
+               round(avg(rrp), 2)                              AS avg_price_mwh
+        FROM   {CATALOG}.{SCHEMA_AEMO}.spot_prices
+        WHERE  region_id = region AND date(settlement_date) = date
+    ),
+    disp AS (
+        SELECT round(coalesce(sum(dispatch_mw), 0.0), 1)       AS total_dispatch_mw
+        FROM   {CATALOG}.{SCHEMA_AEMO}.dispatch_intervals
+        WHERE  region_id = region AND date(settlement_date) = date
+    )
     SELECT to_json(named_struct(
-        'region',           region,
-        'date',             date,
-        'peak_price_mwh',   round(max(sp.rrp), 2),
-        'peak_interval',    cast(max_by(sp.settlement_date, sp.rrp) AS STRING),  -- interval with highest RRP
-        'avg_price_mwh',    round(avg(sp.rrp), 2),
-        'total_dispatch_mw',round(coalesce((
-            -- Correlated subquery: sum 5-min dispatch across all DUIDs for the day
-            SELECT sum(di.dispatch_mw)
-            FROM   {CATALOG}.{SCHEMA_AEMO}.dispatch_intervals di
-            WHERE  di.region_id = region
-            AND    date(di.settlement_date) = date
-        ), 0.0), 1)  -- coalesce guards against regions with no dispatch rows
+        'region',            region,
+        'date',              date,
+        'peak_price_mwh',    price.peak_price_mwh,
+        'peak_interval',     price.peak_interval,
+        'avg_price_mwh',     price.avg_price_mwh,
+        'total_dispatch_mw', disp.total_dispatch_mw
     ))
-    FROM {CATALOG}.{SCHEMA_AEMO}.spot_prices sp
-    WHERE sp.region_id = region
-    AND   date(sp.settlement_date) = date
+    FROM price CROSS JOIN disp
 )
 """)
 
@@ -497,12 +504,19 @@ spike_count (>$300/MWh), peak_demand_interval, top_3_fuel_types.
 Not for single-day spot prices (use calculate_peak_demand). Not for market notices.'
 LANGUAGE SQL
 RETURN (
+    -- Each aggregate lives in its own CTE and the single-row results are
+    -- combined with CROSS JOIN, so no aggregate/scalar-subquery nesting.
     WITH sp AS (
-        -- Spot prices for the region within the rolling window
         SELECT *
         FROM   {CATALOG}.{SCHEMA_AEMO}.spot_prices
         WHERE  region_id = region
         AND    settlement_date >= date_sub(current_date(), days)
+    ),
+    price_agg AS (
+        SELECT round(avg(rrp), 2)                                        AS avg_price_mwh,
+               cast(sum(case when rrp > 300 then 1 else 0 end) AS INT)   AS spike_count,  -- $300/MWh threshold
+               cast(max_by(settlement_date, rrp) AS STRING)             AS peak_demand_interval
+        FROM   sp
     ),
     fuel AS (
         -- Top-3 fuel types by total MW dispatched in the window
@@ -514,19 +528,23 @@ RETURN (
         ORDER  BY total_mw DESC
         LIMIT  3
     ),
-    grand AS (SELECT sum(total_mw) AS grand_total FROM fuel)  -- denominator for % share
+    grand AS (SELECT sum(total_mw) AS grand_total FROM fuel),  -- denominator for % share
+    fuel_json AS (
+        SELECT collect_list(named_struct(
+                   'fuel_type', fuel.fuel_type,
+                   'pct',       round(fuel.total_mw / grand.grand_total * 100, 1)
+               )) AS top_fuel_types
+        FROM fuel CROSS JOIN grand  -- CROSS JOIN is safe: grand is 1 row
+    )
     SELECT to_json(named_struct(
         'region',               region,
         'days',                 days,
-        'avg_price_mwh',        round(avg(sp.rrp), 2),
-        'spike_count',          cast(sum(case when sp.rrp > 300 then 1 else 0 end) AS INT),  -- $300/MWh threshold
-        'peak_demand_interval', cast(max_by(sp.settlement_date, sp.rrp) AS STRING),
-        'top_fuel_types',       (SELECT collect_list(named_struct(
-                                    'fuel_type', fuel.fuel_type,
-                                    'pct',       round(fuel.total_mw / grand.grand_total * 100, 1)
-                                 )) FROM fuel CROSS JOIN grand)  -- CROSS JOIN is safe: grand is 1 row
+        'avg_price_mwh',        price_agg.avg_price_mwh,
+        'spike_count',          price_agg.spike_count,
+        'peak_demand_interval', price_agg.peak_demand_interval,
+        'top_fuel_types',       fuel_json.top_fuel_types
     ))
-    FROM sp
+    FROM price_agg CROSS JOIN fuel_json
 )
 """)
 

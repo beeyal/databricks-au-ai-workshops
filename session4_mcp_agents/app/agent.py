@@ -125,11 +125,19 @@ async def build_agent():
 
     host = _resolve_host()
 
-    uc_server = DatabricksMCPServer.from_uc_function(
-        catalog=CATALOG,
-        schema=SCHEMA_AEMO,
-        name="aemo-uc-tools",
-    )
+    # UC Functions MCP. Prefer the convenience constructor; fall back to the
+    # explicit URL form if the installed databricks_langchain lacks it.
+    try:
+        uc_server = DatabricksMCPServer.from_uc_function(
+            catalog=CATALOG,
+            schema=SCHEMA_AEMO,
+            name="aemo-uc-tools",
+        )
+    except (AttributeError, TypeError):
+        uc_server = DatabricksMCPServer(
+            name="aemo-uc-tools",
+            url=f"{host}/api/2.0/mcp/functions/{CATALOG}/{SCHEMA_AEMO}",
+        )
 
     servers = [uc_server]
 
@@ -141,14 +149,19 @@ async def build_agent():
             )
         )
 
-    vs_parts = VS_INDEX.split(".")
-    vs_url = f"{host}/api/2.0/mcp/vector-search/{'/'.join(vs_parts)}"
-    servers.append(
-        DatabricksMCPServer(
-            name="aemo-market-notices",
-            url=vs_url,
+    # Vector Search MCP is optional: only attach it when an index is configured
+    # and ENABLE_VS is not turned off. A missing index would otherwise fail tool
+    # discovery for the whole client. (Set ENABLE_VS=0 in environments without
+    # the index provisioned.)
+    if VS_INDEX and os.environ.get("ENABLE_VS", "1").lower() not in ("0", "false", "no"):
+        vs_parts = VS_INDEX.split(".")
+        vs_url = f"{host}/api/2.0/mcp/vector-search/{'/'.join(vs_parts)}"
+        servers.append(
+            DatabricksMCPServer(
+                name="aemo-market-notices",
+                url=vs_url,
+            )
         )
-    )
 
     client = DatabricksMultiServerMCPClient(servers)
     tools = await client.get_tools()
@@ -281,8 +294,6 @@ async def astream_answer(
 
     Sources are derived best-effort from Vector Search / Genie tool results.
     """
-    agent = await build_agent()
-
     input_messages = _history_to_messages(history)
     input_messages.append({"role": "user", "content": message})
 
@@ -292,6 +303,9 @@ async def astream_answer(
     announced_tools: set = set()
 
     try:
+        # Build inside the try so a construction failure (e.g. an MCP server or
+        # endpoint being unreachable) is surfaced to the client, not crashed.
+        agent = await build_agent()
         # stream_mode "messages" yields (message_chunk, metadata) tuples with
         # token-level deltas; "updates" yields node outputs (tool results).
         async for stream_mode, chunk in agent.astream(
