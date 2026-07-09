@@ -228,7 +228,7 @@ Vector Search  : {HOST}/api/2.0/mcp/vector-search/{VS_ENDPOINT}/{CATALOG}/{SCHEM
 | `settlement_amounts` | Energy / FCAS / interconnector settlement in AUD |
 
 UC Functions used as agent tools (registered by `setup/setup.py` in the `aemo` schema, exposed via
-the UC Functions MCP server): `calculate_peak_demand`, `count_price_spikes`, `get_generator_info`.
+the UC Functions MCP server): `calculate_peak_demand`, `get_region_summary`, `lookup_duid_info`.
 
 The golden evaluation set is `eval/golden_questions.jsonl` — 10 AEMO questions grounded in these
 tables, with `inputs` (question) and `expectations` (`expected_facts` + a directional reference

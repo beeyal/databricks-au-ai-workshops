@@ -84,14 +84,15 @@ print(f"App name       : {APP_NAME}")
 # MAGIC ```
 # MAGIC session4_mcp_agents/app/
 # MAGIC   app.yaml            # command, env vars, resource declarations
-# MAGIC   requirements.txt    # backend Python deps (databricks-langchain, langgraph, mlflow, ...)
-# MAGIC   backend/            # FastAPI server: /api/chat, /api/health; wraps the ReAct agent
-# MAGIC   frontend/           # React app (chat UI); built to static assets the backend serves
+# MAGIC   requirements.txt    # backend Python deps (fastapi, databricks-langchain, langgraph, ...)
+# MAGIC   server.py           # FastAPI server: /api/chat (SSE), /api/health; serves the built SPA
+# MAGIC   agent.py            # build_agent() + astream_answer() — the ReAct agent over the 3 MCP servers
+# MAGIC   frontend/           # React + Vite chat UI; `npm run build` emits static assets server.py serves
 # MAGIC     package.json
 # MAGIC     src/
 # MAGIC ```
-# MAGIC The backend reuses the Lab 01 agent code (ChatDatabricks on the PT endpoint + the three MCP
-# MAGIC servers) and, where enabled, the Lakebase memory table for multi-turn chat.
+# MAGIC `agent.py` reuses the Lab 01 pattern (ChatDatabricks on the PT endpoint + the three MCP servers)
+# MAGIC and `server.py` adds the Lakebase memory table for multi-turn chat.
 
 # COMMAND ----------
 
@@ -100,7 +101,7 @@ print(f"App name       : {APP_NAME}")
 # MAGIC The manifest declares the run command, environment variables, and — critically — the
 # MAGIC **resources** the app's service principal is granted at deploy time.
 # MAGIC ```yaml
-# MAGIC command: ["python", "backend/main.py"]
+# MAGIC command: ["python", "server.py"]
 # MAGIC
 # MAGIC env:
 # MAGIC   - name: PT_ENDPOINT
@@ -172,7 +173,7 @@ print(f"App name       : {APP_NAME}")
 # MAGIC ### 3.2 — Option B: Databricks CLI
 # MAGIC ```bash
 # MAGIC # 1. Sync the app source into the workspace
-# MAGIC databricks sync session4_mcp_agents/app "/Workspace/Users/<you>/aemo-app" --watch=false
+# MAGIC databricks sync session4_mcp_agents/app "/Workspace/Users/<you>/aemo-app" --full
 # MAGIC
 # MAGIC # 2. Create the app (first time only)
 # MAGIC databricks apps create aemo-operations-agent
@@ -218,7 +219,7 @@ except Exception as e:
 # MAGIC ### 4.1 — Health check `/api/health`
 # MAGIC The backend exposes a health endpoint. From a terminal:
 # MAGIC ```bash
-# MAGIC APP_URL=$(databricks apps get aemo-operations-agent | python -c "import sys,json;print(json.load(sys.stdin)['url'])")
+# MAGIC APP_URL=$(databricks apps get aemo-operations-agent -o json | python -c "import sys,json;print(json.load(sys.stdin)['url'])")
 # MAGIC curl -s -H "Authorization: Bearer $DATABRICKS_TOKEN" "$APP_URL/api/health"
 # MAGIC # expect: {"status":"ok"}
 # MAGIC ```
