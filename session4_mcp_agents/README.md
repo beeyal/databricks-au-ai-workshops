@@ -5,6 +5,7 @@
 **Duration:** ~2.5–3 hours
 **Audience:** Data engineers, analysts, and ML engineers building their first governed agent on Databricks
 **Format:** Hands-on coding labs with step-by-step UI guidance
+**Slides:** [Building Agents, MCPs & Apps](https://docs.google.com/presentation/d/1vwV4xr3xFJ6ypqL0hKe-up7hH0rsGEvCraEfwGbQQ4M/edit) (Google Slides)
 
 ---
 
