@@ -79,6 +79,7 @@ Virtual session: 24 June 09:00–12:00 AEST. Contact your Databricks account tea
 **Level:** 200 (guided) · **Duration:** ~2.5–3 hours
 
 **Slide deck:** https://docs.google.com/presentation/d/1vwV4xr3xFJ6ypqL0hKe-up7hH0rsGEvCraEfwGbQQ4M/edit
+⚠️ **Stale — predates the Level 200 lifecycle rework.** The deck is the older "MCP fundamentals" structure: no Build→Evaluate→Govern→Deploy→Improve spine, **no Evaluate (MLflow judges) or Improve (feedback loop) content, no Lakebase memory, deploy not framed as a React app**, and it still references the **SOCI Act** (removed everywhere else). Rebuild to match the labs before delivering.
 
 Reframed around the agent lifecycle **Build → Evaluate → Govern → Deploy → Improve** — one lab per phase, Lab 05 loops back to Lab 02.
 
@@ -171,6 +172,6 @@ Revokes participant grants on the AEMO Genie Space and schema. Does not drop any
 | Session 1 — Governance & Controls | [Google Slides](https://docs.google.com/presentation/d/18FVU2dVZYdS0ijOMk325LV3m-ktn-_lNb3Zsn2McEhk/edit) | Ready |
 | Session 2 — Building Your Genie Space | TBD | To be created |
 | Session 3 — LDT Line-of-Business Training | Owned by LDT team | LDT team |
-| Session 4 — Building Agents, MCPs & Apps | [Google Slides](https://docs.google.com/presentation/d/1vwV4xr3xFJ6ypqL0hKe-up7hH0rsGEvCraEfwGbQQ4M/edit) | Ready |
+| Session 4 — Building Agents, MCPs & Apps | [Google Slides](https://docs.google.com/presentation/d/1vwV4xr3xFJ6ypqL0hKe-up7hH0rsGEvCraEfwGbQQ4M/edit) | ⚠️ Stale — predates L200 rework (rebuild) |
 | Session 5 — Extending Genie Code | TBD | To be created |
 | Session 6 — AI Ideation and Building | TBD | To be created |
