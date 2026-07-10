@@ -47,6 +47,23 @@ result (the ReAct loop) until it can answer.
 
 ---
 
+## Getting started
+
+1. **Facilitator (once, before the session):** run `setup/setup.py`. It creates the sample data, the
+   Vector Search index, and the UC functions, and grants participants access. See the notebook header
+   for prerequisites (an in-region PT endpoint that's `READY`, and the CSVs staged to DBFS or a UC Volume).
+2. **Participants:** open the `labs/` folder and work through the notebooks **in order, 01 → 05**. Each
+   one is a Databricks notebook — attach it to serverless (or a cluster), set the widgets at the top
+   (the defaults match setup), and run the cells top to bottom. Every lab ends by pointing you to the next.
+3. Lab 04 also builds and deploys the React app in `app/`.
+
+**New to the terms?** *PT endpoint* = a provisioned-throughput model-serving endpoint that runs
+in-region; *Genie* = natural-language-to-SQL over your tables; *MCP* = the open tool protocol the agent
+uses to call Genie / Vector Search / UC Functions; *Lakebase* = managed Postgres that stores the agent's
+conversation memory. Each is explained again where it first appears.
+
+---
+
 ## Australia East residency (read this first)
 
 This workshop exists because of a hard rule: **model calls must stay in Australia East**. AEMO

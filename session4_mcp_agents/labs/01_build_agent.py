@@ -91,6 +91,14 @@
 
 # MAGIC %md
 # MAGIC ### Configuration
+# MAGIC Set these widgets (they appear at the top after you run this cell), then re-run. The defaults
+# MAGIC match the setup notebook, so usually you only touch two:
+# MAGIC - **`pt_endpoint`** — your in-region provisioned-throughput endpoint from setup (default
+# MAGIC   `au_east_llm_inregion`).
+# MAGIC - **`genie_space_id`** — the AEMO Genie Space from Session 2. Find the ID in the Space's browser
+# MAGIC   URL: `.../genie/spaces/<SPACE_ID>`. **Leave it blank** to run with just UC Functions + Vector
+# MAGIC   Search — the agent still works, but the Genie question in Section 3 will be handled by another
+# MAGIC   tool instead of Genie.
 
 # COMMAND ----------
 

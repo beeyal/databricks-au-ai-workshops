@@ -34,6 +34,11 @@
 # MAGIC - Stage the CSVs where this notebook can read them and set the `data_path` widget. On workspaces
 # MAGIC   where the DBFS root is disabled, stage them in a Unity Catalog **Volume** (e.g.
 # MAGIC   `/Volumes/workshop_au/aemo/raw`) and point `data_path` there instead of `dbfs:/...`.
+# MAGIC - Set the `participant_emails` widget (comma-separated) — Step 5 grants those users access.
+# MAGIC   Leave it blank to skip grants (e.g. a solo test run).
+# MAGIC
+# MAGIC **Before you run:** set the widgets at the top of the notebook (they appear once you run the
+# MAGIC first cell), then Run All.
 # MAGIC
 # MAGIC Expected runtime: ~5–10 minutes (the Vector Search index build is the long pole)
 
@@ -46,7 +51,7 @@ dbutils.widgets.text("pt_endpoint",       "au_east_llm_inregion",    "PT endpoin
 dbutils.widgets.text("vs_endpoint",       "workshop_vs",             "Vector Search endpoint name")
 dbutils.widgets.text("genie_space_id",    "",                        "Genie Space ID (optional — for MCP URL)")
 dbutils.widgets.text("participant_emails","",                        "Participant emails (comma-separated)")
-dbutils.widgets.text("data_path",         "dbfs:/tmp/au_workshop/sample_data/aemo", "DBFS path to AEMO CSVs")
+dbutils.widgets.text("data_path",         "dbfs:/tmp/au_workshop/sample_data/aemo", "Staged CSV path (DBFS or UC Volume)")
 
 CATALOG          = dbutils.widgets.get("catalog")
 SCHEMA_AEMO      = dbutils.widgets.get("schema_aemo")
@@ -65,7 +70,7 @@ print(f"PT endpoint: {PT_ENDPOINT}")
 print(f"VS endpoint: {VS_ENDPOINT}")
 print(f"Data path  : {DATA_PATH}")
 print()
-print("Upload AEMO CSVs to DBFS first if not already there:")
+print("Stage the AEMO CSVs first (to DBFS or a UC Volume) if not already there, e.g.:")
 print(f"  databricks fs cp -r ./data/sample_data/aemo/ {DATA_PATH}/")
 
 # COMMAND ----------
